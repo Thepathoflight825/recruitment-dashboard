@@ -217,7 +217,13 @@ async function initDashboard() {
   setSyncStatus('⟳ 連線中', '#EF9F27');
   hideError();
 
-  if (typeof window.h5sdk !== 'undefined') {
+  // 偵測 Lark 注入的全域物件
+  const larkGlobals = ['h5sdk','tt','lark','feishu','larksdk','LarkWebApp'].filter(k => typeof window[k] !== 'undefined');
+  console.log('Lark globals found:', larkGlobals, '| UA:', navigator.userAgent.substring(0,80));
+  document.getElementById('last-updated').textContent = 'globals: ' + (larkGlobals.join(',') || 'none') + ' | ' + navigator.userAgent.substring(0,40);
+
+  const isInLark = larkGlobals.length > 0 || navigator.userAgent.includes('Lark') || navigator.userAgent.includes('Feishu');
+  if (isInLark) {
     await loadViaSDK();
   } else {
     showInfo('⚠️ 請在 Lark 應用程式內開啟此儀表板，才能讀取真實資料。目前顯示示範資料。');
