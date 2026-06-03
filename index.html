@@ -221,7 +221,7 @@ const TABLE_IDS = {
 };
 // ══════════════════════════════════════
 
-const STAGE_ORDER = ['收件總數','HR初篩通過','主管篩選通過','電訪','初試','複試','錄取','到職'];
+const STAGE_ORDER = ['收件總數','AI評分通過','HR推薦','主管篩選通過','電訪','初試','複試','錄取','到職'];
 const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal' };
 
@@ -253,19 +253,50 @@ async function initDashboard() {
 // ── Lark PC 取得 Token（使用 __Lark_Bridge__）──
 async function loadViaSDK() {
   try {
-    // 方法一：從 URL 參數取得 token（Lark 開啟網頁應用時會附加）
-    const urlParams = new URLSearchParams(window.location.search);
-    const allParams = [...urlParams.entries()].map(([k,v]) => k + '=' + v.substring(0,20)).join(' | ');
-    const fullUrl = window.location.href.substring(0,200);
-    
-    // 方法二：檢查 __LarkPCSDK__.bridge.config 的結構
+    // 深度掃描所有 window 物件尋找 token
+    const scanObj = (obj, depth, path) => {
+      if (!obj || depth > 2) return null;
+      try {
+        for (const k of Object.keys(obj).slice(0,20)) {
+          const v = obj[k];
+          const fullPath = path + '.' + k;
+          if (typeof v === 'string' && v.length > 30 && v.length < 500 &&
+              (k.toLowerCase().includes('token') || k.toLowerCase().includes('access'))) {
+            return fullPath + '=' + String(v).slice(0,20) + '...';
+          }
+          if (typeof v === 'object' && v !== null && depth < 2) {
+            const found = scanObj(v, depth+1, fullPath);
+            if (found) return found;
+          }
+        }
+      } catch(e) {}
+      return null;
+    };
+
+    // 掃描已知的 Lark 物件
+    const larkObjs = ['__LarkPCSDK__','__Lark_Bridge__','lark_to_bear_bridge'].filter(k=>window[k]);
+    let scanResult = null;
+    for (const k of larkObjs) {
+      scanResult = scanObj(window[k], 0, k);
+      if (scanResult) break;
+    }
+
+    // 也嘗試直接讀取 __LarkPCSDK__.bridge.config
     const pcSdk = window.__LarkPCSDK__;
-    const configKeys = pcSdk?.bridge?.config ? Object.keys(pcSdk.bridge.config).join(',') : 'no config';
-    const configStr = pcSdk?.bridge?.config ? JSON.stringify(pcSdk.bridge.config).substring(0,200) : 'empty';
+    const bridgeCfg = pcSdk?.bridge?.config;
+    const cfgStr = bridgeCfg ? JSON.stringify(bridgeCfg).slice(0,200) : 'no bridge config';
+    
+    // 嘗試從 cookie 或 localStorage 取 token（某些版本 Lark 會存在這裡）
+    let cookieToken = null;
+    try {
+      const cookies = document.cookie;
+      const match = cookies.match(/user_access_token=([^;]+)/);
+      if (match) cookieToken = match[1].slice(0,20) + '...';
+    } catch(e) {}
 
-    throw new Error('URL params: ' + (allParams || 'none') + ' | URL: ' + fullUrl + ' | config: ' + configStr);
+    throw new Error('scanResult: ' + (scanResult||'none') + ' | bridgeCfg: ' + cfgStr + ' | cookie: ' + (cookieToken||'none'));
 
-    if (!userAccessToken) throw new Error('Token 為空');
+    if (!userAccessToken) throw new Error('Token 為空（偵錯完成）');
 
     await fetchAllTables();
     renderAll();
@@ -461,7 +492,7 @@ function renderFunnelBars() {
   const fs = getFilteredStats();
   const fc = getFilteredCandidates();
   const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
-  const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR初篩通過'))||0), 0);
+  const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
   // 從篩選後招募名單取得後五層
@@ -469,14 +500,15 @@ function renderFunnelBars() {
   fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
 
   const FULL_STAGES = [
-    { label:'📥 收件總數',    n: statsTotal || fc.length, src:'履歷收件統計', color:'#3B8BD4' },
-    { label:'✅ HR初篩通過',  n: statsHR    || fc.length, src:'履歷收件統計', color:'#2E86C1' },
+    { label:'📥 收件總數',     n: statsTotal || fc.length, src:'履歷收件統計', color:'#3B8BD4' },
+    { label:'🤖 AI評分通過',   n: fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分通過'))||0),0) || statsTotal || fc.length, src:'履歷收件統計', color:'#2874A6' },
+    { label:'✅ HR推薦',       n: statsHR    || fc.length, src:'履歷收件統計', color:'#1A5276' },
     { label:'👔 主管篩選通過', n: statsMgr   || fc.length, src:'履歷收件統計', color:'#1D9E75' },
-    { label:'📞 電訪',        n: stageMap['電訪'], src:'招募名單', color:'#27AE60' },
-    { label:'🤝 初試',        n: stageMap['初試'], src:'招募名單', color:'#EF9F27' },
-    { label:'🔄 複試',        n: stageMap['複試'], src:'招募名單', color:'#E67E22' },
-    { label:'🎉 錄取',        n: stageMap['錄取'], src:'招募名單', color:'#639922' },
-    { label:'🏢 到職',        n: stageMap['到職'], src:'招募名單', color:'#534AB7' },
+    { label:'📞 電訪',         n: stageMap['電訪'], src:'招募名單', color:'#27AE60' },
+    { label:'🤝 初試',         n: stageMap['初試'], src:'招募名單', color:'#EF9F27' },
+    { label:'🔄 複試',         n: stageMap['複試'], src:'招募名單', color:'#E67E22' },
+    { label:'🎉 錄取',         n: stageMap['錄取'], src:'招募名單', color:'#639922' },
+    { label:'🏢 到職',         n: stageMap['到職'], src:'招募名單', color:'#534AB7' },
   ];
 
   const max = Math.max(...FULL_STAGES.map(s=>s.n), 1);
