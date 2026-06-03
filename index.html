@@ -189,7 +189,7 @@
 </div>
 
 <!-- Lark JS SDK -->
-<script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js" type="module" id="lark-sdk-cn"></script>
+<script src="https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js" type="module" id="lark-sdk-cn"></script>
 
 <script>
 // ══════════════════════════════════════
@@ -235,10 +235,10 @@ async function loadViaSDK() {
     // 動態 import Lark SDK
     let lark;
     try {
-      lark = await import('https://lf-package-cn.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
+      lark = await import('https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
     } catch(e) {
       // 嘗試備用 CDN（海外 Lark）
-      lark = await import('https://lf1-cdn-tos.bytegoofy.com/goofy/lark/op/h5-js-sdk-v2.2.0/openPlatformH5JsSdk.esm.js');
+      lark = await import('https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
     }
 
     await lark.default.ready();
