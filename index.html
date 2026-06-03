@@ -7,16 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-  /* ── 設定區（唯一需要修改的地方）── */
-  /* 請將下方 YOUR_APP_SECRET_HERE 替換為你的完整 App Secret */
-
   :root {
-    --app-id: "cli_aa952ef73cf85ed0";
-    --base-token: "E3X4blbxWa4DaLsSxsClZ3KbgYb";
-    --table-id: "tbl9yLmC7gMtdN6A";
-    --phone-table-id: "請填入電訪紀錄的table ID";
-    --interview-table-id: "請填入面談紀錄的table ID";
-
     --navy: #1a1a2e;
     --blue: #185FA5;
     --blue-light: #E6F1FB;
@@ -31,297 +22,100 @@
     --text: #1a1a2e;
     --text-sub: #888780;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
 
-  body {
-    font-family: 'Noto Sans TC', sans-serif;
-    background: #F2F1EC;
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ── Header ── */
   .header {
-    background: var(--navy);
-    padding: 0 28px;
-    display: flex;
-    align-items: stretch;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    background: var(--navy); padding: 0 24px;
+    display: flex; align-items: stretch; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
   }
-  .header-left {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 16px 0;
-  }
-  .header-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
-  .header-sub { font-size: 12px; color: #6c9bc8; margin-top: 2px; }
+  .header-left { display: flex; flex-direction: column; justify-content: center; padding: 14px 0; }
+  .header-title { font-size: 17px; font-weight: 700; color: #fff; }
+  .header-sub { font-size: 11px; color: #6c9bc8; margin-top: 2px; }
   .header-tabs { display: flex; align-items: flex-end; gap: 2px; }
-  .tab {
-    padding: 12px 20px 10px;
-    font-size: 13px;
-    color: #8899aa;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all .2s;
-    white-space: nowrap;
-    font-weight: 500;
-  }
+  .tab { padding: 12px 18px 10px; font-size: 13px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
   .tab.active { color: #fff; border-bottom-color: #378ADD; }
   .tab:hover:not(.active) { color: #ccc; }
-  .header-right { display: flex; align-items: center; gap: 12px; }
-  .sync-badge {
-    font-size: 11px; color: #5DCAA5;
-    background: rgba(29,158,117,.12);
-    border: 0.5px solid #5DCAA5;
-    border-radius: 6px;
-    padding: 4px 10px;
-    white-space: nowrap;
-  }
-  .refresh-btn {
-    background: rgba(255,255,255,.08);
-    border: 0.5px solid rgba(255,255,255,.2);
-    border-radius: 6px;
-    color: #fff;
-    font-size: 12px;
-    padding: 5px 14px;
-    cursor: pointer;
-    transition: background .2s;
-    font-family: 'Noto Sans TC', sans-serif;
-  }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .sync-badge { font-size: 11px; color: #5DCAA5; background: rgba(29,158,117,.12); border: 0.5px solid #5DCAA5; border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+  .refresh-btn { background: rgba(255,255,255,.08); border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; color: #fff; font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
   .refresh-btn:hover { background: rgba(255,255,255,.15); }
 
-  /* ── Main ── */
-  .main { padding: 20px 28px 40px; max-width: 1200px; margin: 0 auto; }
+  .main { padding: 18px 24px 40px; max-width: 1200px; margin: 0 auto; }
 
-  /* ── Stat Cards ── */
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
-  }
-  .stat-card {
-    background: #fff;
-    border-radius: 12px;
-    border: 0.5px solid var(--border);
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
-    animation: fadeUp .4s ease both;
-  }
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-  }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 16px 18px; position: relative; overflow: hidden; animation: fadeUp .4s ease both; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
   .stat-card.blue::before { background: var(--blue); }
   .stat-card.teal::before { background: var(--teal); }
   .stat-card.amber::before { background: var(--amber); }
   .stat-card.red::before { background: var(--red); }
-  .stat-label { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
-  .stat-value { font-size: 32px; font-weight: 700; color: var(--navy); line-height: 1; }
-  .stat-sub { font-size: 11px; color: #b4b2a9; margin-top: 6px; }
-  .stat-icon { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 28px; opacity: .12; }
+  .stat-label { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+  .stat-value { font-size: 30px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .stat-sub { font-size: 11px; color: #b4b2a9; margin-top: 5px; }
+  .stat-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 26px; opacity: .1; }
 
-  /* ── Section Panels ── */
-  .panel-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .panel-grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .panel {
-    background: #fff;
-    border-radius: 12px;
-    border: 0.5px solid var(--border);
-    padding: 20px;
-    animation: fadeUp .5s ease both;
-  }
-  .panel-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .panel-title span { font-size: 16px; }
+  .panel-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 18px; animation: fadeUp .5s ease both; }
+  .panel-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
 
-  /* ── Table ── */
-  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .data-table th {
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-sub);
-    background: var(--gray);
-    border-bottom: 0.5px solid var(--border);
-    white-space: nowrap;
-  }
-  .data-table td {
-    padding: 10px 12px;
-    border-bottom: 0.5px solid #F1EFE8;
-    color: #333;
-  }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { text-align: left; padding: 7px 10px; font-size: 11px; font-weight: 500; color: var(--text-sub); background: var(--gray); border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  .data-table td { padding: 9px 10px; border-bottom: 0.5px solid #F1EFE8; color: #333; }
   .data-table tr:last-child td { border-bottom: none; }
   .data-table tr:hover td { background: #FAFAF8; }
 
-  /* ── Badges ── */
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-  }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; }
   .badge-blue { background: var(--blue-light); color: var(--blue); }
   .badge-teal { background: var(--teal-light); color: var(--teal); }
   .badge-amber { background: var(--amber-light); color: #854F0B; }
   .badge-red { background: var(--red-light); color: #A32D2D; }
   .badge-gray { background: #F1EFE8; color: #5F5E5A; }
 
-  /* ── Funnel ── */
-  .funnel-row { margin-bottom: 12px; }
-  .funnel-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #555;
-    margin-bottom: 4px;
-  }
-  .funnel-bar-bg {
-    height: 28px;
-    background: var(--gray);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .funnel-bar-fill {
-    height: 100%;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    padding-left: 10px;
-    transition: width .8s ease;
-    min-width: 0;
-  }
+  .funnel-row { margin-bottom: 10px; }
+  .funnel-label { display: flex; justify-content: space-between; font-size: 12px; color: #555; margin-bottom: 3px; }
+  .funnel-bar-bg { height: 26px; background: var(--gray); border-radius: 5px; overflow: hidden; }
+  .funnel-bar-fill { height: 100%; border-radius: 5px; display: flex; align-items: center; padding-left: 8px; transition: width .8s ease; }
   .funnel-bar-fill span { font-size: 11px; color: #fff; font-weight: 600; }
 
-  /* ── Loading / Error ── */
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 200px;
-    color: var(--text-sub);
-    font-size: 14px;
-    gap: 10px;
-  }
-  .spinner {
-    width: 20px; height: 20px;
-    border: 2px solid var(--border);
-    border-top-color: var(--blue);
-    border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-  .error-box {
-    background: var(--red-light);
-    border: 0.5px solid #F7C1C1;
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-size: 13px;
-    color: #A32D2D;
-    margin-bottom: 16px;
-  }
-  .config-box {
-    background: var(--amber-light);
-    border: 0.5px solid #FAC775;
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-size: 13px;
-    color: #633806;
-    margin-bottom: 16px;
-  }
-  .config-box code {
-    background: rgba(0,0,0,.08);
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-  }
+  .loading { display: flex; align-items: center; justify-content: center; height: 160px; color: var(--text-sub); font-size: 13px; gap: 8px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
 
-  /* ── Tab content ── */
+  .error-box { background: var(--red-light); border: 0.5px solid #F7C1C1; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #A32D2D; margin-bottom: 14px; }
+  .info-box { background: var(--amber-light); border: 0.5px solid #FAC775; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #633806; margin-bottom: 14px; }
+
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 
-  /* ── Score bar ── */
-  .score-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .score-label { font-size: 11px; color: var(--text-sub); width: 80px; text-align: right; flex-shrink: 0; }
-  .score-bar-bg { flex: 1; height: 6px; background: var(--gray); border-radius: 3px; overflow: hidden; }
+  .score-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+  .score-label { font-size: 11px; color: var(--text-sub); width: 75px; text-align: right; flex-shrink: 0; }
+  .score-bar-bg { flex: 1; height: 5px; background: var(--gray); border-radius: 3px; overflow: hidden; }
   .score-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
-  .score-val { font-size: 11px; font-weight: 700; color: var(--navy); width: 28px; }
+  .score-val { font-size: 11px; font-weight: 700; color: var(--navy); width: 26px; }
 
-  /* ── KPI table ── */
-  .kpi-row {
-    display: flex;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 0.5px solid #F1EFE8;
-    gap: 12px;
-  }
+  .kpi-row { display: flex; align-items: center; padding: 9px 0; border-bottom: 0.5px solid #F1EFE8; gap: 10px; }
   .kpi-row:last-child { border-bottom: none; }
-  .kpi-name { flex: 1; font-size: 13px; color: var(--navy); font-weight: 500; }
+  .kpi-name { flex: 1; font-size: 12px; color: var(--navy); font-weight: 500; }
   .kpi-target { font-size: 11px; color: var(--text-sub); }
-  .kpi-value { font-size: 20px; font-weight: 700; min-width: 60px; text-align: right; }
+  .kpi-value { font-size: 18px; font-weight: 700; min-width: 55px; text-align: right; }
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Modal ── */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.45);
-    z-index: 200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; display: none; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
-  .modal {
-    background: #fff;
-    border-radius: 16px;
-    padding: 24px;
-    width: 520px;
-    max-width: 90vw;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 16px;
-  }
-  .modal-close {
-    background: none; border: none;
-    font-size: 20px; cursor: pointer;
-    color: var(--text-sub); line-height: 1;
-  }
+  .modal { background: #fff; border-radius: 14px; padding: 22px; width: 500px; max-width: 92vw; max-height: 82vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-sub); line-height: 1; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 
-<!-- ══ HEADER ══ -->
 <div class="header">
   <div class="header-left">
     <div class="header-title">招募管理儀表板</div>
-    <div class="header-sub" id="last-updated">載入中...</div>
+    <div class="header-sub" id="last-updated">連線中...</div>
   </div>
   <div class="header-tabs">
     <div class="tab active" onclick="switchTab('overview')">總覽</div>
@@ -330,572 +124,383 @@
     <div class="tab" onclick="switchTab('kpi')">本月 KPI</div>
   </div>
   <div class="header-right">
-    <span class="sync-badge" id="sync-status">⚡ 連線中...</span>
-    <button class="refresh-btn" onclick="loadAllData()">↻ 重新整理</button>
+    <span class="sync-badge" id="sync-status">⟳ 連線中</span>
+    <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
 </div>
 
-<!-- ══ MAIN ══ -->
 <div class="main">
+  <div id="error-box" class="error-box" style="display:none"></div>
+  <div id="info-box" class="info-box" style="display:none"></div>
 
-  <!-- Config warning -->
-  <div class="config-box" id="config-warning" style="display:none">
-    ⚙️ 請設定：在程式碼第 30 行填入完整的 <code>App Secret</code>，以及電訪紀錄和面談紀錄的 Table ID（從多維表格網址取得）。
-  </div>
-
-  <div class="error-box" id="error-box" style="display:none"></div>
-
-  <!-- ── Tab: 總覽 ── -->
+  <!-- 總覽 -->
   <div class="tab-content active" id="tab-overview">
-
-    <!-- Stat Cards -->
     <div class="stat-grid">
-      <div class="stat-card blue">
-        <div class="stat-label">本月履歷總數</div>
-        <div class="stat-value" id="stat-total">—</div>
-        <div class="stat-sub" id="stat-total-sub">載入中</div>
-        <div class="stat-icon">📄</div>
-      </div>
-      <div class="stat-card teal">
-        <div class="stat-label">電訪完成</div>
-        <div class="stat-value" id="stat-phone">—</div>
-        <div class="stat-sub" id="stat-phone-sub">載入中</div>
-        <div class="stat-icon">📞</div>
-      </div>
-      <div class="stat-card amber">
-        <div class="stat-label">進行中</div>
-        <div class="stat-value" id="stat-inprogress">—</div>
-        <div class="stat-sub">待後續安排</div>
-        <div class="stat-icon">⏳</div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-label">應徵者婉拒</div>
-        <div class="stat-value" id="stat-declined">—</div>
-        <div class="stat-sub">本月流失</div>
-        <div class="stat-icon">❌</div>
-      </div>
+      <div class="stat-card blue"><div class="stat-label">本月履歷總數</div><div class="stat-value" id="s-total">—</div><div class="stat-sub" id="s-total-sub">載入中</div><div class="stat-icon">📄</div></div>
+      <div class="stat-card teal"><div class="stat-label">電訪完成</div><div class="stat-value" id="s-phone">—</div><div class="stat-sub" id="s-phone-sub">載入中</div><div class="stat-icon">📞</div></div>
+      <div class="stat-card amber"><div class="stat-label">進行中</div><div class="stat-value" id="s-progress">—</div><div class="stat-sub">待後續安排</div><div class="stat-icon">⏳</div></div>
+      <div class="stat-card red"><div class="stat-label">應徵者婉拒</div><div class="stat-value" id="s-declined">—</div><div class="stat-sub">本月流失</div><div class="stat-icon">❌</div></div>
     </div>
-
-    <!-- Charts row -->
     <div class="panel-grid-2">
-      <div class="panel">
-        <div class="panel-title"><span>📊</span>各關卡人數分佈</div>
-        <canvas id="chart-funnel" height="180"></canvas>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span>🔵</span>履歷來源分佈</div>
-        <canvas id="chart-source" height="180"></canvas>
-      </div>
+      <div class="panel"><div class="panel-title">📊 各關卡人數分佈</div><canvas id="chart-funnel" height="190"></canvas></div>
+      <div class="panel"><div class="panel-title">🔵 履歷來源分佈</div><canvas id="chart-source" height="190"></canvas></div>
     </div>
-
-    <!-- Recent candidates -->
-    <div class="panel">
-      <div class="panel-title"><span>👤</span>最新應徵者狀態</div>
-      <div id="recent-table-wrap">
-        <div class="loading"><div class="spinner"></div>載入資料中...</div>
-      </div>
-    </div>
+    <div class="panel"><div class="panel-title">👤 最新應徵者狀態</div><div id="recent-wrap"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
   </div>
 
-  <!-- ── Tab: 應徵者名單 ── -->
+  <!-- 應徵者名單 -->
   <div class="tab-content" id="tab-candidates">
     <div class="panel">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <div class="panel-title" style="margin-bottom:0"><span>📋</span>應徵者完整名單</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap" id="filter-bar"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="panel-title" style="margin-bottom:0">📋 完整名單</div>
+        <div id="filter-bar" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
-      <div id="full-table-wrap">
-        <div class="loading"><div class="spinner"></div>載入資料中...</div>
-      </div>
+      <div id="full-wrap"><div class="loading"><div class="spinner"></div>載入中...</div></div>
     </div>
   </div>
 
-  <!-- ── Tab: 漏斗分析 ── -->
+  <!-- 漏斗分析 -->
   <div class="tab-content" id="tab-funnel">
     <div class="panel-grid-2">
-      <div class="panel">
-        <div class="panel-title"><span>🔻</span>招募漏斗</div>
-        <div id="funnel-bars"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span>📝</span>流失分析</div>
-        <div id="loss-analysis"></div>
-      </div>
+      <div class="panel"><div class="panel-title">🔻 招募漏斗</div><div id="funnel-bars"></div></div>
+      <div class="panel"><div class="panel-title">📝 流失分析</div><div id="loss-wrap"></div></div>
     </div>
-    <div class="panel">
-      <div class="panel-title"><span>⭐</span>電訪評分摘要</div>
-      <div id="phone-scores"></div>
-    </div>
+    <div class="panel"><div class="panel-title">⭐ 電訪評分摘要</div><div id="phone-scores"></div></div>
   </div>
 
-  <!-- ── Tab: KPI ── -->
+  <!-- KPI -->
   <div class="tab-content" id="tab-kpi">
     <div class="panel-grid-2">
-      <div class="panel">
-        <div class="panel-title"><span>🎯</span>本月 KPI 達成</div>
-        <div id="kpi-list"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title"><span>📅</span>招募進度摘要</div>
-        <div id="job-progress"></div>
-      </div>
+      <div class="panel"><div class="panel-title">🎯 本月 KPI 達成</div><div id="kpi-list"></div></div>
+      <div class="panel"><div class="panel-title">📅 職缺招募進度</div><div id="job-progress"></div></div>
     </div>
   </div>
-
 </div>
 
-<!-- ── Detail Modal ── -->
+<!-- Modal -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-header">
-      <div>
-        <div style="font-size:18px; font-weight:700; color:var(--navy)" id="modal-name"></div>
-        <div style="font-size:13px; color:var(--text-sub); margin-top:2px" id="modal-sub"></div>
-      </div>
+      <div><div style="font-size:17px;font-weight:700;color:var(--navy)" id="modal-name"></div><div style="font-size:12px;color:var(--text-sub);margin-top:2px" id="modal-sub"></div></div>
       <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">✕</button>
     </div>
     <div id="modal-body"></div>
   </div>
 </div>
 
+<!-- Lark JS SDK -->
+<script src="https://lf-package-cn.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js" type="module" id="lark-sdk-cn"></script>
+
 <script>
-// ══════════════════════════════════════════
-//  ⚙️  設定區 — 請修改以下兩個值
-// ══════════════════════════════════════════
-const CONFIG = {
-  appId: 'cli_aa952ef73cf85ed0',
-  appSecret: 'TSdyxZ3kWZYs0Q5pBFFZpgQuQ4RnDo5l', // ← 替換為完整 App Secret
-  baseToken: 'E3X4blbxWa4DaLsSxsClZ3KbgYb',
-  tableIds: {
-    招募名單: 'tbl9yLmC7gMtdN6A',
-    電訪紀錄: 'tblkTPzuymEcZoyx',   // ← 從網址取得（切換到電訪紀錄工作表後看 table= 參數）
-    面談紀錄: 'tblaQzLBQlItTtiB' // ← 同上
-  }
+// ══════════════════════════════════════
+//  設定區 — 僅需修改以下值
+// ══════════════════════════════════════
+const BASE_TOKEN = 'E3X4blbxWa4DaLsSxsClZ3KbgYb';
+const TABLE_IDS = {
+  招募名單: 'tbl9yLmC7gMtdN6A',
+  電訪紀錄: 'tblkTPzuymEcZoyx',
+  面談紀錄: 'tblaQzLBQlItTtiB'
 };
-// ══════════════════════════════════════════
+// ══════════════════════════════════════
 
-const STAGE_ORDER = ['收件', '電訪', '初試', '複試', '錄取', '到職'];
-const STAGE_COLORS = {
-  '初試': 'badge-blue', '電訪': 'badge-teal', '複試': 'badge-amber',
-  '錄取': 'badge-teal', '到職': 'badge-teal', '收件': 'badge-gray'
-};
-const PROGRESS_COLORS = {
-  '進行中': 'badge-teal', '應徵者婉拒': 'badge-red',
-  '待安排': 'badge-amber', '通過': 'badge-teal',
-  '不通過': 'badge-red', '錄取': 'badge-teal'
-};
+const STAGE_ORDER = ['收件','電訪','初試','複試','錄取','到職'];
+const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
+const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal' };
 
-let accessToken = null;
-let allCandidates = [];
-let phoneRecords = [];
+let allCandidates = [], phoneRecords = [], interviewRecords = [];
 let currentFilter = '全部';
-let funnelChart = null;
-let sourceChart = null;
+let funnelChart = null, sourceChart = null;
+let userAccessToken = null;
 
-// ── Token ──
-async function getToken() {
-  if (CONFIG.appSecret === 'YOUR_FULL_APP_SECRET_HERE') {
-    document.getElementById('config-warning').style.display = 'block';
-    showError('請先填入完整的 App Secret（程式碼第 63 行）');
-    return null;
-  }
-  try {
-    const res = await fetch('https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app_id: CONFIG.appId, app_secret: CONFIG.appSecret })
-    });
-    const data = await res.json();
-    if (data.code !== 0) throw new Error(data.msg);
-    return data.tenant_access_token;
-  } catch(e) {
-    showError('取得 Token 失敗：' + e.message + '（請確認 App Secret 正確，且應用已開啟多維表格讀取權限）');
-    return null;
-  }
-}
-
-// ── Fetch Table ──
-async function fetchTable(tableId) {
-  let records = [], pageToken = null;
-  do {
-    const url = `https://open.larksuite.com/open-apis/bitable/v1/apps/${CONFIG.baseToken}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-    const data = await res.json();
-    if (data.code !== 0) throw new Error('讀取資料失敗：' + data.msg);
-    records = records.concat(data.data.items || []);
-    pageToken = data.data.page_token;
-  } while (pageToken);
-  return records;
-}
-
-// ── Main Load ──
-async function loadAllData() {
-  setSyncStatus('⟳ 同步中...', '#EF9F27');
+// ── Lark SDK 初始化 ──
+async function initDashboard() {
+  setSyncStatus('⟳ 連線中', '#EF9F27');
   hideError();
 
-  accessToken = await getToken();
-  if (!accessToken) { setSyncStatus('✗ 連線失敗', '#E24B4A'); return; }
+  // 偵測是否在 Lark 環境內
+  const isInLark = navigator.userAgent.includes('Lark') || navigator.userAgent.includes('Feishu') || window.__lark_js_sdk__ !== undefined;
 
+  if (isInLark) {
+    await loadViaSDK();
+  } else {
+    // 瀏覽器直接開啟（測試用）— 使用 demo 資料
+    showInfo('⚠️ 請在 Lark 應用程式內開啟此儀表板，才能讀取真實資料。目前顯示示範資料。');
+    loadDemoData();
+  }
+}
+
+// ── 透過 Lark SDK 取得資料 ──
+async function loadViaSDK() {
   try {
-    // Load 招募名單
-    const rows = await fetchTable(CONFIG.tableIds.招募名單);
-    allCandidates = rows.map(r => r.fields);
-
-    // Try load 電訪紀錄
+    // 動態 import Lark SDK
+    let lark;
     try {
-      if (CONFIG.tableIds.電訪紀錄 !== 'PHONE_TABLE_ID_HERE') {
-        const pRows = await fetchTable(CONFIG.tableIds.電訪紀錄);
-        phoneRecords = pRows.map(r => r.fields);
-      }
-    } catch(e) { phoneRecords = []; }
+      lark = await import('https://lf-package-cn.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
+    } catch(e) {
+      // 嘗試備用 CDN（海外 Lark）
+      lark = await import('https://lf1-cdn-tos.bytegoofy.com/goofy/lark/op/h5-js-sdk-v2.2.0/openPlatformH5JsSdk.esm.js');
+    }
 
+    await lark.default.ready();
+    const result = await lark.default.auth.getUserAccessToken();
+    userAccessToken = result.data?.user_access_token;
+
+    if (!userAccessToken) throw new Error('無法取得使用者 Token');
+
+    await fetchAllTables();
     renderAll();
     setSyncStatus('⚡ 即時同步', '#5DCAA5');
     document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
+
   } catch(e) {
-    showError(e.message);
-    setSyncStatus('✗ 載入失敗', '#E24B4A');
+    console.error(e);
+    showError('Lark SDK 初始化失敗：' + e.message + '。請確認應用已通過審核發布。');
+    setSyncStatus('✗ 連線失敗', '#E24B4A');
+    loadDemoData();
   }
 }
 
-function renderAll() {
-  renderStats();
-  renderRecentTable();
-  renderFullTable();
-  renderFunnelBars();
-  renderLossAnalysis();
-  renderPhoneScores();
-  renderKPI();
-  renderJobProgress();
-  renderCharts();
+// ── Fetch 多維表格資料 ──
+async function fetchTable(tableId) {
+  let records = [], pageToken = null;
+  const headers = { 'Authorization': 'Bearer ' + userAccessToken };
+  do {
+    const url = `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    if (data.code !== 0) throw new Error('讀取失敗：' + data.msg);
+    records = records.concat(data.data?.items || []);
+    pageToken = data.data?.page_token || null;
+  } while (pageToken);
+  return records.map(r => r.fields);
 }
 
-// ── Stats ──
-function renderStats() {
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
-  const monthly = allCandidates.filter(c => {
-    const d = getField(c, '收件日期');
-    return d && String(d).startsWith(thisMonth.replace('/','/').substring(0,7));
-  });
-  const total = allCandidates.length;
-  const phoneCount = allCandidates.filter(c => ['電訪','初試','複試','錄取','到職'].includes(getField(c,'當前關卡'))).length;
-  const inProgress = allCandidates.filter(c => getField(c,'關卡進度') === '進行中').length;
-  const declined = allCandidates.filter(c => String(getField(c,'關卡進度')||'').includes('婉拒')).length;
+async function fetchAllTables() {
+  allCandidates = await fetchTable(TABLE_IDS.招募名單);
+  try { phoneRecords = await fetchTable(TABLE_IDS.電訪紀錄); } catch(e) { phoneRecords = []; }
+  try { interviewRecords = await fetchTable(TABLE_IDS.面談紀錄); } catch(e) { interviewRecords = []; }
+}
 
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-total-sub').textContent = `本月 ${monthly.length} 份`;
-  document.getElementById('stat-phone').textContent = phoneCount;
-  document.getElementById('stat-phone-sub').textContent = phoneRecords.length ? `平均評分 ${avgScore()}` : '電訪完成人數';
-  document.getElementById('stat-inprogress').textContent = inProgress;
-  document.getElementById('stat-declined').textContent = declined;
+// ── Demo 資料（瀏覽器測試用）──
+function loadDemoData() {
+  allCandidates = [
+    { 應徵者:'刁彥瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'初試', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'選擇其他公司Offer' },
+    { 應徵者:'許晉瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'初試', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'面試當天臨時要求改時間' },
+  ];
+  phoneRecords = [
+    { 應徵者:'刁彥瑜', 電訪日期:'2026/05/19', 總體評分:3.83, 是否建議主管面試:'是', 期望薪資:70000, 對公司理解度_1_5分_:4, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
+    { 應徵者:'許晉瑜', 電訪日期:'2026/05/22', 總體評分:3.67, 是否建議主管面試:'是', 期望薪資:80000, 對公司理解度_1_5分_:3, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
+  ];
+  renderAll();
+  setSyncStatus('📋 示範資料', '#EF9F27');
+  document.getElementById('last-updated').textContent = '示範模式（在 Lark 內開啟顯示真實資料）';
+}
+
+// ── Render ──
+function renderAll() {
+  renderStats(); renderRecentTable(); renderFullTable();
+  renderFunnelBars(); renderLossAnalysis(); renderPhoneScores();
+  renderKPI(); renderJobProgress(); renderCharts();
+}
+
+function renderStats() {
+  const total = allCandidates.length;
+  const phoneCount = allCandidates.filter(c => ['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const inProgress = allCandidates.filter(c => gf(c,'關卡進度') === '進行中').length;
+  const declined = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-total-sub').textContent = `本月 ${total} 份`;
+  document.getElementById('s-phone').textContent = phoneCount;
+  document.getElementById('s-phone-sub').textContent = phoneRecords.length ? `平均 ${avgScore()}分` : '電訪人數';
+  document.getElementById('s-progress').textContent = inProgress;
+  document.getElementById('s-declined').textContent = declined;
 }
 
 function avgScore() {
-  const scores = phoneRecords.map(r => parseFloat(getField(r,'總體評分'))).filter(s => !isNaN(s));
-  if (!scores.length) return '—';
-  return (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2);
+  const s = phoneRecords.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
+  return s.length ? (s.reduce((a,b)=>a+b,0)/s.length).toFixed(2) : '—';
 }
 
-// ── Recent Table ──
 function renderRecentTable() {
-  const wrap = document.getElementById('recent-table-wrap');
-  const candidates = [...allCandidates].slice(0, 8);
-  wrap.innerHTML = buildCandidateTable(candidates, true);
+  document.getElementById('recent-wrap').innerHTML = buildTable(allCandidates.slice(0,8), true);
 }
 
-// ── Full Table ──
 function renderFullTable() {
-  // Filter bar
-  const stages = ['全部', ...new Set(allCandidates.map(c => getField(c,'當前關卡')).filter(Boolean))];
-  const filterBar = document.getElementById('filter-bar');
-  filterBar.innerHTML = stages.map(s => `
-    <button onclick="filterCandidates('${s}')" id="filter-${s}"
-      style="padding:3px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:0.5px solid #D3D1C7;
-             background:${s===currentFilter?'var(--navy)':'#F1EFE8'};
-             color:${s===currentFilter?'#fff':'#5F5E5A'};
-             font-family:'Noto Sans TC',sans-serif;font-weight:${s===currentFilter?'600':'400'}"
-    >${s}</button>`).join('');
-
-  const filtered = currentFilter === '全部' ? allCandidates : allCandidates.filter(c => getField(c,'當前關卡') === currentFilter);
-  document.getElementById('full-table-wrap').innerHTML = buildCandidateTable(filtered, false);
+  const stages = ['全部', ...new Set(allCandidates.map(c=>gf(c,'當前關卡')).filter(Boolean))];
+  document.getElementById('filter-bar').innerHTML = stages.map(s => `
+    <button onclick="filterBy('${s}')" style="padding:3px 11px;border-radius:20px;font-size:11px;cursor:pointer;
+      border:0.5px solid #D3D1C7;background:${s===currentFilter?'var(--navy)':'#F1EFE8'};
+      color:${s===currentFilter?'#fff':'#5F5E5A'};font-family:'Noto Sans TC',sans-serif">${s}</button>`).join('');
+  const list = currentFilter === '全部' ? allCandidates : allCandidates.filter(c => gf(c,'當前關卡') === currentFilter);
+  document.getElementById('full-wrap').innerHTML = buildTable(list, false);
 }
 
-function filterCandidates(stage) {
-  currentFilter = stage;
-  renderFullTable();
+function filterBy(s) { currentFilter = s; renderFullTable(); }
+
+function buildTable(list, compact) {
+  if (!list.length) return '<div class="loading">暫無資料</div>';
+  return `<table class="data-table"><thead><tr>
+    <th>應徵者</th><th>應徵職務</th>${compact?'':'<th>履歷來源</th>'}
+    <th>當前關卡</th><th>關卡進度</th><th>收件日期</th>${compact?'':'<th>HR</th>'}<th></th>
+  </tr></thead><tbody>${list.map(c=>`<tr>
+    <td style="font-weight:600">${gf(c,'應徵者')||'—'}</td>
+    <td>${gf(c,'應徵職務')||'—'}</td>
+    ${compact?'':`<td style="color:var(--text-sub)">${gf(c,'履歷來源')||'—'}</td>`}
+    <td><span class="badge ${STAGE_COLOR[gf(c,'當前關卡')]||'badge-gray'}">${gf(c,'當前關卡')||'—'}</span></td>
+    <td><span class="badge ${PROG_COLOR[gf(c,'關卡進度')]||'badge-gray'}">${gf(c,'關卡進度')||'—'}</span></td>
+    <td style="font-size:11px;color:var(--text-sub)">${fmtDate(gf(c,'收件日期'))}</td>
+    ${compact?'':`<td style="font-size:11px;color:var(--text-sub)">${gf(c,'HR')||'—'}</td>`}
+    <td><button onclick='showDetail(${JSON.stringify(c).replace(/'/g,"\\'")})' style="padding:2px 9px;border-radius:5px;font-size:11px;cursor:pointer;background:transparent;border:0.5px solid #D3D1C7;color:#5F5E5A;font-family:'Noto Sans TC',sans-serif">詳情</button></td>
+  </tr>`).join('')}</tbody></table>`;
 }
 
-function buildCandidateTable(candidates, compact) {
-  if (!candidates.length) return '<div class="loading">暫無資料</div>';
-  return `<table class="data-table">
-    <thead><tr>
-      <th>應徵者</th><th>應徵職務</th><th>應徵單位</th>
-      ${compact ? '' : '<th>履歷來源</th>'}
-      <th>當前關卡</th><th>關卡進度</th><th>收件日期</th>
-      ${compact ? '' : '<th>HR</th>'}
-      <th></th>
-    </tr></thead>
-    <tbody>${candidates.map(c => `
-      <tr>
-        <td style="font-weight:600">${getField(c,'應徵者') || '—'}</td>
-        <td>${getField(c,'應徵職務') || '—'}</td>
-        <td>${getField(c,'應徵單位') || '—'}</td>
-        ${compact ? '' : `<td style="font-size:12px;color:var(--text-sub)">${getField(c,'履歷來源') || '—'}</td>`}
-        <td><span class="badge ${STAGE_COLORS[getField(c,'當前關卡')] || 'badge-gray'}">${getField(c,'當前關卡') || '—'}</span></td>
-        <td><span class="badge ${PROGRESS_COLORS[getField(c,'關卡進度')] || 'badge-gray'}">${getField(c,'關卡進度') || '—'}</span></td>
-        <td style="font-size:12px;color:var(--text-sub)">${formatDate(getField(c,'收件日期'))}</td>
-        ${compact ? '' : `<td style="font-size:12px;color:var(--text-sub)">${getField(c,'HR') || '—'}</td>`}
-        <td><button onclick='showDetail(${JSON.stringify(c).replace(/'/g,"\\'")})'
-          style="padding:2px 10px;border-radius:6px;font-size:11px;cursor:pointer;background:transparent;
-                 border:0.5px solid #D3D1C7;color:#5F5E5A;font-family:'Noto Sans TC',sans-serif">詳情</button></td>
-      </tr>`).join('')}
-    </tbody></table>`;
-}
-
-// ── Funnel ──
 function renderFunnelBars() {
   const counts = {};
   STAGE_ORDER.forEach(s => counts[s] = 0);
-  allCandidates.forEach(c => {
-    const stage = getField(c,'當前關卡');
-    if (stage && counts[stage] !== undefined) counts[stage]++;
-    else if (stage) counts[stage] = (counts[stage]||0)+1;
-  });
+  allCandidates.forEach(c => { const s = gf(c,'當前關卡'); if (s) counts[s] = (counts[s]||0)+1; });
   const max = Math.max(...Object.values(counts), 1);
   const colors = ['#3B8BD4','#1D9E75','#EF9F27','#BA7517','#639922','#534AB7'];
-  document.getElementById('funnel-bars').innerHTML = STAGE_ORDER.map((s,i) => {
-    const n = counts[s] || 0;
-    const pct = Math.round((n/allCandidates.length)*100) || 0;
+  document.getElementById('funnel-bars').innerHTML = STAGE_ORDER.map((s,i)=>{
+    const n = counts[s]||0, pct = allCandidates.length ? Math.round(n/allCandidates.length*100) : 0;
     return `<div class="funnel-row">
       <div class="funnel-label"><span>${i+1}. ${s}</span><span>${n} 人 (${pct}%)</span></div>
-      <div class="funnel-bar-bg"><div class="funnel-bar-fill" style="width:${n?Math.max((n/max)*100,4):0}%;background:${colors[i]}">
-        ${n>0?`<span>${n}</span>`:''}
-      </div></div>
-    </div>`;
+      <div class="funnel-bar-bg"><div class="funnel-bar-fill" style="width:${n?Math.max(n/max*100,4):0}%;background:${colors[i]}">
+        ${n?`<span>${n}</span>`:''}</div></div></div>`;
   }).join('');
 }
 
-// ── Loss Analysis ──
 function renderLossAnalysis() {
-  const declined = allCandidates.filter(c => String(getField(c,'關卡進度')||'').includes('婉拒'));
-  const el = document.getElementById('loss-analysis');
-  if (!declined.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:20px 0">目前無流失記錄</div>'; return; }
-  el.innerHTML = declined.map(c => `
-    <div style="border-left:3px solid var(--red);padding:8px 12px;margin-bottom:10px;background:#FEFAFA;border-radius:0 6px 6px 0">
-      <div style="font-weight:600;font-size:13px">${getField(c,'應徵者') || '—'}</div>
-      <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${getField(c,'當前關卡')||''} 階段 · ${getField(c,'應徵職務')||''}</div>
-      ${getField(c,'備註') ? `<div style="font-size:11px;color:#854F0B;margin-top:4px">📝 ${getField(c,'備註')}</div>` : ''}
-    </div>`).join('');
+  const lost = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒'));
+  const el = document.getElementById('loss-wrap');
+  if (!lost.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:16px 0">目前無流失記錄</div>'; return; }
+  el.innerHTML = lost.map(c=>`<div style="border-left:3px solid var(--red);padding:7px 11px;margin-bottom:8px;background:#FEFAFA;border-radius:0 6px 6px 0">
+    <div style="font-weight:600;font-size:13px">${gf(c,'應徵者')||'—'}</div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${gf(c,'當前關卡')||''} · ${gf(c,'應徵職務')||''}</div>
+    ${gf(c,'備註')?`<div style="font-size:11px;color:#854F0B;margin-top:3px">📝 ${gf(c,'備註')}</div>`:''}
+  </div>`).join('');
 }
 
-// ── Phone Scores ──
 function renderPhoneScores() {
   const el = document.getElementById('phone-scores');
-  if (!phoneRecords.length) {
-    el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:10px 0">電訪紀錄工作表 Table ID 尚未設定，或暫無電訪資料</div>';
-    return;
-  }
-  const dims = ['對公司理解度(1-5分)','對職務的瞭解','應徵動機清晰度','經驗匹配度','表達能力'];
-  const avgDims = dims.map(d => {
-    const vals = phoneRecords.map(r => parseFloat(getField(r,d))).filter(v=>!isNaN(v));
-    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
-  });
-  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-    <div>${dims.map((d,i)=>`<div class="score-row">
-      <div class="score-label">${d.replace('(1-5分)','')}</div>
-      <div class="score-bar-bg"><div class="score-bar-fill" style="width:${(avgDims[i]/5)*100}%;background:${avgDims[i]>=4?'#1D9E75':avgDims[i]>=3?'#3B8BD4':'#E24B4A'}"></div></div>
-      <div class="score-val">${avgDims[i].toFixed(1)}</div>
-    </div>`).join('')}</div>
-    <div style="text-align:center;padding:20px">
+  if (!phoneRecords.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px;padding:8px 0">暫無電訪資料</div>'; return; }
+  const dims = [['對公司理解度(1-5分)','對公司理解度_1_5分_'],['對職務的瞭解','對職務的瞭解'],['應徵動機清晰度','應徵動機清晰度'],['經驗匹配度','經驗匹配度'],['表達能力','表達能力']];
+  const avgs = dims.map(([,k]) => { const v = phoneRecords.map(r=>parseFloat(gf(r,k))).filter(v=>!isNaN(v)); return v.length ? v.reduce((a,b)=>a+b)/v.length : 0; });
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>${dims.map(([label],i)=>`<div class="score-row">
+      <div class="score-label">${label.replace('(1-5分)','')}</div>
+      <div class="score-bar-bg"><div class="score-bar-fill" style="width:${avgs[i]/5*100}%;background:${avgs[i]>=4?'#1D9E75':avgs[i]>=3?'#3B8BD4':'#E24B4A'}"></div></div>
+      <div class="score-val">${avgs[i].toFixed(1)}</div></div>`).join('')}</div>
+    <div style="text-align:center;padding:16px">
       <div style="font-size:11px;color:var(--text-sub)">平均總體評分</div>
-      <div style="font-size:52px;font-weight:700;color:var(--blue);line-height:1;margin:8px 0">${avgScore()}</div>
-      <div style="font-size:13px;color:var(--text-sub)">/ 5.0 · ${phoneRecords.length} 筆電訪</div>
-      <div style="margin-top:12px">
-        <span class="badge badge-teal">${phoneRecords.filter(r=>getField(r,'是否建議主管面試')==='是').length} 人建議面試</span>
-      </div>
-    </div>
-  </div>`;
+      <div style="font-size:48px;font-weight:700;color:var(--blue);line-height:1;margin:6px 0">${avgScore()}</div>
+      <div style="font-size:12px;color:var(--text-sub)">/ 5.0 · ${phoneRecords.length} 筆</div>
+      <div style="margin-top:10px"><span class="badge badge-teal">${phoneRecords.filter(r=>gf(r,'是否建議主管面試')==='是').length} 人建議面試</span></div>
+    </div></div>`;
 }
 
-// ── KPI ──
 function renderKPI() {
   const total = allCandidates.length;
-  const phoneCount = allCandidates.filter(c=>['電訪','初試','複試','錄取','到職'].includes(getField(c,'當前關卡'))).length;
-  const interviewCount = allCandidates.filter(c=>['初試','複試','錄取','到職'].includes(getField(c,'當前關卡'))).length;
-  const declined = allCandidates.filter(c=>String(getField(c,'關卡進度')||'').includes('婉拒')).length;
-  const phoneRate = total ? Math.round((phoneCount/total)*100) : 0;
-  const interviewRate = phoneCount ? Math.round((interviewCount/phoneCount)*100) : 0;
-  const lossRate = total ? Math.round((declined/total)*100) : 0;
-
+  const pCount = allCandidates.filter(c=>['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const iCount = allCandidates.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const dec = allCandidates.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
   const kpis = [
-    { name:'每月履歷收件數', target:'≥ 10 份', value:total, unit:'份', ok: total >= 10 },
-    { name:'電訪完成率', target:'100%', value:phoneRate, unit:'%', ok: phoneRate === 100 },
-    { name:'初試邀約率（電訪後）', target:'≥ 60%', value:interviewRate, unit:'%', ok: interviewRate >= 60 },
-    { name:'應徵者流失率', target:'≤ 30%', value:lossRate, unit:'%', ok: lossRate <= 30, invert:true },
-    { name:'電訪平均評分', target:'≥ 3.5 / 5', value:avgScore(), unit:'/5', ok: parseFloat(avgScore()) >= 3.5 },
+    { name:'每月履歷收件數', target:'≥ 10 份', val:total, unit:'份', ok:total>=10 },
+    { name:'電訪完成率', target:'100%', val:total?Math.round(pCount/total*100):0, unit:'%', ok:pCount===total },
+    { name:'初試邀約率', target:'≥ 60%', val:pCount?Math.round(iCount/pCount*100):0, unit:'%', ok:pCount?iCount/pCount>=0.6:false },
+    { name:'應徵者流失率', target:'≤ 30%', val:total?Math.round(dec/total*100):0, unit:'%', ok:total?dec/total<=0.3:true },
+    { name:'電訪平均評分', target:'≥ 3.5 / 5', val:avgScore(), unit:'/5', ok:parseFloat(avgScore())>=3.5 },
   ];
-  document.getElementById('kpi-list').innerHTML = kpis.map(k=>`
-    <div class="kpi-row">
-      <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
-      <div class="kpi-value" style="color:${k.ok?'var(--teal)':'var(--red)'}">${k.value}<span style="font-size:12px;color:var(--text-sub)">${k.unit}</span></div>
-      <div style="font-size:18px">${k.ok?'✅':'❌'}</div>
-    </div>`).join('');
+  document.getElementById('kpi-list').innerHTML = kpis.map(k=>`<div class="kpi-row">
+    <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
+    <div class="kpi-value" style="color:${k.ok?'var(--teal)':'var(--red)'}">${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span></div>
+    <div style="font-size:16px">${k.ok?'✅':'❌'}</div></div>`).join('');
 }
 
-// ── Job Progress ──
 function renderJobProgress() {
   const jobs = {};
   allCandidates.forEach(c => {
-    const pos = getField(c,'應徵職務');
-    const dept = getField(c,'應徵單位');
+    const pos = gf(c,'應徵職務'), dept = gf(c,'應徵單位');
     if (!pos) return;
-    const key = `${pos}｜${dept}`;
+    const key = `${pos}|${dept}`;
     if (!jobs[key]) jobs[key] = { pos, dept, count:0, stages:{} };
     jobs[key].count++;
-    const stage = getField(c,'當前關卡');
-    if (stage) jobs[key].stages[stage] = (jobs[key].stages[stage]||0)+1;
+    const s = gf(c,'當前關卡'); if (s) jobs[key].stages[s] = (jobs[key].stages[s]||0)+1;
   });
   const el = document.getElementById('job-progress');
-  if (!Object.keys(jobs).length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:13px">暫無資料</div>'; return; }
-  el.innerHTML = Object.values(jobs).map(j=>`
-    <div style="border-left:3px solid var(--blue);padding:10px 14px;margin-bottom:12px;background:var(--blue-light);border-radius:0 8px 8px 0">
-      <div style="font-weight:600;font-size:14px;color:var(--navy)">${j.pos}</div>
-      <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${j.dept}</div>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <span class="badge badge-blue">收件 ${j.count} 份</span>
-        ${Object.entries(j.stages).map(([s,n])=>`<span class="badge ${STAGE_COLORS[s]||'badge-gray'}">${s} ${n} 人</span>`).join('')}
-      </div>
-    </div>`).join('');
+  if (!Object.keys(jobs).length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
+  el.innerHTML = Object.values(jobs).map(j=>`<div style="border-left:3px solid var(--blue);padding:9px 12px;margin-bottom:10px;background:var(--blue-light);border-radius:0 7px 7px 0">
+    <div style="font-weight:600;font-size:13px;color:var(--navy)">${j.pos}</div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:1px">${j.dept||''}</div>
+    <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+      <span class="badge badge-blue">收件 ${j.count}</span>
+      ${Object.entries(j.stages).map(([s,n])=>`<span class="badge ${STAGE_COLOR[s]||'badge-gray'}">${s} ${n}</span>`).join('')}
+    </div></div>`).join('');
 }
 
-// ── Charts ──
 function renderCharts() {
-  // Funnel chart
-  const stageCounts = STAGE_ORDER.map(s => allCandidates.filter(c=>getField(c,'當前關卡')===s).length);
+  const stageCounts = STAGE_ORDER.map(s => allCandidates.filter(c=>gf(c,'當前關卡')===s).length);
   const fCtx = document.getElementById('chart-funnel').getContext('2d');
   if (funnelChart) funnelChart.destroy();
-  funnelChart = new Chart(fCtx, {
-    type: 'bar',
-    data: {
-      labels: STAGE_ORDER,
-      datasets: [{ data: stageCounts,
-        backgroundColor: ['#3B8BD4','#1D9E75','#EF9F27','#BA7517','#639922','#534AB7'],
-        borderRadius: 6, borderSkipped: false }]
-    },
-    options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true }
-  });
+  funnelChart = new Chart(fCtx, { type:'bar', data:{ labels:STAGE_ORDER, datasets:[{ data:stageCounts, backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#BA7517','#639922','#534AB7'], borderRadius:5, borderSkipped:false }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true } });
 
-  // Source chart
-  const sourceCounts = {};
-  allCandidates.forEach(c => {
-    const s = getField(c,'履歷來源') || '未知';
-    sourceCounts[s] = (sourceCounts[s]||0)+1;
-  });
+  const srcCounts = {};
+  allCandidates.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
   const sCtx = document.getElementById('chart-source').getContext('2d');
   if (sourceChart) sourceChart.destroy();
-  sourceChart = new Chart(sCtx, {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(sourceCounts),
-      datasets: [{ data: Object.values(sourceCounts),
-        backgroundColor: ['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'],
-        borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: { plugins:{legend:{position:'right',labels:{font:{size:11}}}}, responsive:true, maintainAspectRatio:true }
-  });
+  sourceChart = new Chart(sCtx, { type:'doughnut', data:{ labels:Object.keys(srcCounts), datasets:[{ data:Object.values(srcCounts), backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'], borderWidth:2, borderColor:'#fff' }] }, options:{ plugins:{legend:{position:'right',labels:{font:{size:11}}}}, responsive:true, maintainAspectRatio:true } });
 }
 
-// ── Detail Modal ──
-function showDetail(candidate) {
-  const name = getField(candidate,'應徵者') || '—';
+function showDetail(c) {
+  const name = gf(c,'應徵者')||'—';
   document.getElementById('modal-name').textContent = name;
-  document.getElementById('modal-sub').textContent =
-    `${getField(candidate,'應徵職務')||''} · ${getField(candidate,'應徵單位')||''} · HR: ${getField(candidate,'HR')||''}`;
-
-  const phone = phoneRecords.find(r => getField(r,'應徵者') === name);
+  document.getElementById('modal-sub').textContent = `${gf(c,'應徵職務')||''} · ${gf(c,'應徵單位')||''} · HR: ${gf(c,'HR')||''}`;
+  const phone = phoneRecords.find(r => gf(r,'應徵者') === name);
   document.getElementById('modal-body').innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <span class="badge ${STAGE_COLORS[getField(candidate,'當前關卡')]||'badge-gray'}">${getField(candidate,'當前關卡')||'—'}</span>
-      <span class="badge ${PROGRESS_COLORS[getField(candidate,'關卡進度')]||'badge-gray'}">${getField(candidate,'關卡進度')||'—'}</span>
+    <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap">
+      <span class="badge ${STAGE_COLOR[gf(c,'當前關卡')]||'badge-gray'}">${gf(c,'當前關卡')||'—'}</span>
+      <span class="badge ${PROG_COLOR[gf(c,'關卡進度')]||'badge-gray'}">${gf(c,'關卡進度')||'—'}</span>
     </div>
-    <table style="width:100%;font-size:13px;border-collapse:collapse">
-      ${[['收件日期',formatDate(getField(candidate,'收件日期'))],['履歷來源',getField(candidate,'履歷來源')],
-         ['面談主管',getField(candidate,'面談主管_初試')],['任用單審批',getField(candidate,'任用單審批進度')]
-        ].map(([k,v])=>v?`<tr><td style="color:var(--text-sub);padding:5px 0;width:100px">${k}</td><td style="padding:5px 0">${v}</td></tr>`:'').join('')}
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      ${[['收件日期',fmtDate(gf(c,'收件日期'))],['履歷來源',gf(c,'履歷來源')],['面談主管',gf(c,'面談主管_初試')]].map(([k,v])=>v?`<tr><td style="color:var(--text-sub);padding:4px 0;width:80px">${k}</td><td>${v}</td></tr>`:'').join('')}
     </table>
-    ${getField(candidate,'備註')?`<div style="background:var(--amber-light);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12px;color:#633806">📝 ${getField(candidate,'備註')}</div>`:''}
-    ${phone ? `
-    <div style="margin-top:16px;border-top:0.5px solid var(--border);padding-top:14px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:10px">📞 電訪記錄</div>
+    ${gf(c,'備註')?`<div style="background:var(--amber-light);border-radius:7px;padding:9px 11px;margin-top:10px;font-size:12px;color:#633806">📝 ${gf(c,'備註')}</div>`:''}
+    ${phone?`<div style="margin-top:14px;border-top:0.5px solid var(--border);padding-top:12px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:9px">📞 電訪記錄</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="flex:1">${['對公司理解度(1-5分)','對職務的瞭解','應徵動機清晰度','經驗匹配度','表達能力'].map(d=>`
-          <div class="score-row">
-            <div class="score-label" style="width:90px">${d.replace('(1-5分)','')}</div>
-            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${(parseFloat(getField(phone,d)||0)/5)*100}%;background:#3B8BD4"></div></div>
-            <div class="score-val">${getField(phone,d)||'—'}</div>
-          </div>`).join('')}</div>
-        <div style="text-align:center;padding:0 16px">
-          <div style="font-size:11px;color:var(--text-sub)">總分</div>
-          <div style="font-size:36px;font-weight:700;color:var(--blue);line-height:1">${getField(phone,'總體評分')||'—'}</div>
-          <div style="font-size:11px;color:var(--text-sub)">/ 5.0</div>
-          ${getField(phone,'期望薪資')?`<div style="margin-top:8px;font-size:12px;color:#444">NT$ ${Number(getField(phone,'期望薪資')).toLocaleString()}</div>`:''}
-        </div>
-      </div>
-    </div>` : ''}
-  `;
+        <div style="flex:1">${[['對公司理解度','對公司理解度_1_5分_'],['對職務的瞭解','對職務的瞭解'],['應徵動機','應徵動機清晰度'],['經驗匹配度','經驗匹配度'],['表達能力','表達能力']].map(([l,k])=>`<div class="score-row">
+          <div class="score-label">${l}</div>
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${parseFloat(gf(phone,k)||0)/5*100}%;background:#3B8BD4"></div></div>
+          <div class="score-val">${gf(phone,k)||'—'}</div></div>`).join('')}</div>
+        <div style="text-align:center;padding:0 14px">
+          <div style="font-size:10px;color:var(--text-sub)">總分</div>
+          <div style="font-size:34px;font-weight:700;color:var(--blue);line-height:1">${gf(phone,'總體評分')||'—'}</div>
+          <div style="font-size:10px;color:var(--text-sub)">/5.0</div>
+          ${gf(phone,'期望薪資')?`<div style="margin-top:6px;font-size:12px">NT$ ${Number(gf(phone,'期望薪資')).toLocaleString()}</div>`:''}
+        </div></div></div>`:''}`;
   document.getElementById('modal-overlay').classList.add('open');
 }
 
-function closeModal(e) {
-  if (e.target === document.getElementById('modal-overlay'))
-    document.getElementById('modal-overlay').classList.remove('open');
+function closeModal(e) { if (e.target===document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('open'); }
+function switchTab(n) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['overview','candidates','funnel','kpi'][i]===n));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');
 }
-
-// ── Helpers ──
-function getField(obj, key) {
-  if (!obj || !obj[key]) return null;
+function setSyncStatus(t,c) { const el=document.getElementById('sync-status'); el.textContent=t; el.style.color=c; el.style.borderColor=c; el.style.background=c+'18'; }
+function showError(m) { const el=document.getElementById('error-box'); el.textContent='⚠️ '+m; el.style.display='block'; }
+function hideError() { document.getElementById('error-box').style.display='none'; document.getElementById('info-box').style.display='none'; }
+function showInfo(m) { const el=document.getElementById('info-box'); el.textContent=m; el.style.display='block'; }
+function gf(obj, key) {
+  if (!obj||!obj[key]) return null;
   const v = obj[key];
-  if (Array.isArray(v)) return v.map(i => typeof i === 'object' ? (i.text || i.name || JSON.stringify(i)) : i).join(', ');
-  if (typeof v === 'object' && v.text) return v.text;
+  if (Array.isArray(v)) return v.map(i=>typeof i==='object'?(i.text||i.name||''):i).join(', ');
+  if (typeof v==='object'&&v.text) return v.text;
   return v;
 }
+function fmtDate(d) { if (!d) return '—'; const s=String(d); if (s.includes('/')) return s.split(' ')[0]; if (!isNaN(d)) return new Date(Number(d)).toLocaleDateString('zh-TW'); return s.split('T')[0]; }
 
-function formatDate(d) {
-  if (!d) return '—';
-  const s = String(d);
-  if (s.includes('/')) return s.split(' ')[0];
-  if (!isNaN(d)) return new Date(Number(d)).toLocaleDateString('zh-TW');
-  return s.split('T')[0];
-}
-
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    const names = ['overview','candidates','funnel','kpi'];
-    t.classList.toggle('active', names[i] === name);
-  });
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-}
-
-function setSyncStatus(text, color) {
-  const el = document.getElementById('sync-status');
-  el.textContent = text;
-  el.style.color = color;
-  el.style.borderColor = color;
-  el.style.background = color + '18';
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-box');
-  el.textContent = '⚠️ ' + msg;
-  el.style.display = 'block';
-}
-
-function hideError() { document.getElementById('error-box').style.display = 'none'; }
-
-// ── Init ──
-loadAllData();
+// 啟動
+initDashboard();
 </script>
 </body>
 </html>
