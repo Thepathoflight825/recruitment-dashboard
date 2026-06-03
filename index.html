@@ -217,12 +217,10 @@ async function initDashboard() {
   setSyncStatus('⟳ 連線中', '#EF9F27');
   hideError();
 
-  // 偵測 Lark 注入的全域物件
-  const larkGlobals = ['h5sdk','tt','lark','feishu','larksdk','LarkWebApp'].filter(k => typeof window[k] !== 'undefined');
-  console.log('Lark globals found:', larkGlobals, '| UA:', navigator.userAgent.substring(0,80));
-  document.getElementById('last-updated').textContent = 'globals: ' + (larkGlobals.join(',') || 'none') + ' | ' + navigator.userAgent.substring(0,40);
+  const ua = navigator.userAgent;
+  const isInLark = ua.includes('Lark') || ua.includes('Feishu');
+  document.getElementById('last-updated').textContent = 'UA: ' + ua.substring(0,60);
 
-  const isInLark = larkGlobals.length > 0 || navigator.userAgent.includes('Lark') || navigator.userAgent.includes('Feishu');
   if (isInLark) {
     await loadViaSDK();
   } else {
@@ -231,23 +229,44 @@ async function initDashboard() {
   }
 }
 
-// ── 透過 Lark 內建 h5sdk 取得 Token ──
+// ── 透過 Lark API 取得資料（使用 tenant_access_token）──
 async function loadViaSDK() {
   try {
-    await new Promise((resolve, reject) => {
-      window.h5sdk.ready(() => resolve());
-      setTimeout(() => reject(new Error('SDK ready 超時')), 8000);
-    });
-
-    const tokenResult = await new Promise((resolve, reject) => {
-      window.h5sdk.auth.getUserAccessToken({
-        success: resolve,
-        fail: (e) => reject(new Error(JSON.stringify(e)))
+    // Lark 國際版網頁應用使用 tenant_access_token 直接呼叫 API
+    // 透過後端 proxy 或直接用 app credentials 取得 token
+    // 這裡改用直接帶 token 的方式
+    const sdk = window.h5sdk || window.tt || window.lark;
+    
+    if (sdk) {
+      // 有 SDK，用 SDK 取 token
+      await new Promise((resolve, reject) => {
+        const ready = sdk.ready || sdk.onReady;
+        if (typeof ready === 'function') {
+          ready.call(sdk, () => resolve());
+        } else {
+          resolve(); // 直接嘗試
+        }
+        setTimeout(() => resolve(), 3000);
       });
-    });
 
-    userAccessToken = tokenResult?.data?.user_access_token || tokenResult?.user_access_token;
-    if (!userAccessToken) throw new Error('無法取得 Token，請確認應用已開啟多維表格權限');
+      const tokenResult = await new Promise((resolve, reject) => {
+        const auth = sdk.auth || sdk;
+        if (auth.getUserAccessToken) {
+          auth.getUserAccessToken({ success: resolve, fail: reject });
+        } else if (auth.getAccessToken) {
+          auth.getAccessToken({ success: resolve, fail: reject });
+        } else {
+          reject(new Error('找不到 token 方法，SDK keys: ' + Object.keys(sdk).join(',')));
+        }
+      });
+      userAccessToken = tokenResult?.data?.user_access_token || tokenResult?.user_access_token || tokenResult?.access_token;
+    }
+
+    if (!userAccessToken) {
+      // 顯示 SDK 狀態供偵錯
+      const sdkKeys = Object.keys(window).filter(k => k.toLowerCase().includes('lark') || k.toLowerCase().includes('feishu') || k === 'tt' || k === 'h5sdk');
+      throw new Error('無法取得 Token。window keys: ' + sdkKeys.join(',') || '(無相關物件)');
+    }
 
     await fetchAllTables();
     renderAll();
