@@ -253,13 +253,14 @@ async function initDashboard() {
 // ── Lark PC 取得 Token（使用 __Lark_Bridge__）──
 async function loadViaSDK() {
   try {
-    const bridge = window.__Lark_Bridge__;
-    if (!bridge) throw new Error('找不到 __Lark_Bridge__');
+    // lark_to_bear_bridge 是 Lark PC 網頁應用的原生通訊橋接器
+    const ltb = window.lark_to_bear_bridge;
+    if (!ltb) throw new Error('找不到 lark_to_bear_bridge');
 
-    // 先列出 bridge 所有 keys 和類型
-    const bKeys = Object.keys(bridge);
-    const bTypes = bKeys.map(k => k + ':' + typeof bridge[k]).join(',');
-    throw new Error('__Lark_Bridge__ keys: ' + bTypes);
+    // 列出所有 keys 和類型
+    const ltbKeys = Object.keys(ltb);
+    const ltbTypes = ltbKeys.slice(0,20).map(k => k + ':' + typeof ltb[k]).join(' | ');
+    throw new Error('lark_to_bear_bridge keys: ' + ltbTypes);
 
     if (!userAccessToken) throw new Error('Token 為空');
 
