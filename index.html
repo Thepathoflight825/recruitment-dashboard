@@ -254,31 +254,12 @@ async function initDashboard() {
 async function loadViaSDK() {
   try {
     const bridge = window.__Lark_Bridge__;
-    if (!bridge) throw new Error('找不到 __Lark_Bridge__，bridge keys: ' + Object.keys(window).filter(k=>k.includes('Lark')||k.includes('lark')).join(','));
+    if (!bridge) throw new Error('找不到 __Lark_Bridge__');
 
-    // __Lark_Bridge__ 使用 call 方法
-    userAccessToken = await new Promise((resolve, reject) => {
-      const method = typeof bridge.call === 'function' ? 'call'
-                   : typeof bridge.invoke === 'function' ? 'invoke'
-                   : typeof bridge.request === 'function' ? 'request'
-                   : null;
-
-      if (!method) {
-        const bKeys = Object.keys(bridge).slice(0,15).join(',');
-        reject(new Error('__Lark_Bridge__ 無可用方法，keys: ' + bKeys));
-        return;
-      }
-
-      bridge[method]('getUserAccessToken', {}, (res) => {
-        console.log('Bridge result:', JSON.stringify(res).substring(0,200));
-        const token = res?.data?.user_access_token || res?.user_access_token
-          || res?.data?.accessToken || res?.accessToken
-          || res?.data?.token || res?.token;
-        if (token) resolve(token);
-        else reject(new Error('無 token，回傳: ' + JSON.stringify(res).substring(0,150)));
-      });
-      setTimeout(() => reject(new Error('Bridge 超時，方法: ' + method)), 8000);
-    });
+    // 先列出 bridge 所有 keys 和類型
+    const bKeys = Object.keys(bridge);
+    const bTypes = bKeys.map(k => k + ':' + typeof bridge[k]).join(',');
+    throw new Error('__Lark_Bridge__ keys: ' + bTypes);
 
     if (!userAccessToken) throw new Error('Token 為空');
 
