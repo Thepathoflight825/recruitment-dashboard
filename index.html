@@ -108,6 +108,7 @@
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
+  select option { background: #1a1a2e; color: #fff; }
 </style>
 </head>
 <body>
@@ -116,6 +117,17 @@
   <div class="header-left">
     <div class="header-title">招募管理儀表板</div>
     <div class="header-sub" id="last-updated">連線中...</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:0 16px">
+    <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
+    <select id="period-select" onchange="onPeriodChange(this.value)" style="background:#2a2a45;border:0.5px solid #3a3a5e;border-radius:6px;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer;font-family:'Noto Sans TC',sans-serif">
+      <option value="current">當月</option>
+      <option value="prev">上個月</option>
+      <option value="3m">近三個月</option>
+      <option value="6m">近半年</option>
+      <option value="1y">整年度</option>
+      <option value="all">全部</option>
+    </select>
   </div>
   <div class="header-tabs">
     <div class="tab active" onclick="switchTab('overview')">總覽</div>
@@ -161,6 +173,12 @@
 
   <!-- 漏斗分析 -->
   <div class="tab-content" id="tab-funnel">
+    <div class="panel" style="margin-bottom:14px;padding:12px 18px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:600;color:var(--navy)">職缺篩選：</span>
+        <div id="position-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+    </div>
     <div class="panel-grid-2">
       <div class="panel"><div class="panel-title">🔻 招募漏斗</div><div id="funnel-bars"></div></div>
       <div class="panel"><div class="panel-title">📝 流失分析</div><div id="loss-wrap"></div></div>
@@ -208,6 +226,8 @@ const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','複試':'badg
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal' };
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
+let selectedPeriod = 'current';   // current | prev | 3m | 6m | 1y | all
+let selectedPosition = '全部職缺'; // 從招募名單動態產生
 let currentFilter = '全部';
 let funnelChart = null, sourceChart = null;
 let userAccessToken = null;
@@ -230,31 +250,34 @@ async function initDashboard() {
   }
 }
 
-// ── 透過 __LarkPCSDK__ 取得 Token ──
-// Lark PC SDK 的 bridge.invoke 回傳格式：{ code, data, msg }
+// ── Lark PC 取得 Token（使用 __Lark_Bridge__）──
 async function loadViaSDK() {
   try {
-    const sdk = window.__LarkPCSDK__;
-    if (!sdk?.bridge?.invoke) throw new Error('找不到 bridge.invoke');
+    const bridge = window.__Lark_Bridge__;
+    if (!bridge) throw new Error('找不到 __Lark_Bridge__，bridge keys: ' + Object.keys(window).filter(k=>k.includes('Lark')||k.includes('lark')).join(','));
 
+    // __Lark_Bridge__ 使用 call 方法
     userAccessToken = await new Promise((resolve, reject) => {
-      // Lark PC SDK 正確的 invoke 格式
-      sdk.bridge.invoke('getUserAccessToken', {}, (result) => {
-        console.log('getUserAccessToken result:', JSON.stringify(result).substring(0,150));
-        const token = result?.data?.user_access_token
-          || result?.user_access_token
-          || result?.data?.accessToken
-          || result?.accessToken
-          || result?.data?.token
-          || result?.token;
+      const method = typeof bridge.call === 'function' ? 'call'
+                   : typeof bridge.invoke === 'function' ? 'invoke'
+                   : typeof bridge.request === 'function' ? 'request'
+                   : null;
+
+      if (!method) {
+        const bKeys = Object.keys(bridge).slice(0,15).join(',');
+        reject(new Error('__Lark_Bridge__ 無可用方法，keys: ' + bKeys));
+        return;
+      }
+
+      bridge[method]('getUserAccessToken', {}, (res) => {
+        console.log('Bridge result:', JSON.stringify(res).substring(0,200));
+        const token = res?.data?.user_access_token || res?.user_access_token
+          || res?.data?.accessToken || res?.accessToken
+          || res?.data?.token || res?.token;
         if (token) resolve(token);
-        else {
-          // 回傳了結果但沒有 token，顯示完整回傳內容供偵錯
-          const resultStr = JSON.stringify(result).substring(0, 200);
-          reject(new Error('invoke 回傳無 token：' + resultStr));
-        }
+        else reject(new Error('無 token，回傳: ' + JSON.stringify(res).substring(0,150)));
       });
-      setTimeout(() => reject(new Error('getUserAccessToken 超時 10s')), 10000);
+      setTimeout(() => reject(new Error('Bridge 超時，方法: ' + method)), 8000);
     });
 
     if (!userAccessToken) throw new Error('Token 為空');
@@ -314,24 +337,100 @@ function loadDemoData() {
 }
 
 // ── Render ──
+// ── 時間範圍篩選 ──
+function getPeriodRange(period) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  switch(period) {
+    case 'current': return { start: new Date(y, m, 1),     end: new Date(y, m+1, 0) };
+    case 'prev':    return { start: new Date(y, m-1, 1),   end: new Date(y, m, 0) };
+    case '3m':      return { start: new Date(y, m-2, 1),   end: new Date(y, m+1, 0) };
+    case '6m':      return { start: new Date(y, m-5, 1),   end: new Date(y, m+1, 0) };
+    case '1y':      return { start: new Date(y, 0, 1),     end: new Date(y, 11, 31) };
+    default:        return null; // all
+  }
+}
+
+function parseDateVal(v) {
+  if (!v) return null;
+  if (!isNaN(v)) return new Date(Number(v));
+  return new Date(String(v).replace(/\//g, '-').split(' ')[0]);
+}
+
+function filterByPeriod(records, dateField) {
+  const range = getPeriodRange(selectedPeriod);
+  if (!range) return records;
+  return records.filter(r => {
+    const d = parseDateVal(gf(r, dateField));
+    return d && d >= range.start && d <= range.end;
+  });
+}
+
+function getFilteredCandidates() {
+  let list = filterByPeriod(allCandidates, '收件日期');
+  if (selectedPosition !== '全部職缺') list = list.filter(c => gf(c,'應徵職務') === selectedPosition);
+  return list;
+}
+
+function getFilteredStats() {
+  let list = filterByPeriod(statsRecords, '統計日期');
+  if (selectedPosition !== '全部職缺') list = list.filter(r => gf(r,'應徵職務') === selectedPosition);
+  return list;
+}
+
+function getFilteredPhone() {
+  const filtered = getFilteredCandidates().map(c => gf(c,'應徵者')).filter(Boolean);
+  return phoneRecords.filter(r => filtered.includes(gf(r,'應徵者')));
+}
+
+function onPeriodChange(val) {
+  selectedPeriod = val;
+  renderAll();
+}
+
+function onPositionChange(pos) {
+  selectedPosition = pos;
+  renderPositionFilter();
+  renderAll();
+}
+
+function renderPositionFilter() {
+  const positions = ['全部職缺', ...new Set(allCandidates.map(c=>gf(c,'應徵職務')).filter(Boolean))];
+  const bar = document.getElementById('position-filter-bar');
+  if (!bar) return;
+  bar.innerHTML = positions.map(p => `
+    <button onclick="onPositionChange('${p}')" style="padding:3px 12px;border-radius:20px;font-size:12px;cursor:pointer;
+      border:0.5px solid #D3D1C7;background:${p===selectedPosition?'var(--navy)':'#F1EFE8'};
+      color:${p===selectedPosition?'#fff':'#5F5E5A'};font-family:'Noto Sans TC',sans-serif;white-space:nowrap">${p}</button>`).join('');
+}
+
 function renderAll() {
+  renderPositionFilter();
   renderStats(); renderRecentTable(); renderFullTable();
   renderFunnelBars(); renderLossAnalysis(); renderPhoneScores();
   renderKPI(); renderJobProgress(); renderCharts();
 }
 
 function renderStats() {
-  const total = allCandidates.length;
-  const phoneCount = allCandidates.filter(c => ['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
-  const inProgress = allCandidates.filter(c => gf(c,'關卡進度') === '進行中').length;
-  const declined = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
-  const statsTotal = statsRecords.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
+  const fc = getFilteredCandidates();
+  const fp = getFilteredPhone();
+  const fs = getFilteredStats();
+  const total = fc.length;
+  const phoneCount = fc.filter(c => ['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
+  const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
   document.getElementById('s-total').textContent = statsTotal || total;
   document.getElementById('s-total-sub').textContent = statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`;
   document.getElementById('s-phone').textContent = phoneCount;
-  document.getElementById('s-phone-sub').textContent = phoneRecords.length ? `平均 ${avgScore()}分` : '電訪人數';
+  document.getElementById('s-phone-sub').textContent = fp.length ? `平均 ${avgScoreFromList(fp)}分` : '電訪人數';
   document.getElementById('s-progress').textContent = inProgress;
   document.getElementById('s-declined').textContent = declined;
+}
+
+function avgScoreFromList(list) {
+  const s = list.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
+  return s.length ? (s.reduce((a,b)=>a+b,0)/s.length).toFixed(2) : '—';
 }
 
 function avgScore() {
@@ -340,7 +439,7 @@ function avgScore() {
 }
 
 function renderRecentTable() {
-  document.getElementById('recent-wrap').innerHTML = buildTable(allCandidates.slice(0,8), true);
+  document.getElementById('recent-wrap').innerHTML = buildTable(getFilteredCandidates().slice(0,8), true);
 }
 
 function renderFullTable() {
@@ -373,19 +472,21 @@ function buildTable(list, compact) {
 }
 
 function renderFunnelBars() {
-  // 從履歷收件統計取得前三層
-  const statsTotal    = statsRecords.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
-  const statsHR       = statsRecords.reduce((a,r) => a + (parseFloat(gf(r,'HR初篩通過'))||0), 0);
-  const statsMgr      = statsRecords.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
+  // 從篩選後的資料取得各層數字
+  const fs = getFilteredStats();
+  const fc = getFilteredCandidates();
+  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR初篩通過'))||0), 0);
+  const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
-  // 從招募名單取得後五層
+  // 從篩選後招募名單取得後五層
   const stageMap = { '電訪':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
-  allCandidates.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
+  fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
 
   const FULL_STAGES = [
-    { label:'📥 收件總數',    n: statsTotal || allCandidates.length, src:'履歷收件統計', color:'#3B8BD4' },
-    { label:'✅ HR初篩通過',  n: statsHR    || allCandidates.length, src:'履歷收件統計', color:'#2E86C1' },
-    { label:'👔 主管篩選通過', n: statsMgr   || allCandidates.length, src:'履歷收件統計', color:'#1D9E75' },
+    { label:'📥 收件總數',    n: statsTotal || fc.length, src:'履歷收件統計', color:'#3B8BD4' },
+    { label:'✅ HR初篩通過',  n: statsHR    || fc.length, src:'履歷收件統計', color:'#2E86C1' },
+    { label:'👔 主管篩選通過', n: statsMgr   || fc.length, src:'履歷收件統計', color:'#1D9E75' },
     { label:'📞 電訪',        n: stageMap['電訪'], src:'招募名單', color:'#27AE60' },
     { label:'🤝 初試',        n: stageMap['初試'], src:'招募名單', color:'#EF9F27' },
     { label:'🔄 複試',        n: stageMap['複試'], src:'招募名單', color:'#E67E22' },
@@ -414,7 +515,7 @@ function renderFunnelBars() {
 }
 
 function renderLossAnalysis() {
-  const lost = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒'));
+  const lost = getFilteredCandidates().filter(c => String(gf(c,'關卡進度')||'').includes('婉拒'));
   const el = document.getElementById('loss-wrap');
   if (!lost.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:16px 0">目前無流失記錄</div>'; return; }
   el.innerHTML = lost.map(c=>`<div style="border-left:3px solid var(--red);padding:7px 11px;margin-bottom:8px;background:#FEFAFA;border-radius:0 6px 6px 0">
@@ -426,9 +527,11 @@ function renderLossAnalysis() {
 
 function renderPhoneScores() {
   const el = document.getElementById('phone-scores');
-  if (!phoneRecords.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px;padding:8px 0">暫無電訪資料</div>'; return; }
+  const fp2 = getFilteredPhone();
+  if (!fp2.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px;padding:8px 0">此篩選條件下暫無電訪資料</div>'; return; }
+  const phoneRecordsLocal = fp2;
   const dims = [['對公司理解度(1-5分)','對公司理解度_1_5分_'],['對職務的瞭解','對職務的瞭解'],['應徵動機清晰度','應徵動機清晰度'],['經驗匹配度','經驗匹配度'],['表達能力','表達能力']];
-  const avgs = dims.map(([,k]) => { const v = phoneRecords.map(r=>parseFloat(gf(r,k))).filter(v=>!isNaN(v)); return v.length ? v.reduce((a,b)=>a+b)/v.length : 0; });
+  const avgs = dims.map(([,k]) => { const v = phoneRecordsLocal.map(r=>parseFloat(gf(r,k))).filter(v=>!isNaN(v)); return v.length ? v.reduce((a,b)=>a+b)/v.length : 0; });
   el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>${dims.map(([label],i)=>`<div class="score-row">
       <div class="score-label">${label.replace('(1-5分)','')}</div>
@@ -482,13 +585,14 @@ function renderJobProgress() {
 }
 
 function renderCharts() {
-  const stageCounts = STAGE_ORDER.map(s => allCandidates.filter(c=>gf(c,'當前關卡')===s).length);
+  const fc2 = getFilteredCandidates();
+  const stageCounts = STAGE_ORDER.map(s => fc2.filter(c=>gf(c,'當前關卡')===s).length);
   const fCtx = document.getElementById('chart-funnel').getContext('2d');
   if (funnelChart) funnelChart.destroy();
   funnelChart = new Chart(fCtx, { type:'bar', data:{ labels:STAGE_ORDER, datasets:[{ data:stageCounts, backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#BA7517','#639922','#534AB7'], borderRadius:5, borderSkipped:false }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true } });
 
   const srcCounts = {};
-  allCandidates.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
+  fc2.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
   const sCtx = document.getElementById('chart-source').getContext('2d');
   if (sourceChart) sourceChart.destroy();
   sourceChart = new Chart(sCtx, { type:'doughnut', data:{ labels:Object.keys(srcCounts), datasets:[{ data:Object.values(srcCounts), backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'], borderWidth:2, borderColor:'#fff' }] }, options:{ plugins:{legend:{position:'right',labels:{font:{size:11}}}}, responsive:true, maintainAspectRatio:true } });
