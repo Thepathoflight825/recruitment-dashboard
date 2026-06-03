@@ -212,7 +212,6 @@
 // ══════════════════════════════════════
 //  設定區 — 僅需修改以下值
 // ══════════════════════════════════════
-const BASE_TOKEN = 'E3X4blbxWa4DaLsSxsClZ3KbgYb';
 const TABLE_IDS = {
   招募名單: 'tbl9yLmC7gMtdN6A',
   電訪紀錄: 'tblkTPzuymEcZoyx',
@@ -232,92 +231,30 @@ let currentFilter = '全部';
 let funnelChart = null, sourceChart = null;
 let userAccessToken = null;
 
-// ── Lark SDK 初始化 ──
-// Lark 開啟網頁應用時，會自動在 window 注入 h5sdk，直接使用即可
+// ── 初始化（透過 Cloudflare Worker 直接讀取資料）──
 async function initDashboard() {
   setSyncStatus('⟳ 連線中', '#EF9F27');
   hideError();
-
-  const ua = navigator.userAgent;
-  const isInLark = ua.includes('Lark') || ua.includes('Feishu');
-  document.getElementById('last-updated').textContent = 'UA: ' + ua.substring(0,60);
-
-  if (isInLark) {
-    await loadViaSDK();
-  } else {
-    showInfo('⚠️ 請在 Lark 應用程式內開啟此儀表板，才能讀取真實資料。目前顯示示範資料。');
-    loadDemoData();
-  }
-}
-
-// ── Lark PC 取得 Token（使用 __Lark_Bridge__）──
-async function loadViaSDK() {
   try {
-    // 深度掃描所有 window 物件尋找 token
-    const scanObj = (obj, depth, path) => {
-      if (!obj || depth > 2) return null;
-      try {
-        for (const k of Object.keys(obj).slice(0,20)) {
-          const v = obj[k];
-          const fullPath = path + '.' + k;
-          if (typeof v === 'string' && v.length > 30 && v.length < 500 &&
-              (k.toLowerCase().includes('token') || k.toLowerCase().includes('access'))) {
-            return fullPath + '=' + String(v).slice(0,20) + '...';
-          }
-          if (typeof v === 'object' && v !== null && depth < 2) {
-            const found = scanObj(v, depth+1, fullPath);
-            if (found) return found;
-          }
-        }
-      } catch(e) {}
-      return null;
-    };
-
-    // 掃描已知的 Lark 物件
-    const larkObjs = ['__LarkPCSDK__','__Lark_Bridge__','lark_to_bear_bridge'].filter(k=>window[k]);
-    let scanResult = null;
-    for (const k of larkObjs) {
-      scanResult = scanObj(window[k], 0, k);
-      if (scanResult) break;
-    }
-
-    // 也嘗試直接讀取 __LarkPCSDK__.bridge.config
-    const pcSdk = window.__LarkPCSDK__;
-    const bridgeCfg = pcSdk?.bridge?.config;
-    const cfgStr = bridgeCfg ? JSON.stringify(bridgeCfg).slice(0,200) : 'no bridge config';
-    
-    // 嘗試從 cookie 或 localStorage 取 token（某些版本 Lark 會存在這裡）
-    let cookieToken = null;
-    try {
-      const cookies = document.cookie;
-      const match = cookies.match(/user_access_token=([^;]+)/);
-      if (match) cookieToken = match[1].slice(0,20) + '...';
-    } catch(e) {}
-
-    throw new Error('scanResult: ' + (scanResult||'none') + ' | bridgeCfg: ' + cfgStr + ' | cookie: ' + (cookieToken||'none'));
-
-    if (!userAccessToken) throw new Error('Token 為空（偵錯完成）');
-
     await fetchAllTables();
     renderAll();
     setSyncStatus('⚡ 即時同步', '#5DCAA5');
     document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
-
   } catch(e) {
-    console.error(e);
-    showError('SDK 錯誤：' + e.message);
-    setSyncStatus('✗ 連線失敗', '#E24B4A');
+    showError('資料載入失敗：' + e.message);
+    setSyncStatus('✗ 載入失敗', '#E24B4A');
     loadDemoData();
   }
 }
 
-// ── Fetch 多維表格資料 ──
+
+
+// ── Fetch 多維表格資料（透過 Cloudflare Worker）──
 async function fetchTable(tableId) {
   let records = [], pageToken = null;
-  const headers = { 'Authorization': 'Bearer ' + userAccessToken };
   do {
-    const url = `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
-    const res = await fetch(url, { headers });
+    const path = `/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
+    const res = await fetch(WORKER_URL + path);
     const data = await res.json();
     if (data.code !== 0) throw new Error('讀取失敗：' + data.msg);
     records = records.concat(data.data?.items || []);
