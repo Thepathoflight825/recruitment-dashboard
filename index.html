@@ -266,9 +266,10 @@ async function loadViaSDK() {
         resolve(sdk.token || sdk.accessToken);
       }
       else {
-        // 列出 SDK 所有方法供偵錯
-        const keys = Object.keys(sdk).slice(0, 20).join(',');
-        reject(new Error('找不到 token 方法。SDK keys: ' + keys));
+        // 深入探索 base 和 bridge
+        const bridgeKeys = sdk.bridge ? Object.keys(sdk.bridge).slice(0,20).join(',') : 'no bridge';
+        const baseKeys = sdk.base ? Object.keys(sdk.base).slice(0,20).join(',') : 'no base';
+        reject(new Error('bridge keys: ' + bridgeKeys + ' | base keys: ' + baseKeys));
       }
     });
 
