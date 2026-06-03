@@ -229,44 +229,50 @@ async function initDashboard() {
   }
 }
 
-// ── 透過 Lark API 取得資料（使用 tenant_access_token）──
+// ── 透過 __LarkPCSDK__ 取得 User Access Token ──
 async function loadViaSDK() {
   try {
-    // Lark 國際版網頁應用使用 tenant_access_token 直接呼叫 API
-    // 透過後端 proxy 或直接用 app credentials 取得 token
-    // 這裡改用直接帶 token 的方式
-    const sdk = window.h5sdk || window.tt || window.lark;
-    
-    if (sdk) {
-      // 有 SDK，用 SDK 取 token
-      await new Promise((resolve, reject) => {
-        const ready = sdk.ready || sdk.onReady;
-        if (typeof ready === 'function') {
-          ready.call(sdk, () => resolve());
-        } else {
-          resolve(); // 直接嘗試
-        }
-        setTimeout(() => resolve(), 3000);
-      });
+    const sdk = window.__LarkPCSDK__;
+    if (!sdk) throw new Error('找不到 __LarkPCSDK__');
 
-      const tokenResult = await new Promise((resolve, reject) => {
-        const auth = sdk.auth || sdk;
-        if (auth.getUserAccessToken) {
-          auth.getUserAccessToken({ success: resolve, fail: reject });
-        } else if (auth.getAccessToken) {
-          auth.getAccessToken({ success: resolve, fail: reject });
-        } else {
-          reject(new Error('找不到 token 方法，SDK keys: ' + Object.keys(sdk).join(',')));
-        }
-      });
-      userAccessToken = tokenResult?.data?.user_access_token || tokenResult?.user_access_token || tokenResult?.access_token;
-    }
+    // 等待 SDK 就緒
+    await new Promise((resolve, reject) => {
+      if (sdk.ready) {
+        sdk.ready(resolve);
+      } else {
+        resolve();
+      }
+      setTimeout(resolve, 3000);
+    });
 
-    if (!userAccessToken) {
-      // 顯示 SDK 狀態供偵錯
-      const sdkKeys = Object.keys(window).filter(k => k.toLowerCase().includes('lark') || k.toLowerCase().includes('feishu') || k === 'tt' || k === 'h5sdk');
-      throw new Error('無法取得 Token。window keys: ' + sdkKeys.join(',') || '(無相關物件)');
-    }
+    // 嘗試取得 user_access_token
+    userAccessToken = await new Promise((resolve, reject) => {
+      // 方法一：getUserAccessToken
+      if (sdk.getUserAccessToken) {
+        sdk.getUserAccessToken({
+          success: (res) => resolve(res?.user_access_token || res?.data?.user_access_token),
+          fail: (e) => reject(new Error('getUserAccessToken 失敗: ' + JSON.stringify(e)))
+        });
+      }
+      // 方法二：auth.getUserAccessToken
+      else if (sdk.auth?.getUserAccessToken) {
+        sdk.auth.getUserAccessToken({
+          success: (res) => resolve(res?.user_access_token || res?.data?.user_access_token),
+          fail: (e) => reject(new Error('auth.getUserAccessToken 失敗: ' + JSON.stringify(e)))
+        });
+      }
+      // 方法三：直接取 token 屬性
+      else if (sdk.token || sdk.accessToken) {
+        resolve(sdk.token || sdk.accessToken);
+      }
+      else {
+        // 列出 SDK 所有方法供偵錯
+        const keys = Object.keys(sdk).slice(0, 20).join(',');
+        reject(new Error('找不到 token 方法。SDK keys: ' + keys));
+      }
+    });
+
+    if (!userAccessToken) throw new Error('Token 為空');
 
     await fetchAllTables();
     renderAll();
