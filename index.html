@@ -188,8 +188,7 @@
   </div>
 </div>
 
-<!-- Lark JS SDK -->
-<script src="https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js" type="module" id="lark-sdk-cn"></script>
+
 
 <script>
 // ══════════════════════════════════════
@@ -213,39 +212,36 @@ let funnelChart = null, sourceChart = null;
 let userAccessToken = null;
 
 // ── Lark SDK 初始化 ──
+// Lark 開啟網頁應用時，會自動在 window 注入 h5sdk，直接使用即可
 async function initDashboard() {
   setSyncStatus('⟳ 連線中', '#EF9F27');
   hideError();
 
-  // 偵測是否在 Lark 環境內
-  const isInLark = navigator.userAgent.includes('Lark') || navigator.userAgent.includes('Feishu') || window.__lark_js_sdk__ !== undefined;
-
-  if (isInLark) {
+  if (typeof window.h5sdk !== 'undefined') {
     await loadViaSDK();
   } else {
-    // 瀏覽器直接開啟（測試用）— 使用 demo 資料
     showInfo('⚠️ 請在 Lark 應用程式內開啟此儀表板，才能讀取真實資料。目前顯示示範資料。');
     loadDemoData();
   }
 }
 
-// ── 透過 Lark SDK 取得資料 ──
+// ── 透過 Lark 內建 h5sdk 取得 Token ──
 async function loadViaSDK() {
   try {
-    // 動態 import Lark SDK
-    let lark;
-    try {
-      lark = await import('https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
-    } catch(e) {
-      // 嘗試備用 CDN（海外 Lark）
-      lark = await import('https://lf-package-en.feishucdn.com/obj/feishu-static/open-platform/dev-tools/h5jssdk/v2.2/openPlatformH5JsSdk.esm.js');
-    }
+    await new Promise((resolve, reject) => {
+      window.h5sdk.ready(() => resolve());
+      setTimeout(() => reject(new Error('SDK ready 超時')), 8000);
+    });
 
-    await lark.default.ready();
-    const result = await lark.default.auth.getUserAccessToken();
-    userAccessToken = result.data?.user_access_token;
+    const tokenResult = await new Promise((resolve, reject) => {
+      window.h5sdk.auth.getUserAccessToken({
+        success: resolve,
+        fail: (e) => reject(new Error(JSON.stringify(e)))
+      });
+    });
 
-    if (!userAccessToken) throw new Error('無法取得使用者 Token');
+    userAccessToken = tokenResult?.data?.user_access_token || tokenResult?.user_access_token;
+    if (!userAccessToken) throw new Error('無法取得 Token，請確認應用已開啟多維表格權限');
 
     await fetchAllTables();
     renderAll();
@@ -254,7 +250,7 @@ async function loadViaSDK() {
 
   } catch(e) {
     console.error(e);
-    showError('Lark SDK 初始化失敗：' + e.message + '。請確認應用已通過審核發布。');
+    showError('SDK 錯誤：' + e.message);
     setSyncStatus('✗ 連線失敗', '#E24B4A');
     loadDemoData();
   }
