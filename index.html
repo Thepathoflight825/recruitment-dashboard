@@ -222,9 +222,10 @@ const TABLE_IDS = {
 };
 // ══════════════════════════════════════
 
-const STAGE_ORDER = ['收件總數','送審人選','主管篩選通過','電訪','初試','複試','錄取','到職'];
-const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
-const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal' };
+const STAGE_ORDER = ['電訪','AI評分','初試','複試','錄取','到職'];
+const STAGE_ORDER_FULL = ['收件總數','送審人選','主管篩選通過','電訪','AI評分','初試','複試','錄取','到職'];
+const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'badge-amber','AI評分通過':'badge-amber','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
+const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
 let selectedPeriod = 'current';   // current | prev | 3m | 6m | 1y | all
@@ -279,12 +280,16 @@ async function fetchAllTables() {
 // ── Demo 資料（瀏覽器測試用）──
 function loadDemoData() {
   allCandidates = [
-    { 應徵者:'刁彥瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'初試', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'選擇其他公司Offer' },
-    { 應徵者:'許晉瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'初試', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'面試當天臨時要求改時間' },
+    { 應徵者:'刁彥瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'電訪', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'選擇其他公司Offer' },
+    { 應徵者:'許晉瑜', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'電訪', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'面試當天臨時要求改時間' },
+    { 應徵者:'嚴庭亞', 應徵職務:'AI前端工程師', 應徵單位:'技術中心', 履歷來源:'104主動應徵', HR:'KR-Sherry', 面談主管_初試:'KR-Satoshi', 當前關卡:'AI評分', 關卡進度:'應徵者婉拒', 收件日期:'2026/05/18', 備註:'邀約電訪，104訊息已讀未回' },
   ];
   phoneRecords = [
     { 應徵者:'刁彥瑜', 電訪日期:'2026/05/19', 總體評分:3.83, 是否建議主管面試:'是', 期望薪資:70000, 對公司理解度_1_5分_:4, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
     { 應徵者:'許晉瑜', 電訪日期:'2026/05/22', 總體評分:3.67, 是否建議主管面試:'是', 期望薪資:80000, 對公司理解度_1_5分_:3, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
+  ];
+  statsRecords = [
+    { 統計日期:'2026/05/31', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:27, AI評分通過:2, HR推薦:0, 主管篩選通過:3, 主要來源:'104主動應徵' },
   ];
   renderAll();
   setSyncStatus('📋 示範資料', '#EF9F27');
@@ -371,7 +376,7 @@ function renderStats() {
   const fp = getFilteredPhone();
   const fs = getFilteredStats();
   const total = fc.length;
-  const phoneCount = fc.filter(c => ['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const phoneCount = fc.filter(c => ['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
   const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
   const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
@@ -435,7 +440,7 @@ function renderFunnelBars() {
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
   // 從篩選後招募名單取得後五層
-  const stageMap = { '電訪':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
+  const stageMap = { '電訪':0,'AI評分':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
   fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
 
   const statsAI  = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分通過'))||0),0);
@@ -450,6 +455,7 @@ function renderFunnelBars() {
     { label:'👔 主管篩選通過', n: statsMgr || fc.length,
       sub: null, src:'履歷收件統計', color:'#0F6E56' },
     { label:'📞 電訪',       n: stageMap['電訪'], sub: null, src:'招募名單', color:'#EF9F27' },
+    { label:'🤖 AI評分',     n: stageMap['AI評分'], sub: null, src:'招募名單', color:'#D4AC0D' },
     { label:'🤝 初試',       n: stageMap['初試'], sub: null, src:'招募名單', color:'#E67E22' },
     { label:'🔄 複試',       n: stageMap['複試'], sub: null, src:'招募名單', color:'#BA7517' },
     { label:'🎉 錄取',       n: stageMap['錄取'], sub: null, src:'招募名單', color:'#639922' },
@@ -509,7 +515,7 @@ function renderPhoneScores() {
 
 function renderKPI() {
   const total = allCandidates.length;
-  const pCount = allCandidates.filter(c=>['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const pCount = allCandidates.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const iCount = allCandidates.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const dec = allCandidates.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
   const kpis = [
@@ -548,10 +554,51 @@ function renderJobProgress() {
 
 function renderCharts() {
   const fc2 = getFilteredCandidates();
-  const stageCounts = STAGE_ORDER.map(s => fc2.filter(c=>gf(c,'當前關卡')===s).length);
+  const fs = getFilteredStats();
+
+  // 上游三層從「履歷收件統計」取數
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsHR    = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const statsAI    = fs.reduce((a,r) => a + (parseFloat(gf(r,'AI評分通過'))||0), 0);
+  const statsMgr   = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
+  const statsSent  = statsAI + statsHR;
+
+  // 下游從招募名單取當前關卡
+  const stageCountsLower = STAGE_ORDER.map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
+
+  // 合併成完整 8 段
+  const labels = ['收件總數','送審人選','主管篩選\n通過','電訪','AI評分','初試','複試','錄取','到職'];
+  const counts = [
+    statsTotal || fc2.length,
+    statsSent  || statsMgr || fc2.length,
+    statsMgr   || 0,
+    ...stageCountsLower
+  ];
+  const barColors = ['#3B8BD4','#1D9E75','#0F6E56','#EF9F27','#D4AC0D','#E67E22','#BA7517','#639922','#534AB7'];
+
   const fCtx = document.getElementById('chart-funnel').getContext('2d');
   if (funnelChart) funnelChart.destroy();
-  funnelChart = new Chart(fCtx, { type:'bar', data:{ labels:STAGE_ORDER, datasets:[{ data:stageCounts, backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#BA7517','#639922','#534AB7'], borderRadius:5, borderSkipped:false }] }, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true } });
+  funnelChart = new Chart(fCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: barColors,
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      },
+      responsive: true,
+      maintainAspectRatio: true
+    }
+  });
 
   const srcCounts = {};
   fc2.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
