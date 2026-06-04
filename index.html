@@ -222,7 +222,7 @@ const TABLE_IDS = {
 };
 // ══════════════════════════════════════
 
-const STAGE_ORDER = ['收件總數','AI評分通過','HR推薦','主管篩選通過','電訪','初試','複試','錄取','到職'];
+const STAGE_ORDER = ['收件總數','送審人選','主管篩選通過','電訪','初試','複試','錄取','到職'];
 const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal' };
 
@@ -374,7 +374,7 @@ function renderStats() {
   const phoneCount = fc.filter(c => ['電訪','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
   const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
   document.getElementById('s-total').textContent = statsTotal || total;
   document.getElementById('s-total-sub').textContent = statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`;
   document.getElementById('s-phone').textContent = phoneCount;
@@ -430,7 +430,7 @@ function renderFunnelBars() {
   // 從篩選後的資料取得各層數字
   const fs = getFilteredStats();
   const fc = getFilteredCandidates();
-  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
   const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
@@ -438,16 +438,22 @@ function renderFunnelBars() {
   const stageMap = { '電訪':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
   fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
 
+  const statsAI  = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分通過'))||0),0);
+  const statsSent = statsAI + statsHR; // 送審人選 = AI評分通過 + HR推薦
+
   const FULL_STAGES = [
-    { label:'📥 收件總數',     n: statsTotal || fc.length, src:'履歷收件統計', color:'#3B8BD4' },
-    { label:'🤖 AI評分通過',   n: fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分通過'))||0),0) || statsTotal || fc.length, src:'履歷收件統計', color:'#2874A6' },
-    { label:'✅ HR推薦',       n: statsHR    || fc.length, src:'履歷收件統計', color:'#1A5276' },
-    { label:'👔 主管篩選通過', n: statsMgr   || fc.length, src:'履歷收件統計', color:'#1D9E75' },
-    { label:'📞 電訪',         n: stageMap['電訪'], src:'招募名單', color:'#27AE60' },
-    { label:'🤝 初試',         n: stageMap['初試'], src:'招募名單', color:'#EF9F27' },
-    { label:'🔄 複試',         n: stageMap['複試'], src:'招募名單', color:'#E67E22' },
-    { label:'🎉 錄取',         n: stageMap['錄取'], src:'招募名單', color:'#639922' },
-    { label:'🏢 到職',         n: stageMap['到職'], src:'招募名單', color:'#534AB7' },
+    { label:'📥 收件總數',   n: statsTotal || fc.length,
+      sub: null, src:'履歷收件統計', color:'#3B8BD4' },
+    { label:'📋 送審人選',   n: statsSent || statsMgr || fc.length,
+      sub: statsAI || statsHR ? `AI通過 ${statsAI}　＋　HR推薦 ${statsHR}` : null,
+      src:'履歷收件統計', color:'#1D9E75' },
+    { label:'👔 主管篩選通過', n: statsMgr || fc.length,
+      sub: null, src:'履歷收件統計', color:'#0F6E56' },
+    { label:'📞 電訪',       n: stageMap['電訪'], sub: null, src:'招募名單', color:'#EF9F27' },
+    { label:'🤝 初試',       n: stageMap['初試'], sub: null, src:'招募名單', color:'#E67E22' },
+    { label:'🔄 複試',       n: stageMap['複試'], sub: null, src:'招募名單', color:'#BA7517' },
+    { label:'🎉 錄取',       n: stageMap['錄取'], sub: null, src:'招募名單', color:'#639922' },
+    { label:'🏢 到職',       n: stageMap['到職'], sub: null, src:'招募名單', color:'#534AB7' },
   ];
 
   const max = Math.max(...FULL_STAGES.map(s=>s.n), 1);
@@ -462,7 +468,7 @@ function renderFunnelBars() {
     const srcBadge = `<span style="font-size:10px;color:${s.src==='履歷收件統計'?'#185FA5':'#1D9E75'};background:${s.src==='履歷收件統計'?'#E6F1FB':'#E1F5EE'};padding:1px 6px;border-radius:4px;margin-left:4px">${s.src}</span>`;
     return `<div class="funnel-row">
       <div class="funnel-label">
-        <span>${i+1}. ${s.label} ${srcBadge}</span>
+        <span>${i+1}. ${s.label} ${srcBadge}${s.sub ? `<span style="font-size:11px;color:var(--text-sub);margin-left:6px">${s.sub}</span>` : ''}</span>
         <span style="font-weight:600">${s.n} 人 <span style="color:#aaa;font-weight:400">(${pct}%)</span></span>
       </div>
       <div class="funnel-bar-bg"><div class="funnel-bar-fill" style="width:${s.n?Math.max(s.n/max*100,3):0}%;background:${s.color}">
