@@ -175,6 +175,20 @@
   .alert-banner-title { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
   .alert-banner-desc  { font-size: 11px; opacity: .85; line-height: 1.5; }
 
+  /* ── Donut 圖外部標籤佈局 ── */
+  .donut-wrap { display: flex; align-items: center; justify-content: center; gap: 0; width: 100%; }
+  .donut-labels-left  { display: flex; flex-direction: column; justify-content: center; gap: 8px; flex: 1; align-items: flex-end; padding-right: 14px; }
+  .donut-labels-right { display: flex; flex-direction: column; justify-content: center; gap: 8px; flex: 1; align-items: flex-start; padding-left: 14px; }
+  .donut-canvas-wrap  { position: relative; flex-shrink: 0; }
+  .donut-center-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .donut-center-val   { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .donut-center-sub   { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
+  .donut-label-item   { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .donut-label-item .dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .donut-label-item .lbl  { font-size: 11px; color: #444; }
+  .donut-label-item .val  { font-size: 11px; font-weight: 600; color: var(--navy); }
+  .donut-label-item .pct  { font-size: 10px; color: var(--text-sub); }
+
   .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: var(--text-sub); font-size: 13px; gap: 8px; }
   .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
   .error-box { background: var(--red-light); border: 0.5px solid #F7C1C1; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #A32D2D; margin-bottom: 14px; }
@@ -235,8 +249,28 @@
       <div class="panel"><div class="panel-title">🎂 年齡分布 <span class="pt-sub">在職中</span></div><canvas id="chart-age" height="180"></canvas></div>
     </div>
     <div class="panel-grid-2">
-      <div class="panel"><div class="panel-title">📊 在職狀態</div><div style="display:flex;align-items:center;gap:20px"><canvas id="chart-status" width="160" height="160" style="flex-shrink:0"></canvas><div id="status-legend"></div></div></div>
-      <div class="panel"><div class="panel-title">🔧 職能分布 <span class="pt-sub">在職中</span></div><div style="display:flex;align-items:center;gap:20px"><canvas id="chart-role" width="160" height="160" style="flex-shrink:0"></canvas><div id="role-legend"></div></div></div>
+      <div class="panel">
+        <div class="panel-title">📊 在職狀態</div>
+        <div class="donut-wrap">
+          <div class="donut-labels-left" id="status-labels-left"></div>
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-status" width="170" height="170"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="status-total"></div><div class="donut-center-sub">總數</div></div>
+          </div>
+          <div class="donut-labels-right" id="status-labels-right"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🔧 職能分布 <span class="pt-sub">在職中</span></div>
+        <div class="donut-wrap">
+          <div class="donut-labels-left" id="role-labels-left"></div>
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-role" width="170" height="170"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="role-total"></div><div class="donut-center-sub">總數</div></div>
+          </div>
+          <div class="donut-labels-right" id="role-labels-right"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -247,8 +281,28 @@
       <div class="panel"><div class="panel-title">📈 累計離職率趨勢</div><canvas id="chart-cumulative" height="200"></canvas></div>
     </div>
     <div class="panel-grid-3">
-      <div class="panel"><div class="panel-title">🔄 離職類型</div><div style="display:flex;flex-direction:column;align-items:center"><canvas id="chart-exit-type" width="160" height="160"></canvas><div id="exit-type-legend" style="margin-top:10px;font-size:11px;color:var(--text-sub)"></div></div></div>
-      <div class="panel"><div class="panel-title">💬 離職原因</div><div style="display:flex;flex-direction:column;align-items:center"><canvas id="chart-exit-reason" width="160" height="160"></canvas><div id="exit-reason-legend" style="margin-top:10px;font-size:11px;color:var(--text-sub)"></div></div></div>
+      <div class="panel">
+        <div class="panel-title">🔄 離職類型</div>
+        <div class="donut-wrap">
+          <div class="donut-labels-left" id="exit-type-labels-left"></div>
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-exit-type" width="150" height="150"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="exit-type-total"></div><div class="donut-center-sub">總數</div></div>
+          </div>
+          <div class="donut-labels-right" id="exit-type-labels-right"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">💬 離職原因</div>
+        <div class="donut-wrap">
+          <div class="donut-labels-left" id="exit-reason-labels-left"></div>
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-exit-reason" width="150" height="150"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="exit-reason-total"></div><div class="donut-center-sub">總數</div></div>
+          </div>
+          <div class="donut-labels-right" id="exit-reason-labels-right"></div>
+        </div>
+      </div>
       <div class="panel"><div class="panel-title">📋 離職明細 <span class="pt-sub">近 10 筆</span></div><div id="exit-table-wrap"></div></div>
     </div>
   </div>
@@ -567,7 +621,28 @@ function calcAvgTenure() {
   return avg.toFixed(1) + ' 年';
 }
 
-// ── 全域長條圖數值標籤 plugin ──
+// ── Donut 外部標籤渲染（左右分欄）──
+function renderDonutLabels(entries, colors, total, leftId, rightId, totalId) {
+  if (totalId) { const el = document.getElementById(totalId); if (el) el.textContent = total; }
+  const half = Math.ceil(entries.length / 2);
+  const left  = entries.slice(0, half);
+  const right = entries.slice(half);
+  function mkItem(k, v, color) {
+    const pct = total ? Math.round(v / total * 100) : 0;
+    return `<div class="donut-label-item">
+      <span class="dot" style="background:${color}"></span>
+      <span class="lbl">${k}:</span>
+      <span class="val">${v}</span>
+      <span class="pct">(${pct}%)</span>
+    </div>`;
+  }
+  const lEl = document.getElementById(leftId);
+  const rEl = document.getElementById(rightId);
+  if (lEl) lEl.innerHTML = left.map(([k,v],i) => mkItem(k, v, colors[i])).join('');
+  if (rEl) rEl.innerHTML = right.map(([k,v],i) => mkItem(k, v, colors[half+i])).join('');
+}
+
+
 const barLabelPlugin = {
   id: 'barLabel',
   afterDatasetsDraw(chart) {
@@ -626,18 +701,22 @@ function renderCharts() {
   const ageMap = {}; actives.forEach(e=>{ const a=gf(e,'年齡區間')||'—'; ageMap[a]=(ageMap[a]||0)+1; });
   mkChart('chart-age', { type:'bar', data:{ labels:ageOrder.filter(a=>ageMap[a]>0), datasets:[{data:ageOrder.filter(a=>ageMap[a]>0).map(a=>ageMap[a]||0), backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
 
-  // 在職狀態 donut（中央顯示總數）
+  // 在職狀態 donut（外部標籤）
   const statusMap = {}; employees.forEach(e=>{ const s=gf(e,'在職狀態')||'未知'; statusMap[s]=(statusMap[s]||0)+1; });
   const statusColors = {'在職中':'#1D9E75','已離職':'#6B4FA0','留職停薪':'#3B8BD4'};
   const statusTotal = employees.length;
-  mkChart('chart-status',{type:'doughnut',data:{labels:Object.keys(statusMap),datasets:[{data:Object.values(statusMap),backgroundColor:Object.keys(statusMap).map(k=>statusColors[k]||'#aaa'),borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 22px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(statusTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
-  document.getElementById('status-legend').innerHTML = Object.entries(statusMap).map(([k,v])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:${statusColors[k]||'#aaa'};flex-shrink:0"></span><span style="font-size:12px;color:#444">${k}: <strong>${v}</strong> (${Math.round(v/statusTotal*100)}%)</span></div>`).join('');
+  const statusEntries = Object.entries(statusMap);
+  const statusColorArr = statusEntries.map(([k])=>statusColors[k]||'#aaa');
+  mkChart('chart-status',{type:'doughnut',data:{labels:statusEntries.map(e=>e[0]),datasets:[{data:statusEntries.map(e=>e[1]),backgroundColor:statusColorArr,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
+  renderDonutLabels(statusEntries, statusColorArr, statusTotal, 'status-labels-left', 'status-labels-right', 'status-total');
 
-  // 職能分布 donut（中央顯示總數）
+  // 職能分布 donut（外部標籤）
   const roleMap = {}; actives.forEach(e=>{ const r=gf(e,'職能')||'其他'; roleMap[r]=(roleMap[r]||0)+1; });
   const roleTotal = actives.length;
-  mkChart('chart-role',{type:'doughnut',data:{labels:Object.keys(roleMap),datasets:[{data:Object.values(roleMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 22px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(roleTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
-  document.getElementById('role-legend').innerHTML = Object.entries(roleMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0"></span><span style="font-size:11px;color:#555">${k}: ${v} (${Math.round(v/roleTotal*100)}%)</span></div>`).join('');
+  const roleEntries = Object.entries(roleMap).sort((a,b)=>b[1]-a[1]);
+  const roleColorArr = roleEntries.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]);
+  mkChart('chart-role',{type:'doughnut',data:{labels:roleEntries.map(e=>e[0]),datasets:[{data:roleEntries.map(e=>e[1]),backgroundColor:roleColorArr,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
+  renderDonutLabels(roleEntries, roleColorArr, roleTotal, 'role-labels-left', 'role-labels-right', 'role-total');
 }
 
 function renderAttrition() {
@@ -654,17 +733,21 @@ function renderAttrition() {
   // 累計離職率
   mkChart('chart-cumulative',{type:'line',data:{labels:months,datasets:[{label:'累計離職率(%)',data:cumRate,borderColor:'#3B8BD4',backgroundColor:'rgba(59,139,212,.08)',tension:.3,pointRadius:3,yAxisID:'y'},{label:'累計離職人數',data:cumCnt,borderColor:'#1D9E75',backgroundColor:'transparent',tension:.3,pointRadius:3,yAxisID:'y1',borderDash:[5,3]}]},options:{plugins:{legend:{labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},y1:{beginAtZero:true,position:'right',ticks:{font:{size:10}},grid:{drawOnChartArea:false}}},responsive:true,maintainAspectRatio:true}});
 
-  // 離職類型 donut（中央顯示總數）
+  // 離職類型 donut（外部標籤）
   const typeMap = {}; fel.forEach(e=>{ const t=gf(e,'離職類型')||'未知'; typeMap[t]=(typeMap[t]||0)+1; });
   const typeTotal = fel.length;
-  mkChart('chart-exit-type',{type:'doughnut',data:{labels:Object.keys(typeMap),datasets:[{data:Object.values(typeMap),backgroundColor:['#EF9F27','#3B8BD4'],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false},datalabels:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 20px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(typeTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
-  document.getElementById('exit-type-legend').innerHTML = Object.entries(typeMap).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${['#EF9F27','#3B8BD4'][i]};margin-right:4px"></span>${k}: <strong>${v}</strong> (${typeTotal?Math.round(v/typeTotal*100):0}%)</div>`).join('');
+  const typeEntries = Object.entries(typeMap);
+  const typeColorArr = typeEntries.map((_,i)=>['#EF9F27','#3B8BD4','#E24B4A','#1D9E75'][i]||CHART_COLORS[i]);
+  mkChart('chart-exit-type',{type:'doughnut',data:{labels:typeEntries.map(e=>e[0]),datasets:[{data:typeEntries.map(e=>e[1]),backgroundColor:typeColorArr,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
+  renderDonutLabels(typeEntries, typeColorArr, typeTotal, 'exit-type-labels-left', 'exit-type-labels-right', 'exit-type-total');
 
-  // 離職原因 donut（中央顯示總數）
+  // 離職原因 donut（外部標籤）
   const reasonMap = {}; fel.forEach(e=>{ const r=gf(e,'離職原因')||'未知'; reasonMap[r]=(reasonMap[r]||0)+1; });
   const reasonTotal = fel.length;
-  mkChart('chart-exit-reason',{type:'doughnut',data:{labels:Object.keys(reasonMap),datasets:[{data:Object.values(reasonMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false},datalabels:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 20px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(reasonTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
-  document.getElementById('exit-reason-legend').innerHTML = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i]};margin-right:4px"></span>${k}: <strong>${v}</strong></div>`).join('');
+  const reasonEntries = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]);
+  const reasonColorArr = reasonEntries.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]);
+  mkChart('chart-exit-reason',{type:'doughnut',data:{labels:reasonEntries.map(e=>e[0]),datasets:[{data:reasonEntries.map(e=>e[1]),backgroundColor:reasonColorArr,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
+  renderDonutLabels(reasonEntries, reasonColorArr, reasonTotal, 'exit-reason-labels-left', 'exit-reason-labels-right', 'exit-reason-total');
 
   // 離職明細表
   const el = document.getElementById('exit-table-wrap');
