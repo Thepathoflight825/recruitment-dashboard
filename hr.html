@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人力資源儀表板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1a1a2e;
+    --blue: #185FA5;   --blue-light: #E6F1FB;
+    --teal: #1D9E75;   --teal-light: #E1F5EE;
+    --amber: #EF9F27;  --amber-light: #FAEEDA;
+    --red: #E24B4A;    --red-light: #FCEBEB;
+    --purple: #6B4FA0; --purple-light: #EFE9FA;
+    --gray: #F7F6F2;   --border: #E8E6DF;
+    --text: #1a1a2e;   --text-sub: #888780;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  .header { background: var(--navy); padding: 0 24px; display: flex; align-items: stretch; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; flex-direction: column; justify-content: center; padding: 14px 0; }
+  .header-title { font-size: 17px; font-weight: 700; color: #fff; }
+  .header-sub   { font-size: 11px; color: #6c9bc8; margin-top: 2px; }
+  .header-tabs  { display: flex; align-items: flex-end; gap: 2px; }
+  .tab { padding: 12px 18px 10px; font-size: 13px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
+  .tab.active { color: #fff; border-bottom-color: #378ADD; }
+  .tab:hover:not(.active) { color: #ccc; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .sync-badge  { font-size: 11px; color: #5DCAA5; background: rgba(29,158,117,.12); border: 0.5px solid #5DCAA5; border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+  .refresh-btn { background: rgba(255,255,255,.08); border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; color: #fff; font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: 'Noto Sans TC',sans-serif; }
+  .refresh-btn:hover { background: rgba(255,255,255,.15); }
+
+  /* ── 跳轉串接按鈕 ── */
+  .nav-bridge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.06); border: 0.5px solid rgba(255,255,255,.18); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 11px; color: #aac4e0; font-family: 'Noto Sans TC',sans-serif; transition: all .2s; white-space: nowrap; }
+  .nav-bridge:hover { background: rgba(255,255,255,.14); color: #fff; }
+  .nav-bridge .nb-icon { font-size: 13px; }
+  .nav-bridge .nb-arrow { font-size: 10px; margin-left: 2px; }
+
+  /* ── Layout ── */
+  .main { padding: 18px 24px 40px; max-width: 1280px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Stat cards ── */
+  .stat-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-card { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 14px 16px; position: relative; overflow: hidden; animation: fadeUp .4s ease both; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .stat-card.blue::before   { background: var(--blue); }
+  .stat-card.teal::before   { background: var(--teal); }
+  .stat-card.amber::before  { background: var(--amber); }
+  .stat-card.red::before    { background: var(--red); }
+  .stat-card.purple::before { background: var(--purple); }
+  .stat-card.gray::before   { background: #aaa; }
+  .stat-label { font-size: 10px; color: var(--text-sub); margin-bottom: 4px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .stat-sub   { font-size: 10px; color: #b4b2a9; margin-top: 4px; }
+  .stat-icon  { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 22px; opacity: .1; }
+  .stat-delta { font-size: 11px; font-weight: 600; margin-top: 3px; }
+  .stat-delta.up   { color: var(--teal); }
+  .stat-delta.down { color: var(--red); }
+
+  /* ── Panels ── */
+  .panel-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-13 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-31 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 18px; animation: fadeUp .5s ease both; }
+  .panel-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .panel-title .pt-sub { font-size: 11px; font-weight: 400; color: var(--text-sub); margin-left: 4px; }
+
+  /* ── Badge ── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-blue   { background: var(--blue-light);   color: var(--blue); }
+  .badge-teal   { background: var(--teal-light);   color: var(--teal); }
+  .badge-amber  { background: var(--amber-light);  color: #854F0B; }
+  .badge-red    { background: var(--red-light);    color: #A32D2D; }
+  .badge-purple { background: var(--purple-light); color: var(--purple); }
+  .badge-gray   { background: #F1EFE8; color: #5F5E5A; }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { text-align: left; padding: 6px 10px; font-size: 11px; font-weight: 500; color: var(--text-sub); background: var(--gray); border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  .data-table td { padding: 8px 10px; border-bottom: 0.5px solid #F1EFE8; color: #333; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAFAF8; }
+
+  /* ── Trend bar ── */
+  .trend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .trend-label { font-size: 11px; color: var(--text-sub); width: 52px; text-align: right; flex-shrink: 0; }
+  .trend-bar-bg   { flex: 1; height: 14px; background: var(--gray); border-radius: 3px; overflow: hidden; }
+  .trend-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .trend-val { font-size: 11px; font-weight: 600; color: var(--navy); width: 28px; }
+
+  /* ── 離職月份 bar ── */
+  .month-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .month-bar-label { font-size: 10px; color: var(--text-sub); width: 48px; flex-shrink: 0; }
+  .month-bar-bg   { flex: 1; height: 12px; background: var(--gray); border-radius: 2px; overflow: hidden; }
+  .month-bar-fill { height: 100%; border-radius: 2px; background: var(--amber); transition: width .6s ease; }
+  .month-bar-val  { font-size: 10px; font-weight: 600; color: var(--navy); width: 18px; }
+
+  /* ── Score row ── */
+  .score-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+  .score-label { font-size: 11px; color: var(--text-sub); width: 70px; text-align: right; flex-shrink: 0; }
+  .score-bar-bg   { flex: 1; height: 5px; background: var(--gray); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .score-val { font-size: 11px; font-weight: 700; color: var(--navy); width: 30px; }
+
+  /* ── KPI row ── */
+  .kpi-row { display: flex; align-items: center; padding: 9px 0; border-bottom: 0.5px solid #F1EFE8; gap: 10px; }
+  .kpi-row:last-child { border-bottom: none; }
+  .kpi-name   { flex: 1; font-size: 12px; color: var(--navy); font-weight: 500; }
+  .kpi-target { font-size: 11px; color: var(--text-sub); }
+  .kpi-value  { font-size: 18px; font-weight: 700; min-width: 55px; text-align: right; }
+
+  /* ── 風險卡片 ── */
+  .risk-card { border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid; }
+  .risk-card.high   { background: #FFF2F2; border-color: #E24B4A; }
+  .risk-card.medium { background: #FFFBF0; border-color: #EF9F27; }
+  .risk-card.low    { background: #F0F6FF; border-color: #3B8BD4; }
+  .risk-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .risk-card-level  { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+  .risk-card.high   .risk-card-level { background: #E24B4A; color: #fff; }
+  .risk-card.medium .risk-card-level { background: #EF9F27; color: #fff; }
+  .risk-card.low    .risk-card-level { background: #3B8BD4; color: #fff; }
+  .risk-card-title  { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .risk-card-metric { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+  .risk-card-desc   { font-size: 12px; color: #444; line-height: 1.6; }
+
+  /* ── 策略卡片 ── */
+  .strategy-card { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border: 0.5px solid var(--border); }
+  .strategy-card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .strategy-icon { font-size: 20px; flex-shrink: 0; }
+  .strategy-meta { flex: 1; }
+  .strategy-title { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .strategy-tag   { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
+  .strategy-body  { font-size: 12px; color: #444; line-height: 1.7; padding-left: 30px; }
+  .strategy-body li { margin-bottom: 4px; }
+  .strategy-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-left: 30px; }
+  .strategy-step  { background: var(--gray); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #555; border: 0.5px solid var(--border); }
+
+  /* ── 報告摘要 ── */
+  .report-summary-box { background: var(--navy); color: #fff; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .report-summary-box .rs-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .report-summary-box .rs-sub   { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
+  .report-summary-box .rs-body  { font-size: 12px; color: #c8d8ea; line-height: 1.7; }
+  .report-summary-box .rs-kpi-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 0.5px solid rgba(255,255,255,.12); }
+  .report-summary-box .rs-kpi-item { text-align: center; }
+  .report-summary-box .rs-kpi-val  { font-size: 22px; font-weight: 700; line-height: 1; }
+  .report-summary-box .rs-kpi-lbl  { font-size: 10px; color: #8899aa; margin-top: 2px; }
+  .report-section-title { font-size: 11px; font-weight: 700; color: var(--text-sub); letter-spacing: .06em; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+
+  /* ── 跳轉橋接卡 ── */
+  .bridge-card { background: var(--navy); border-radius: 14px; padding: 20px 24px; margin-bottom: 14px; display: flex; align-items: center; gap: 18px; }
+  .bridge-card .bc-icon { font-size: 32px; }
+  .bridge-card .bc-body { flex: 1; }
+  .bridge-card .bc-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .bridge-card .bc-desc  { font-size: 12px; color: #8899aa; line-height: 1.5; }
+  .bridge-card .bc-btn   { background: #378ADD; border: none; color: #fff; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Noto Sans TC',sans-serif; white-space: nowrap; transition: background .2s; }
+  .bridge-card .bc-btn:hover { background: #2872C4; }
+  .bridge-card.care  { background: linear-gradient(135deg, #1a1a2e 0%, #1D9E75 180%); }
+  .bridge-card.recruit { background: linear-gradient(135deg, #1a1a2e 0%, #185FA5 180%); }
+
+  /* ── alert banner ── */
+  .alert-banner { border-radius: 10px; padding: 11px 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
+  .alert-banner.critical { background: #FFF0F0; border: 1px solid #F5C0C0; color: #8B2020; }
+  .alert-banner.warning  { background: #FFFBF0; border: 1px solid #F5DFA0; color: #7A4D00; }
+  .alert-banner.info     { background: #F0F6FF; border: 1px solid #B8D4F5; color: #1A4A80; }
+  .alert-banner-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .alert-banner-body { flex: 1; }
+  .alert-banner-title { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .alert-banner-desc  { font-size: 11px; opacity: .85; line-height: 1.5; }
+
+  .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: var(--text-sub); font-size: 13px; gap: 8px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
+  .error-box { background: var(--red-light); border: 0.5px solid #F7C1C1; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #A32D2D; margin-bottom: 14px; }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes spin   { to { transform: rotate(360deg); } }
+  select option { background: #1a1a2e; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">人力資源儀表板</div>
+    <div class="header-sub" id="last-updated">載入中...</div>
+  </div>
+  <div class="header-tabs">
+    <div class="tab active" onclick="switchTab('overview')">總覽</div>
+    <div class="tab" onclick="switchTab('attrition')">離職分析</div>
+    <div class="tab" onclick="switchTab('leave')">差勤記錄</div>
+    <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
+  </div>
+  <div class="header-right">
+    <button class="nav-bridge" onclick="goTo('recruit')" title="前往招募管理儀表板">
+      <span class="nb-icon">🎯</span> 招募管理
+      <span class="nb-arrow">→</span>
+    </button>
+    <button class="nav-bridge" onclick="goTo('care')" title="前往關懷小幫手" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)">
+      <span class="nb-icon">💚</span> 關懷小幫手
+      <span class="nb-arrow">→</span>
+    </button>
+    <span class="sync-badge" id="sync-status">⟳ 載入中</span>
+    <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="error-box" class="error-box" style="display:none"></div>
+
+  <!-- ── 總覽 ── -->
+  <div class="tab-content active" id="tab-overview">
+    <div id="alert-banners-hr"></div>
+    <div class="stat-grid-6" id="stat-grid"></div>
+    <div class="panel-grid-3">
+      <div class="panel"><div class="panel-title">🏢 各單位在職人力</div><canvas id="chart-dept" height="180"></canvas></div>
+      <div class="panel"><div class="panel-title">🏅 年資結構 <span class="pt-sub">在職中</span></div><canvas id="chart-tenure" height="180"></canvas></div>
+      <div class="panel"><div class="panel-title">🎂 年齡分布 <span class="pt-sub">在職中</span></div><canvas id="chart-age" height="180"></canvas></div>
+    </div>
+    <div class="panel-grid-2">
+      <div class="panel"><div class="panel-title">📊 在職狀態</div><div style="display:flex;align-items:center;gap:20px"><canvas id="chart-status" width="160" height="160" style="flex-shrink:0"></canvas><div id="status-legend"></div></div></div>
+      <div class="panel"><div class="panel-title">🔧 職能分布 <span class="pt-sub">在職中</span></div><div style="display:flex;align-items:center;gap:20px"><canvas id="chart-role" width="160" height="160" style="flex-shrink:0"></canvas><div id="role-legend"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ── 離職分析 ── -->
+  <div class="tab-content" id="tab-attrition">
+    <div class="panel-grid-2" style="margin-bottom:14px">
+      <div class="panel"><div class="panel-title">📉 月離職人數趨勢</div><canvas id="chart-monthly-exit" height="200"></canvas></div>
+      <div class="panel"><div class="panel-title">📈 累計離職率趨勢</div><canvas id="chart-cumulative" height="200"></canvas></div>
+    </div>
+    <div class="panel-grid-3">
+      <div class="panel"><div class="panel-title">🔄 離職類型</div><div style="display:flex;flex-direction:column;align-items:center"><canvas id="chart-exit-type" width="160" height="160"></canvas><div id="exit-type-legend" style="margin-top:10px;font-size:11px;color:var(--text-sub)"></div></div></div>
+      <div class="panel"><div class="panel-title">💬 離職原因</div><div style="display:flex;flex-direction:column;align-items:center"><canvas id="chart-exit-reason" width="160" height="160"></canvas><div id="exit-reason-legend" style="margin-top:10px;font-size:11px;color:var(--text-sub)"></div></div></div>
+      <div class="panel"><div class="panel-title">📋 離職明細 <span class="pt-sub">近 10 筆</span></div><div id="exit-table-wrap"></div></div>
+    </div>
+  </div>
+
+  <!-- ── 差勤記錄 ── -->
+  <div class="tab-content" id="tab-leave">
+    <div class="panel-grid-2" style="margin-bottom:14px">
+      <div class="panel"><div class="panel-title">📅 假別使用趨勢 <span class="pt-sub">月份</span></div><canvas id="chart-leave-month" height="200"></canvas></div>
+      <div class="panel"><div class="panel-title">🏖️ 假別總量分布</div><canvas id="chart-leave-type" height="200"></canvas></div>
+    </div>
+    <div class="panel"><div class="panel-title">🏢 各單位請假天數</div><canvas id="chart-leave-dept" height="120"></canvas></div>
+    <div class="panel" style="margin-top:14px"><div class="panel-title">👤 個人請假排行</div><div id="leave-person-wrap"></div></div>
+  </div>
+
+  <!-- ── 本月報告 ── -->
+  <div class="tab-content" id="tab-report">
+    <div id="report-summary-wrap"></div>
+    <div class="report-section-title">🚨 風險預告</div>
+    <div id="report-risks"></div>
+    <div class="report-section-title">💡 策略建議</div>
+    <div id="report-strategies"></div>
+    <div class="report-section-title">🔗 人力資源全圖</div>
+    <div class="bridge-card recruit">
+      <div class="bc-icon">🎯</div>
+      <div class="bc-body">
+        <div class="bc-title">招募管理儀表板</div>
+        <div class="bc-desc">查看本期招募漏斗、應徵者名單、電訪評分與 KPI 達成狀況，與人力補充計劃接軌。</div>
+      </div>
+      <button class="bc-btn" onclick="goTo('recruit')">前往招募管理 →</button>
+    </div>
+    <div class="bridge-card care" style="margin-top:10px">
+      <div class="bc-icon">💚</div>
+      <div class="bc-body">
+        <div class="bc-title">關懷小幫手</div>
+        <div class="bc-desc">針對高離職風險同仁或差勤異常者，啟動關懷流程，提升員工留任率與組織健康度。</div>
+      </div>
+      <button class="bc-btn" onclick="goTo('care')" style="background:#1D9E75">前往關懷小幫手 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  設定區 — 僅需修改以下值
+// ══════════════════════════════════════
+const WORKER_URL    = 'https://lark-recruitment-api.sherrya82255.workers.dev';
+const BASE_TOKEN_HR = 'YOUR_HR_BASE_TOKEN';   // ← 填入人力資源 Base Token
+const TABLE_IDS_HR  = {
+  員工基本資料: 'YOUR_TABLE_ID_EMPLOYEE',
+  人力彙總:     'YOUR_TABLE_ID_SUMMARY',
+  離職記錄:     'YOUR_TABLE_ID_EXIT',
+  差勤記錄:     'YOUR_TABLE_ID_LEAVE',
+};
+// 跳轉 URL — 填入各儀表板在 Lark App 的網址
+const LINKS = {
+  recruit: '',   // ← 填入招募管理儀表板 URL
+  care:    '',   // ← 填入關懷小幫手 URL
+};
+// ══════════════════════════════════════
+
+let employees = [], summaries = [], exitList = [], leaveList = [];
+let chartInstances = {};
+
+// ── 跳轉 ──
+function goTo(key) {
+  if (LINKS[key]) { window.location.href = LINKS[key]; }
+  else { alert(`尚未設定「${key === 'recruit' ? '招募管理儀表板' : '關懷小幫手'}」的跳轉連結，請在程式碼 LINKS 區填入對應 URL。`); }
+}
+
+// ── 初始化 ──
+async function initDashboard() {
+  setSyncStatus('⟳ 連線中', '#EF9F27');
+  try {
+    await fetchAllTables();
+    renderAll();
+    setSyncStatus('⚡ 即時同步', '#5DCAA5');
+    document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
+  } catch(e) {
+    document.getElementById('error-box').textContent = '⚠️ 資料載入失敗：' + e.message + '（已載入示範資料）';
+    document.getElementById('error-box').style.display = 'block';
+    setSyncStatus('📋 示範資料', '#EF9F27');
+    loadDemoData();
+  }
+}
+
+async function fetchTable(tableId, baseToken) {
+  let records = [], pageToken = null;
+  do {
+    const path = `/open-apis/bitable/v1/apps/${baseToken}/tables/${tableId}/records?page_size=100${pageToken?'&page_token='+pageToken:''}`;
+    const res = await fetch(WORKER_URL + path);
+    const data = await res.json();
+    if (data.code !== 0) throw new Error('讀取失敗：' + data.msg);
+    records = records.concat(data.data?.items || []);
+    pageToken = data.data?.page_token || null;
+  } while(pageToken);
+  return records.map(r => r.fields);
+}
+
+async function fetchAllTables() {
+  if (!BASE_TOKEN_HR || BASE_TOKEN_HR === 'YOUR_HR_BASE_TOKEN') throw new Error('尚未設定 BASE_TOKEN_HR');
+  employees  = await fetchTable(TABLE_IDS_HR.員工基本資料, BASE_TOKEN_HR);
+  summaries  = await fetchTable(TABLE_IDS_HR.人力彙總,     BASE_TOKEN_HR);
+  exitList   = await fetchTable(TABLE_IDS_HR.離職記錄,     BASE_TOKEN_HR);
+  leaveList  = await fetchTable(TABLE_IDS_HR.差勤記錄,     BASE_TOKEN_HR);
+}
+
+// ── 示範資料（根據真實 CSV 建立）──
+function loadDemoData() {
+  employees = [
+    {員工編號:'002',英文名字:'Dana',   中文姓名:'王人焌',在職狀態:'在職中',  單位:'營運中心',職能:'PM', 年資區間:'5年以上', 年齡區間:'26-35歲'},
+    {員工編號:'010',英文名字:'Kassy',  中文姓名:'粘凱茵',在職狀態:'在職中',  單位:'管理中心',職能:'HR', 年資區間:'5年以上', 年齡區間:'26-35歲'},
+    {員工編號:'012',英文名字:'Felix',  中文姓名:'蔡岳融',在職狀態:'在職中',  單位:'技術中心',職能:'FE', 年資區間:'1-3年',   年齡區間:'26-35歲'},
+    {員工編號:'015',英文名字:'Fish',   中文姓名:'陳一',  在職狀態:'在職中',  單位:'技術中心',職能:'BE', 年資區間:'3-5年',   年齡區間:'26-35歲'},
+    {員工編號:'018',英文名字:'Finn',   中文姓名:'陳二',  在職狀態:'在職中',  單位:'客服中心',職能:'CS', 年資區間:'1-3年',   年齡區間:'36-45歲'},
+    {員工編號:'020',英文名字:'Jayfung',中文姓名:'馮三',  在職狀態:'在職中',  單位:'技術中心',職能:'SRE',年資區間:'5年以上', 年齡區間:'36-45歲'},
+    {員工編號:'022',英文名字:'Jimma',  中文姓名:'吳四',  在職狀態:'在職中',  單位:'管理中心',職能:'AD', 年資區間:'3-5年',   年齡區間:'36-45歲'},
+    {員工編號:'023',英文名字:'Dennis', 中文姓名:'林五',  在職狀態:'在職中',  單位:'運維中心',職能:'SRE',年資區間:'0-1年',   年齡區間:'26-35歲'},
+    {員工編號:'025',英文名字:'Judy',   中文姓名:'張六',  在職狀態:'在職中',  單位:'客服中心',職能:'CS', 年資區間:'0-1年',   年齡區間:'25歲以下'},
+    {員工編號:'027',英文名字:'Tom',    中文姓名:'王七',  在職狀態:'在職中',  單位:'客服中心',職能:'CS', 年資區間:'1-3年',   年齡區間:'26-35歲'},
+    // 補足到 30 在職
+    ...Array.from({length:20},(_,i)=>({英文名字:`E${i+30}`,在職狀態:'在職中',單位:['技術中心','客服中心','管理中心','營運中心','運維中心'][i%5],職能:['BE','CS','FE','PM','SRE','AD','HR'][i%7],年資區間:['0-1年','1-3年','3-5年','5年以上'][i%4],年齡區間:['26-35歲','36-45歲','26-35歲'][i%3]})),
+    // 已離職
+    ...Array.from({length:37},(_,i)=>({英文名字:`X${i+1}`,在職狀態:'已離職',單位:['技術中心','客服中心'][i%2],職能:'BE',年資區間:['0-1年','1-3年'][i%2],年齡區間:'26-35歲'})),
+    {英文名字:'Oswald',在職狀態:'留職停薪',單位:'技術中心',職能:'BE',年資區間:'5年以上',年齡區間:'36-45歲'},
+  ];
+  summaries = [
+    {月份:'2025/01',當月在職總人數:47,當月離職人數:1,當月新進人數:0,'累計離職人數（2025起）':1,'累計離職率（歷史總覽）':1.4,淨人力變化:-1},
+    {月份:'2025/02',當月在職總人數:47,當月離職人數:1,當月新進人數:1,'累計離職人數（2025起）':2,'累計離職率（歷史總覽）':2.9,淨人力變化:0},
+    {月份:'2025/03',當月在職總人數:45,當月離職人數:2,當月新進人數:0,'累計離職人數（2025起）':4,'累計離職率（歷史總覽）':5.7,淨人力變化:-2},
+    {月份:'2025/04',當月在職總人數:46,當月離職人數:0,當月新進人數:1,'累計離職人數（2025起）':4,'累計離職率（歷史總覽）':5.7,淨人力變化:1},
+    {月份:'2025/05',當月在職總人數:44,當月離職人數:3,當月新進人數:1,'累計離職人數（2025起）':7,'累計離職率（歷史總覽）':10,淨人力變化:-2},
+    {月份:'2025/06',當月在職總人數:34,當月離職人數:10,當月新進人數:0,'累計離職人數（2025起）':17,'累計離職率（歷史總覽）':24.3,淨人力變化:-10},
+    {月份:'2025/07',當月在職總人數:35,當月離職人數:0,當月新進人數:1,'累計離職人數（2025起）':17,'累計離職率（歷史總覽）':24.3,淨人力變化:1},
+    {月份:'2025/08',當月在職總人數:40,當月離職人數:0,當月新進人數:5,'累計離職人數（2025起）':17,'累計離職率（歷史總覽）':24.3,淨人力變化:5},
+    {月份:'2025/09',當月在職總人數:38,當月離職人數:2,當月新進人數:0,'累計離職人數（2025起）':19,'累計離職率（歷史總覽）':27.1,淨人力變化:-2},
+    {月份:'2025/10',當月在職總人數:37,當月離職人數:2,當月新進人數:1,'累計離職人數（2025起）':21,'累計離職率（歷史總覽）':30,淨人力變化:-1},
+    {月份:'2025/11',當月在職總人數:34,當月離職人數:4,當月新進人數:1,'累計離職人數（2025起）':25,'累計離職率（歷史總覽）':35.7,淨人力變化:-3},
+    {月份:'2025/12',當月在職總人數:32,當月離職人數:4,當月新進人數:2,'累計離職人數（2025起）':29,'累計離職率（歷史總覽）':41.4,淨人力變化:-2},
+    {月份:'2026/01',當月在職總人數:33,當月離職人數:1,當月新進人數:2,'累計離職人數（2025起）':30,'累計離職率（歷史總覽）':42.9,淨人力變化:1},
+    {月份:'2026/02',當月在職總人數:32,當月離職人數:1,當月新進人數:0,'累計離職人數（2025起）':31,'累計離職率（歷史總覽）':44.3,淨人力變化:-1},
+    {月份:'2026/03',當月在職總人數:32,當月離職人數:3,當月新進人數:3,'累計離職人數（2025起）':34,'累計離職率（歷史總覽）':48.6,淨人力變化:0},
+    {月份:'2026/04',當月在職總人數:30,當月離職人數:2,當月新進人數:0,'累計離職人數（2025起）':36,'累計離職率（歷史總覽）':51.4,淨人力變化:-2},
+    {月份:'2026/05',當月在職總人數:29,當月離職人數:1,當月新進人數:0,'累計離職人數（2025起）':37,'累計離職率（歷史總覽）':52.9,淨人力變化:-1},
+  ];
+  exitList = [
+    {英文名字:'Victor', 單位:'研發部',  職能:'BE', 離職類型:'自願離職', 離職原因:'移轉集團轄下公司', 離職月份:'2025/12', 年資區間:'5年以上'},
+    {英文名字:'Oswald', 單位:'技術中心',職能:'BE', 離職類型:'非自願離職',離職原因:'資遣_工作無法勝任',離職月份:'2025/11', 年資區間:'5年以上'},
+    {英文名字:'ExA',    單位:'客服中心',職能:'CS', 離職類型:'自願離職', 離職原因:'生涯規劃',         離職月份:'2025/06', 年資區間:'1-3年'},
+    {英文名字:'ExB',    單位:'技術中心',職能:'FE', 離職類型:'自願離職', 離職原因:'生涯規劃',         離職月份:'2025/06', 年資區間:'3-5年'},
+    {英文名字:'ExC',    單位:'技術中心',職能:'BE', 離職類型:'自願離職', 離職原因:'其他',             離職月份:'2025/06', 年資區間:'1-3年'},
+    {英文名字:'ExD',    單位:'技術中心',職能:'SRE',離職類型:'自願離職', 離職原因:'生涯規劃',         離職月份:'2025/06', 年資區間:'3-5年'},
+    {英文名字:'ExE',    單位:'營運中心',職能:'PM', 離職類型:'自願離職', 離職原因:'其他',             離職月份:'2025/06', 年資區間:'0-1年'},
+    {英文名字:'ExF',    單位:'客服中心',職能:'CS', 離職類型:'非自願離職',離職原因:'資遣_工作無法勝任',離職月份:'2025/06', 年資區間:'1-3年'},
+    {英文名字:'ExG',    單位:'技術中心',職能:'BE', 離職類型:'自願離職', 離職原因:'移轉集團轄下公司',  離職月份:'2025/05', 年資區間:'5年以上'},
+    {英文名字:'ExH',    單位:'管理中心',職能:'AD', 離職類型:'自願離職', 離職原因:'其他',             離職月份:'2025/11', 年資區間:'0-1年'},
+    ...Array.from({length:27},(_,i)=>({英文名字:`X${i+11}`,單位:['技術中心','客服中心','營運中心'][i%3],職能:['BE','CS','PM'][i%3],離職類型:i%5===0?'非自願離職':'自願離職',離職原因:['生涯規劃','其他','移轉集團轄下公司','資遣_工作無法勝任'][i%4],離職月份:['2025/09','2025/10','2025/11','2025/12','2026/01','2026/02','2026/03','2026/04','2026/05'][i%9],年資區間:['0-1年','1-3年','3-5年'][i%3]})),
+  ];
+  leaveList = [
+    {英文名字:'Kassy', 部門:'管理中心',月份:'2026/01',假別:'病假',天數:0.5},
+    {英文名字:'Kassy', 部門:'管理中心',月份:'2026/01',假別:'病假',天數:0.375},
+    {英文名字:'Dana',  部門:'營運中心',月份:'2026/02',假別:'病假',天數:1},
+    {英文名字:'Dana',  部門:'營運中心',月份:'2026/02',假別:'福利假',天數:1},
+    {英文名字:'Dana',  部門:'營運中心',月份:'2026/03',假別:'病假',天數:1},
+    {英文名字:'Dana',  部門:'營運中心',月份:'2026/04',假別:'病假',天數:1},
+    {英文名字:'Fish',  部門:'技術中心',月份:'2026/02',假別:'特休假',天數:1},
+    {英文名字:'Fish',  部門:'技術中心',月份:'2026/02',假別:'特休假',天數:1},
+    {英文名字:'Fish',  部門:'技術中心',月份:'2026/02',假別:'特休假',天數:1},
+    {英文名字:'Jayfung',部門:'技術中心',月份:'2026/02',假別:'喪假',天數:1},
+    {英文名字:'Jayfung',部門:'技術中心',月份:'2026/02',假別:'特休假',天數:1},
+    {英文名字:'Jayfung',部門:'技術中心',月份:'2026/02',假別:'補休假',天數:0.25},
+    {英文名字:'Jimma', 部門:'管理中心',月份:'2026/02',假別:'生理假',天數:1},
+    {英文名字:'Jimma', 部門:'管理中心',月份:'2026/03',假別:'生理假',天數:1},
+    {英文名字:'Dennis',部門:'運維中心',月份:'2026/02',假別:'補休假',天數:0.75},
+    {英文名字:'Felix', 部門:'技術中心',月份:'2026/02',假別:'福利假',天數:0.25},
+    {英文名字:'Finn',  部門:'客服中心',月份:'2026/03',假別:'病假',天數:1},
+    {英文名字:'Judy',  部門:'客服中心',月份:'2026/02',假別:'特休假',天數:1},
+    {英文名字:'Judy',  部門:'客服中心',月份:'2026/03',假別:'病假',天數:0.5},
+    // 補足特休、病假
+    ...Array.from({length:40},(_,i)=>({英文名字:`E${i+30}`,部門:['技術中心','客服中心','管理中心','營運中心','運維中心'][i%5],月份:['2026/01','2026/02','2026/03','2026/04'][i%4],假別:['特休假','病假','福利假','生理假','公出假','補休假','事假'][i%7],天數:[1,0.5,1,0.5,1][i%5]})),
+  ];
+  renderAll();
+  document.getElementById('last-updated').textContent = '示範模式';
+}
+
+function gf(obj, key) {
+  if (!obj || obj[key] === undefined || obj[key] === null) return null;
+  const v = obj[key];
+  if (Array.isArray(v)) return v.map(i=>typeof i==='object'?(i.text||i.name||''):i).join(', ');
+  if (typeof v === 'object' && v.text) return v.text;
+  return v;
+}
+function n(v) { return parseFloat(v) || 0; }
+
+// ── Render All ──
+function renderAll() {
+  renderStats();
+  renderCharts();
+  renderAttrition();
+  renderLeave();
+  renderAlertBannersHR();
+  renderReportHR();
+}
+
+function renderStats() {
+  const active   = employees.filter(e=>gf(e,'在職狀態')==='在職中').length;
+  const leave    = employees.filter(e=>gf(e,'在職狀態')==='留職停薪').length;
+  const total    = employees.length;
+  const latest   = summaries[summaries.length - 1] || {};
+  const prev     = summaries[summaries.length - 2] || {};
+  const exitCnt  = n(gf(latest,'當月離職人數'));
+  const newCnt   = n(gf(latest,'當月新進人數'));
+  const netChg   = n(gf(latest,'淨人力變化'));
+  const cumRate  = n(gf(latest,'累計離職率（歷史總覽）'));
+  const avgTenure= calcAvgTenure();
+
+  const grid = document.getElementById('stat-grid');
+  grid.innerHTML = `
+    <div class="stat-card blue">
+      <div class="stat-label">在職人數</div>
+      <div class="stat-value">${active}</div>
+      <div class="stat-sub">留職停薪 ${leave} 人</div>
+      <div class="stat-icon">👥</div>
+    </div>
+    <div class="stat-card ${exitCnt > 5 ? 'red' : 'amber'}">
+      <div class="stat-label">本月離職人數</div>
+      <div class="stat-value">${exitCnt}</div>
+      <div class="stat-sub">${gf(latest,'月份')||'—'}</div>
+      <div class="stat-icon">🚪</div>
+    </div>
+    <div class="stat-card teal">
+      <div class="stat-label">本月新進人數</div>
+      <div class="stat-value">${newCnt}</div>
+      <div class="stat-sub">淨變化 ${netChg >= 0 ? '+' : ''}${netChg}</div>
+      <div class="stat-icon">🌱</div>
+    </div>
+    <div class="stat-card ${cumRate > 40 ? 'red' : cumRate > 20 ? 'amber' : 'gray'}">
+      <div class="stat-label">累計離職率</div>
+      <div class="stat-value" style="font-size:22px">${cumRate}%</div>
+      <div class="stat-sub">2025 起歷史總覽</div>
+      <div class="stat-icon">📉</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">平均在職年資</div>
+      <div class="stat-value" style="font-size:22px">${avgTenure}</div>
+      <div class="stat-sub">在職中員工</div>
+      <div class="stat-icon">🏅</div>
+    </div>
+    <div class="stat-card gray">
+      <div class="stat-label">總員工數（歷史）</div>
+      <div class="stat-value">${total}</div>
+      <div class="stat-sub">含已離職</div>
+      <div class="stat-icon">📋</div>
+    </div>`;
+}
+
+function calcAvgTenure() {
+  const map = {'0-1年':0.5,'1-3年':2,'3-5年':4,'5年以上':6};
+  const actives = employees.filter(e=>gf(e,'在職狀態')==='在職中');
+  if (!actives.length) return '—';
+  const avg = actives.reduce((a,e)=>a+(map[gf(e,'年資區間')]||0),0)/actives.length;
+  return avg.toFixed(1) + ' 年';
+}
+
+function mkChart(id, config) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  chartInstances[id] = new Chart(ctx, config);
+}
+
+const CHART_COLORS = ['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#6B4FA0','#D85A30','#639922','#BA7517','#534AB7','#D4AC0D'];
+
+function renderCharts() {
+  const actives = employees.filter(e=>gf(e,'在職狀態')==='在職中');
+
+  // 各單位在職人力
+  const deptMap = {};
+  actives.forEach(e=>{ const d=gf(e,'單位')||'其他'; deptMap[d]=(deptMap[d]||0)+1; });
+  const deptSorted = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
+  mkChart('chart-dept', { type:'bar', data:{ labels:deptSorted.map(d=>d[0]), datasets:[{data:deptSorted.map(d=>d[1]), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+
+  // 年資結構
+  const tenureOrder = ['0-1年','1-3年','3-5年','5年以上'];
+  const tenureMap = {}; actives.forEach(e=>{ const t=gf(e,'年資區間')||'—'; tenureMap[t]=(tenureMap[t]||0)+1; });
+  mkChart('chart-tenure', { type:'bar', data:{ labels:tenureOrder, datasets:[{data:tenureOrder.map(t=>tenureMap[t]||0), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+
+  // 年齡分布
+  const ageOrder = ['25歲以下','26-35歲','36-45歲','46歲以上'];
+  const ageMap = {}; actives.forEach(e=>{ const a=gf(e,'年齡區間')||'—'; ageMap[a]=(ageMap[a]||0)+1; });
+  mkChart('chart-age', { type:'bar', data:{ labels:ageOrder.filter(a=>ageMap[a]>0), datasets:[{data:ageOrder.filter(a=>ageMap[a]>0).map(a=>ageMap[a]||0), backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+
+  // 在職狀態 donut
+  const statusMap = {}; employees.forEach(e=>{ const s=gf(e,'在職狀態')||'未知'; statusMap[s]=(statusMap[s]||0)+1; });
+  const statusColors = {'在職中':'#1D9E75','已離職':'#6B4FA0','留職停薪':'#3B8BD4'};
+  mkChart('chart-status',{type:'doughnut',data:{labels:Object.keys(statusMap),datasets:[{data:Object.values(statusMap),backgroundColor:Object.keys(statusMap).map(k=>statusColors[k]||'#aaa'),borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
+  document.getElementById('status-legend').innerHTML = Object.entries(statusMap).map(([k,v])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:${statusColors[k]||'#aaa'};flex-shrink:0"></span><span style="font-size:12px;color:#444">${k}: <strong>${v}</strong> (${Math.round(v/employees.length*100)}%)</span></div>`).join('');
+
+  // 職能分布 donut
+  const roleMap = {}; actives.forEach(e=>{ const r=gf(e,'職能')||'其他'; roleMap[r]=(roleMap[r]||0)+1; });
+  mkChart('chart-role',{type:'doughnut',data:{labels:Object.keys(roleMap),datasets:[{data:Object.values(roleMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
+  document.getElementById('role-legend').innerHTML = Object.entries(roleMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0"></span><span style="font-size:11px;color:#555">${k}: ${v} (${Math.round(v/actives.length*100)}%)</span></div>`).join('');
+}
+
+function renderAttrition() {
+  const months = summaries.map(r=>gf(r,'月份'));
+  const exits  = summaries.map(r=>n(gf(r,'當月離職人數')));
+  const cumRate = summaries.map(r=>n(gf(r,'累計離職率（歷史總覽）')));
+  const cumCnt  = summaries.map(r=>n(gf(r,'累計離職人數（2025起）')));
+
+  // 月離職趨勢
+  mkChart('chart-monthly-exit',{type:'bar',data:{labels:months,datasets:[{label:'當月離職人數',data:exits,backgroundColor:exits.map(v=>v>=5?'#E24B4A':v>=3?'#EF9F27':'#3B8BD4'),borderRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false},ticks:{font:{size:9}}}},responsive:true,maintainAspectRatio:true}});
+
+  // 累計離職率
+  mkChart('chart-cumulative',{type:'line',data:{labels:months,datasets:[{label:'累計離職率(%)',data:cumRate,borderColor:'#3B8BD4',backgroundColor:'rgba(59,139,212,.08)',tension:.3,pointRadius:3,yAxisID:'y'},{label:'累計離職人數',data:cumCnt,borderColor:'#1D9E75',backgroundColor:'transparent',tension:.3,pointRadius:3,yAxisID:'y1',borderDash:[5,3]}]},options:{plugins:{legend:{labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},y1:{beginAtZero:true,position:'right',ticks:{font:{size:10}},grid:{drawOnChartArea:false}}},responsive:true,maintainAspectRatio:true}});
+
+  // 離職類型
+  const typeMap = {}; exitList.forEach(e=>{ const t=gf(e,'離職類型')||'未知'; typeMap[t]=(typeMap[t]||0)+1; });
+  mkChart('chart-exit-type',{type:'doughnut',data:{labels:Object.keys(typeMap),datasets:[{data:Object.values(typeMap),backgroundColor:['#EF9F27','#3B8BD4'],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
+  document.getElementById('exit-type-legend').innerHTML = Object.entries(typeMap).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${['#EF9F27','#3B8BD4'][i]};margin-right:4px"></span>${k}: <strong>${v}</strong> (${Math.round(v/exitList.length*100)}%)</div>`).join('');
+
+  // 離職原因
+  const reasonMap = {}; exitList.forEach(e=>{ const r=gf(e,'離職原因')||'未知'; reasonMap[r]=(reasonMap[r]||0)+1; });
+  mkChart('chart-exit-reason',{type:'doughnut',data:{labels:Object.keys(reasonMap),datasets:[{data:Object.values(reasonMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
+  document.getElementById('exit-reason-legend').innerHTML = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i]};margin-right:4px"></span>${k}: <strong>${v}</strong></div>`).join('');
+
+  // 離職明細表
+  const el = document.getElementById('exit-table-wrap');
+  const recent = [...exitList].slice(-10).reverse();
+  if (!recent.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
+  el.innerHTML = `<table class="data-table"><thead><tr><th>姓名</th><th>單位</th><th>類型</th><th>原因</th><th>月份</th></tr></thead><tbody>
+    ${recent.map(r=>`<tr><td><strong>${gf(r,'英文名字')||'—'}</strong></td><td>${gf(r,'單位')||'—'}</td><td><span class="badge ${gf(r,'離職類型')==='自願離職'?'badge-amber':'badge-red'}">${gf(r,'離職類型')||'—'}</span></td><td style="font-size:11px;color:var(--text-sub)">${gf(r,'離職原因')||'—'}</td><td style="font-size:11px">${gf(r,'離職月份')||'—'}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderLeave() {
+  const LEAVE_COLORS = {'病假':'#3B8BD4','特休假':'#EF9F27','福利假':'#1D9E75','生理假':'#E24B4A','公出假':'#6B4FA0','補休假':'#D85A30','事假':'#BA7517','喪假':'#534AB7'};
+
+  // 假別月份趨勢（堆疊）
+  const months = [...new Set(leaveList.map(l=>gf(l,'月份')).filter(Boolean))].sort();
+  const types  = [...new Set(leaveList.map(l=>gf(l,'假別')).filter(Boolean))];
+  const datasets = types.map((t,i)=>({label:t,data:months.map(m=>leaveList.filter(l=>gf(l,'月份')===m&&gf(l,'假別')===t).reduce((a,l)=>a+n(gf(l,'天數')),0)),backgroundColor:LEAVE_COLORS[t]||CHART_COLORS[i],stack:'a'}));
+  mkChart('chart-leave-month',{type:'bar',data:{labels:months,datasets},options:{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{font:{size:10}}}},responsive:true,maintainAspectRatio:true}});
+
+  // 假別總量
+  const typeTotal = {}; leaveList.forEach(l=>{ const t=gf(l,'假別')||'其他'; typeTotal[t]=(typeTotal[t]||0)+n(gf(l,'天數')); });
+  const sortedTypes = Object.entries(typeTotal).sort((a,b)=>b[1]-a[1]);
+  mkChart('chart-leave-type',{type:'bar',data:{labels:sortedTypes.map(t=>t[0]),datasets:[{data:sortedTypes.map(t=>t[1].toFixed(2)),backgroundColor:sortedTypes.map(([t])=>LEAVE_COLORS[t]||'#aaa'),borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+
+  // 各單位請假天數
+  const deptMap = {}; leaveList.forEach(l=>{ const d=gf(l,'部門')||'其他'; deptMap[d]=(deptMap[d]||0)+n(gf(l,'天數')); });
+  const sortedDept = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
+  mkChart('chart-leave-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>d[1].toFixed(2)),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+
+  // 個人請假排行
+  const personMap = {}; leaveList.forEach(l=>{ const p=gf(l,'英文名字')||'未知'; if(!personMap[p]) personMap[p]={total:0,types:{}}; personMap[p].total+=n(gf(l,'天數')); const t=gf(l,'假別')||'其他'; personMap[p].types[t]=(personMap[p].types[t]||0)+n(gf(l,'天數')); });
+  const topPersons = Object.entries(personMap).sort((a,b)=>b[1].total-a[1].total).slice(0,15);
+  const el = document.getElementById('leave-person-wrap');
+  if (!topPersons.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
+  el.innerHTML = `<table class="data-table"><thead><tr><th>姓名</th><th>假別明細</th><th style="text-align:right">合計(天)</th></tr></thead><tbody>
+    ${topPersons.map(([name,d])=>`<tr><td><strong>${name}</strong></td><td>${Object.entries(d.types).map(([t,v])=>`<span class="badge badge-gray" style="margin-right:3px;background:${LEAVE_COLORS[t]+'22'};color:#333">${t} ${v.toFixed(2)}</span>`).join('')}</td><td style="text-align:right;font-weight:700">${d.total.toFixed(2)}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── 風險計算 ──
+function computeHRMetrics() {
+  const latest     = summaries[summaries.length-1] || {};
+  const prev       = summaries[summaries.length-2] || {};
+  const actives    = employees.filter(e=>gf(e,'在職狀態')==='在職中');
+  const exitCnt    = n(gf(latest,'當月離職人數'));
+  const newCnt     = n(gf(latest,'當月新進人數'));
+  const cumRate    = n(gf(latest,'累計離職率（歷史總覽）'));
+  const activeCnt  = actives.length;
+  const monthlyRate= activeCnt ? parseFloat((exitCnt/activeCnt*100).toFixed(1)) : 0;
+  const netChange  = n(gf(latest,'淨人力變化'));
+
+  // 年資 0-1 年佔比
+  const juniorPct  = actives.length ? Math.round(actives.filter(e=>gf(e,'年資區間')==='0-1年').length/actives.length*100) : 0;
+  // 單一單位最高離職數
+  const exitByDept = {}; exitList.forEach(e=>{ const d=gf(e,'單位')||'其他'; exitByDept[d]=(exitByDept[d]||0)+1; });
+  const maxDeptExit= Math.max(...Object.values(exitByDept),0);
+  const maxDeptName= Object.entries(exitByDept).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
+  // 最新月份病假率
+  const latestMonth= gf(latest,'月份');
+  const sickDays   = leaveList.filter(l=>gf(l,'假別')==='病假'&&gf(l,'月份')===latestMonth).reduce((a,l)=>a+n(gf(l,'天數')),0);
+  // 自願離職 vs 非自願
+  const voluntaryPct = exitList.length ? Math.round(exitList.filter(e=>gf(e,'離職類型')==='自願離職').length/exitList.length*100) : 0;
+
+  return { latest, exitCnt, newCnt, cumRate, activeCnt, monthlyRate, netChange, juniorPct, maxDeptExit, maxDeptName, sickDays, latestMonth, voluntaryPct };
+}
+
+function computeHRRisks(m) {
+  const risks = [];
+
+  if (m.cumRate > 50) risks.push({level:'high', icon:'🚨', title:'累計離職率嚴重超標', metric:`累計離職率 ${m.cumRate}%（2025 起）`, desc:`過去 17 個月已有超過半數歷史員工離職，顯示組織留任能力面臨嚴峻挑戰，建議啟動全面的留才專案及薪資結構檢討。`, tag:'留才風險'});
+  else if (m.cumRate > 30) risks.push({level:'medium', icon:'📉', title:'累計離職率偏高', metric:`累計離職率 ${m.cumRate}%`, desc:`歷史離職率持續攀升，須監控是否出現加速趨勢，並針對高離職率部門進行深度訪談。`, tag:'留才風險'});
+
+  if (m.monthlyRate > 10) risks.push({level:'high', icon:'🔥', title:'當月離職率過高', metric:`月離職率 ${m.monthlyRate}%（${m.exitCnt} 人）`, desc:`當月離職人數偏高，若持續超過 10% 將嚴重影響服務能量與交接品質，建議本週緊急召開部門主管會議評估原因。`, tag:'緊急風險'});
+  else if (m.monthlyRate > 5) risks.push({level:'medium', icon:'⚠️', title:'當月離職率偏高', metric:`月離職率 ${m.monthlyRate}%`, desc:`當月離職比例高於健康水準（< 5%），需追蹤是否為連續趨勢。`, tag:'留才風險'});
+
+  if (m.netChange < 0 && m.newCnt < m.exitCnt) risks.push({level:'high', icon:'📊', title:'淨人力持續負成長', metric:`本月淨變化 ${m.netChange}，新進 ${m.newCnt} < 離職 ${m.exitCnt}`, desc:`補充人力速度跟不上流失速度，若招募管線未能及時填補，將造成業務超載與品質下滑。`, tag:'人力缺口'});
+
+  if (m.juniorPct > 30) risks.push({level:'medium', icon:'🌱', title:'新進員工比例偏高', metric:`年資 0-1 年佔在職 ${m.juniorPct}%`, desc:`大量新進員工需要較多培訓資源與輔導，短期內可能影響整體生產力，建議啟動配對導師制。`, tag:'人才發展'});
+
+  if (m.maxDeptExit > 5) risks.push({level:'medium', icon:'🏢', title:`${m.maxDeptName} 離職集中`, metric:`${m.maxDeptName} 離職 ${m.maxDeptExit} 人（歷史最高單位）`, desc:`單一部門離職人數過於集中，需了解該部門是否存在管理問題、薪資落差或工作負荷問題。`, tag:'部門風險'});
+
+  if (m.voluntaryPct > 75) risks.push({level:'low', icon:'💼', title:'自願離職比例偏高', metric:`自願離職佔 ${m.voluntaryPct}%`, desc:`高自願離職率通常反映對組織的主動脫離意願，建議透過離職訪談深入了解核心動機，並定期進行在職員工滿意度調查。`, tag:'員工關係'});
+
+  return risks.sort((a,b)=>({'high':0,'medium':1,'low':2}[a.level]-{'high':0,'medium':1,'low':2}[b.level]));
+}
+
+function computeHRStrategies(m, risks) {
+  const strategies = [];
+  const tags = risks.map(r=>r.tag);
+
+  if (tags.includes('緊急風險') || tags.includes('留才風險')) {
+    strategies.push({icon:'🤝', title:'啟動留才行動計劃', tag:'短期 · 立即執行', body:`<li>本週內完成對所有在職滿 1-3 年員工的<strong>個別留才訪談</strong>，掌握潛在離職意向</li><li>對照市場薪資資料，評估是否需要啟動<strong>薪資調整或彈性福利方案</strong></li><li>彙整離職訪談中重複出現的原因，形成 Top 3 改善項目呈報管理層</li>`, steps:['1週內完成留才訪談','薪資市場比對','離職原因 Top 3 呈報']});
+  }
+
+  if (tags.includes('人力缺口')) {
+    strategies.push({icon:'🎯', title:'與招募管理儀表板聯動補充人力', tag:'短期 · 跨部門協作', body:`<li>對照在職人力缺口，立即更新各職缺的<strong>招募優先順序</strong>，與 HR 招募側同步</li><li>啟用招募管理儀表板確認目前各職缺的漏斗進度，預估填補時程</li><li>若招募週期超過 60 天，需評估是否啟動<strong>外包或臨時人力</strong>作為過渡</li>`, steps:['更新招募優先順序','確認漏斗進度','評估臨時人力']});
+  }
+
+  if (tags.includes('人才發展')) {
+    strategies.push({icon:'📚', title:'建立新進員工培訓與導師制度', tag:'中期 · 人才投資', body:`<li>為年資 0-1 年員工指定<strong>配對資深導師</strong>，每月進行一次非正式 Check-in</li><li>建立 <strong>30/60/90 天入職學習地圖</strong>，追蹤完成進度</li><li>每季舉辦跨部門交流活動，強化新進員工的組織認同感</li>`, steps:['配對導師制','30/60/90天地圖','每季交流活動']});
+  }
+
+  strategies.push({icon:'💚', title:'啟用關懷小幫手 — 預防性員工關懷', tag:'長期 · 組織健康', body:`<li>針對<strong>差勤異常</strong>（病假 ≥ 3 天/月）或<strong>高離職風險部門</strong>同仁，觸發關懷流程</li><li>HR 每月透過關懷小幫手進行結構化關懷訪談，記錄員工狀態與需求</li><li>建立員工關懷指數趨勢，作為月度人資報告的健康度指標</li>`, steps:['差勤異常自動觸發','每月結構化訪談','建立關懷健康指數']});
+
+  strategies.push({icon:'📊', title:'人力資源月報標準化', tag:'長期 · 月報機制', body:`<li>以本儀表板為基礎，每月 5 日前完成人力月報，涵蓋：在職數、離職率、新進人數、病假趨勢</li><li>月報後立即銜接招募管理儀表板，說明人力補充計畫</li><li>季度會議加入<strong>員工滿意度調查</strong>結果，形成完整人力健康全圖</li>`, steps:['每月5日完成月報','銜接招募儀表板','季度滿意度調查']});
+
+  return strategies;
+}
+
+function renderAlertBannersHR() {
+  const m = computeHRMetrics();
+  const risks = computeHRRisks(m);
+  const el = document.getElementById('alert-banners-hr');
+  if (!el) return;
+  const highRisks = risks.filter(r=>r.level==='high');
+  const medRisks  = risks.filter(r=>r.level==='medium');
+  if (!risks.length) { el.innerHTML = `<div class="alert-banner info"><div class="alert-banner-icon">✅</div><div class="alert-banner-body"><div class="alert-banner-title">人力狀態良好</div><div class="alert-banner-desc">本期各項指標均在健康範圍。</div></div></div>`; return; }
+  let html = '';
+  if (highRisks.length) html += `<div class="alert-banner critical"><div class="alert-banner-icon">🚨</div><div class="alert-banner-body"><div class="alert-banner-title">高風險預警（${highRisks.length} 項）— 需立即處理</div><div class="alert-banner-desc">${highRisks.map(r=>`<strong>${r.title}</strong>：${r.metric}`).join('　｜　')}</div></div></div>`;
+  if (medRisks.length) html += `<div class="alert-banner warning"><div class="alert-banner-icon">⚠️</div><div class="alert-banner-body"><div class="alert-banner-title">中風險提醒（${medRisks.length} 項）</div><div class="alert-banner-desc">${medRisks.map(r=>r.title).join('、')}</div></div></div>`;
+  html += `<div style="text-align:right;margin-bottom:6px"><button onclick="switchTab('report')" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;text-decoration:underline">→ 查看完整風險分析與策略建議</button></div>`;
+  el.innerHTML = html;
+}
+
+function renderReportHR() {
+  const m = computeHRMetrics();
+  const risks = computeHRRisks(m);
+  const strategies = computeHRStrategies(m, risks);
+  const highCount = risks.filter(r=>r.level==='high').length;
+  const now = new Date();
+  const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
+  const statusText  = highCount > 0 ? '⚠ 高風險' : risks.length > 0 ? '注意' : '✓ 健康';
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">人力資源狀況摘要</div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        截至 <strong style="color:#fff">${gf(m.latest,'月份')||'—'}</strong>，在職人數 <strong style="color:#fff">${m.activeCnt}</strong> 人，
+        本月離職 <strong style="color:${m.exitCnt>5?'#F08080':'#fff'}">${m.exitCnt}</strong> 人、新進 <strong style="color:#fff">${m.newCnt}</strong> 人，
+        淨變化 <strong style="color:${m.netChange<0?'#F08080':'#5DCAA5'}">${m.netChange>=0?'+':''}${m.netChange}</strong>。
+        累計離職率（2025 起歷史）<strong style="color:${m.cumRate>40?'#F08080':'#fff'}">${m.cumRate}%</strong>。
+        在職員工年資 0-1 年佔比 <strong style="color:${m.juniorPct>30?'#F08080':'#fff'}">${m.juniorPct}%</strong>，
+        自願離職佔全體離職 <strong style="color:#fff">${m.voluntaryPct}%</strong>。
+        共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${m.activeCnt}</div><div class="rs-kpi-lbl">在職人數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.exitCnt>5?'#F08080':'#EF9F27'}">${m.exitCnt}</div><div class="rs-kpi-lbl">本月離職</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.cumRate>40?'#F08080':'#EF9F27'}">${m.cumRate}%</div><div class="rs-kpi-lbl">累計離職率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.monthlyRate>10?'#F08080':'#5DCAA5'}">${m.monthlyRate}%</div><div class="rs-kpi-lbl">月離職率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.netChange<0?'#F08080':'#5DCAA5'}">${m.netChange>=0?'+':''}${m.netChange}</div><div class="rs-kpi-lbl">淨人力</div></div>
+      </div>
+    </div>`;
+
+  document.getElementById('report-risks').innerHTML = !risks.length
+    ? `<div style="color:var(--text-sub);font-size:13px;padding:16px 0;text-align:center">🎉 本期無顯著風險！</div>`
+    : risks.map(r=>`<div class="risk-card ${r.level}"><div class="risk-card-header"><span style="font-size:18px">${r.icon}</span><span class="risk-card-level">${{high:'高風險',medium:'中風險',low:'低風險'}[r.level]}</span><span class="risk-card-title">${r.title}</span><span style="font-size:10px;color:var(--text-sub);margin-left:auto">${r.tag}</span></div><div class="risk-card-metric">📌 ${r.metric}</div><div class="risk-card-desc">${r.desc}</div></div>`).join('');
+
+  document.getElementById('report-strategies').innerHTML = strategies.map(s=>`<div class="strategy-card"><div class="strategy-card-header"><div class="strategy-icon">${s.icon}</div><div class="strategy-meta"><div class="strategy-title">${s.title}</div><div class="strategy-tag">${s.tag}</div></div></div><ul class="strategy-body">${s.body}</ul><div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div></div>`).join('');
+}
+
+function switchTab(n) {
+  const tabs = ['overview','attrition','leave','report'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===n));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');
+}
+
+function setSyncStatus(t,c) { const el=document.getElementById('sync-status'); el.textContent=t; el.style.color=c; el.style.borderColor=c; el.style.background=c+'18'; }
+
+// ── 啟動 ──
+initDashboard();
+</script>
+</body>
+</html>
