@@ -191,6 +191,17 @@
     <div class="header-title">人力資源儀表板</div>
     <div class="header-sub" id="last-updated">載入中...</div>
   </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:0 12px">
+    <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
+    <select id="period-select" onchange="onPeriodChange(this.value)" style="background:#2a2a45;border:0.5px solid #3a3a5e;border-radius:6px;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer;font-family:'Noto Sans TC',sans-serif">
+      <option value="current">當月</option>
+      <option value="prev" selected>上個月</option>
+      <option value="3m">近三個月</option>
+      <option value="6m">近半年</option>
+      <option value="1y">整年度</option>
+      <option value="all">全部</option>
+    </select>
+  </div>
   <div class="header-tabs">
     <div class="tab active" onclick="switchTab('overview')">總覽</div>
     <div class="tab" onclick="switchTab('attrition')">離職分析</div>
@@ -422,6 +433,61 @@ function loadDemoData() {
   document.getElementById('last-updated').textContent = '示範模式';
 }
 
+let selectedPeriod = 'prev';
+
+function getPeriodRange(period) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  switch(period) {
+    case 'current': return { start: new Date(y, m, 1),     end: new Date(y, m+1, 0) };
+    case 'prev':    return { start: new Date(y, m-1, 1),   end: new Date(y, m, 0) };
+    case '3m':      return { start: new Date(y, m-2, 1),   end: new Date(y, m+1, 0) };
+    case '6m':      return { start: new Date(y, m-5, 1),   end: new Date(y, m+1, 0) };
+    case '1y':      return { start: new Date(y, 0, 1),     end: new Date(y, 11, 31) };
+    default:        return null;
+  }
+}
+
+function parseDateVal(v) {
+  if (!v) return null;
+  if (!isNaN(v)) return new Date(Number(v));
+  return new Date(String(v).replace(/\//g, '-').split(' ')[0]);
+}
+
+function filterByPeriod(records, dateField) {
+  const range = getPeriodRange(selectedPeriod);
+  if (!range) return records;
+  return records.filter(r => {
+    const d = parseDateVal(gf(r, dateField));
+    return d && d >= range.start && d <= range.end;
+  });
+}
+
+function onPeriodChange(val) {
+  selectedPeriod = val;
+  renderAll();
+}
+
+// 取得篩選後的人力彙總（取最後一筆符合期間的月份）
+function getFilteredSummaries() {
+  if (selectedPeriod === 'all') return summaries;
+  const range = getPeriodRange(selectedPeriod);
+  if (!range) return summaries;
+  return summaries.filter(r => {
+    const d = parseDateVal(gf(r, '月份'));
+    return d && d >= range.start && d <= range.end;
+  });
+}
+
+function getFilteredExitList() {
+  return filterByPeriod(exitList, '離職月份');
+}
+
+function getFilteredLeaveList() {
+  return filterByPeriod(leaveList, '月份');
+}
+
+
 function gf(obj, key) {
   if (!obj || obj[key] === undefined || obj[key] === null) return null;
   const v = obj[key];
@@ -445,8 +511,8 @@ function renderStats() {
   const active   = employees.filter(e=>gf(e,'在職狀態')==='在職中').length;
   const leave    = employees.filter(e=>gf(e,'在職狀態')==='留職停薪').length;
   const total    = employees.length;
-  const latest   = summaries[summaries.length - 1] || {};
-  const prev     = summaries[summaries.length - 2] || {};
+  const fs       = getFilteredSummaries();
+  const latest   = fs[fs.length - 1] || summaries[summaries.length - 1] || {};
   const exitCnt  = n(gf(latest,'當月離職人數'));
   const newCnt   = n(gf(latest,'當月新進人數'));
   const netChg   = n(gf(latest,'淨人力變化'));
@@ -501,6 +567,37 @@ function calcAvgTenure() {
   return avg.toFixed(1) + ' 年';
 }
 
+// ── 全域長條圖數值標籤 plugin ──
+const barLabelPlugin = {
+  id: 'barLabel',
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.type !== 'bar') return;
+      meta.data.forEach((bar, i) => {
+        const val = ds.data[i];
+        if (!val || val === '0' || val === 0) return;
+        const isHorizontal = chart.options.indexAxis === 'y';
+        ctx.save();
+        ctx.font = '600 10px Noto Sans TC,sans-serif';
+        ctx.textBaseline = 'middle';
+        if (isHorizontal) {
+          ctx.fillStyle = '#333';
+          ctx.textAlign = 'left';
+          ctx.fillText(val, bar.x + 4, bar.y);
+        } else {
+          ctx.fillStyle = '#555';
+          ctx.textAlign = 'center';
+          ctx.fillText(val, bar.x, bar.y - 5);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(barLabelPlugin);
+
 function mkChart(id, config) {
   if (chartInstances[id]) { chartInstances[id].destroy(); }
   const ctx = document.getElementById(id);
@@ -529,43 +626,49 @@ function renderCharts() {
   const ageMap = {}; actives.forEach(e=>{ const a=gf(e,'年齡區間')||'—'; ageMap[a]=(ageMap[a]||0)+1; });
   mkChart('chart-age', { type:'bar', data:{ labels:ageOrder.filter(a=>ageMap[a]>0), datasets:[{data:ageOrder.filter(a=>ageMap[a]>0).map(a=>ageMap[a]||0), backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
 
-  // 在職狀態 donut
+  // 在職狀態 donut（中央顯示總數）
   const statusMap = {}; employees.forEach(e=>{ const s=gf(e,'在職狀態')||'未知'; statusMap[s]=(statusMap[s]||0)+1; });
   const statusColors = {'在職中':'#1D9E75','已離職':'#6B4FA0','留職停薪':'#3B8BD4'};
-  mkChart('chart-status',{type:'doughnut',data:{labels:Object.keys(statusMap),datasets:[{data:Object.values(statusMap),backgroundColor:Object.keys(statusMap).map(k=>statusColors[k]||'#aaa'),borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
-  document.getElementById('status-legend').innerHTML = Object.entries(statusMap).map(([k,v])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:${statusColors[k]||'#aaa'};flex-shrink:0"></span><span style="font-size:12px;color:#444">${k}: <strong>${v}</strong> (${Math.round(v/employees.length*100)}%)</span></div>`).join('');
+  const statusTotal = employees.length;
+  mkChart('chart-status',{type:'doughnut',data:{labels:Object.keys(statusMap),datasets:[{data:Object.values(statusMap),backgroundColor:Object.keys(statusMap).map(k=>statusColors[k]||'#aaa'),borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 22px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(statusTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
+  document.getElementById('status-legend').innerHTML = Object.entries(statusMap).map(([k,v])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:${statusColors[k]||'#aaa'};flex-shrink:0"></span><span style="font-size:12px;color:#444">${k}: <strong>${v}</strong> (${Math.round(v/statusTotal*100)}%)</span></div>`).join('');
 
-  // 職能分布 donut
+  // 職能分布 donut（中央顯示總數）
   const roleMap = {}; actives.forEach(e=>{ const r=gf(e,'職能')||'其他'; roleMap[r]=(roleMap[r]||0)+1; });
-  mkChart('chart-role',{type:'doughnut',data:{labels:Object.keys(roleMap),datasets:[{data:Object.values(roleMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false}});
-  document.getElementById('role-legend').innerHTML = Object.entries(roleMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0"></span><span style="font-size:11px;color:#555">${k}: ${v} (${Math.round(v/actives.length*100)}%)</span></div>`).join('');
+  const roleTotal = actives.length;
+  mkChart('chart-role',{type:'doughnut',data:{labels:Object.keys(roleMap),datasets:[{data:Object.values(roleMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',plugins:{legend:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 22px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(roleTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
+  document.getElementById('role-legend').innerHTML = Object.entries(roleMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0"></span><span style="font-size:11px;color:#555">${k}: ${v} (${Math.round(v/roleTotal*100)}%)</span></div>`).join('');
 }
 
 function renderAttrition() {
-  const months = summaries.map(r=>gf(r,'月份'));
-  const exits  = summaries.map(r=>n(gf(r,'當月離職人數')));
-  const cumRate = summaries.map(r=>n(gf(r,'累計離職率（歷史總覽）')));
-  const cumCnt  = summaries.map(r=>n(gf(r,'累計離職人數（2025起）')));
+  const fs = getFilteredSummaries();
+  const fel = getFilteredExitList();
+  const months  = fs.map(r=>gf(r,'月份'));
+  const exits   = fs.map(r=>n(gf(r,'當月離職人數')));
+  const cumRate = fs.map(r=>n(gf(r,'累計離職率（歷史總覽）')));
+  const cumCnt  = fs.map(r=>n(gf(r,'累計離職人數（2025起）')));
 
-  // 月離職趨勢
+  // 月離職趨勢（長條標值）
   mkChart('chart-monthly-exit',{type:'bar',data:{labels:months,datasets:[{label:'當月離職人數',data:exits,backgroundColor:exits.map(v=>v>=5?'#E24B4A':v>=3?'#EF9F27':'#3B8BD4'),borderRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false},ticks:{font:{size:9}}}},responsive:true,maintainAspectRatio:true}});
 
   // 累計離職率
   mkChart('chart-cumulative',{type:'line',data:{labels:months,datasets:[{label:'累計離職率(%)',data:cumRate,borderColor:'#3B8BD4',backgroundColor:'rgba(59,139,212,.08)',tension:.3,pointRadius:3,yAxisID:'y'},{label:'累計離職人數',data:cumCnt,borderColor:'#1D9E75',backgroundColor:'transparent',tension:.3,pointRadius:3,yAxisID:'y1',borderDash:[5,3]}]},options:{plugins:{legend:{labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},y1:{beginAtZero:true,position:'right',ticks:{font:{size:10}},grid:{drawOnChartArea:false}}},responsive:true,maintainAspectRatio:true}});
 
-  // 離職類型
-  const typeMap = {}; exitList.forEach(e=>{ const t=gf(e,'離職類型')||'未知'; typeMap[t]=(typeMap[t]||0)+1; });
-  mkChart('chart-exit-type',{type:'doughnut',data:{labels:Object.keys(typeMap),datasets:[{data:Object.values(typeMap),backgroundColor:['#EF9F27','#3B8BD4'],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
-  document.getElementById('exit-type-legend').innerHTML = Object.entries(typeMap).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${['#EF9F27','#3B8BD4'][i]};margin-right:4px"></span>${k}: <strong>${v}</strong> (${Math.round(v/exitList.length*100)}%)</div>`).join('');
+  // 離職類型 donut（中央顯示總數）
+  const typeMap = {}; fel.forEach(e=>{ const t=gf(e,'離職類型')||'未知'; typeMap[t]=(typeMap[t]||0)+1; });
+  const typeTotal = fel.length;
+  mkChart('chart-exit-type',{type:'doughnut',data:{labels:Object.keys(typeMap),datasets:[{data:Object.values(typeMap),backgroundColor:['#EF9F27','#3B8BD4'],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false},datalabels:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 20px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(typeTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
+  document.getElementById('exit-type-legend').innerHTML = Object.entries(typeMap).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${['#EF9F27','#3B8BD4'][i]};margin-right:4px"></span>${k}: <strong>${v}</strong> (${typeTotal?Math.round(v/typeTotal*100):0}%)</div>`).join('');
 
-  // 離職原因
-  const reasonMap = {}; exitList.forEach(e=>{ const r=gf(e,'離職原因')||'未知'; reasonMap[r]=(reasonMap[r]||0)+1; });
-  mkChart('chart-exit-reason',{type:'doughnut',data:{labels:Object.keys(reasonMap),datasets:[{data:Object.values(reasonMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false}},responsive:false}});
+  // 離職原因 donut（中央顯示總數）
+  const reasonMap = {}; fel.forEach(e=>{ const r=gf(e,'離職原因')||'未知'; reasonMap[r]=(reasonMap[r]||0)+1; });
+  const reasonTotal = fel.length;
+  mkChart('chart-exit-reason',{type:'doughnut',data:{labels:Object.keys(reasonMap),datasets:[{data:Object.values(reasonMap),backgroundColor:CHART_COLORS,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'60%',plugins:{legend:{display:false},datalabels:{display:false}},responsive:false},plugins:[{id:'center-text',afterDraw(chart){const{ctx,chartArea:{top,bottom,left,right}}=chart;ctx.save();ctx.font='700 20px Noto Sans TC,sans-serif';ctx.fillStyle='#1a1a2e';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(reasonTotal,(left+right)/2,(top+bottom)/2);ctx.restore();}}]});
   document.getElementById('exit-reason-legend').innerHTML = Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div style="margin-bottom:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${CHART_COLORS[i]};margin-right:4px"></span>${k}: <strong>${v}</strong></div>`).join('');
 
   // 離職明細表
   const el = document.getElementById('exit-table-wrap');
-  const recent = [...exitList].slice(-10).reverse();
+  const recent = [...fel].slice(-10).reverse();
   if (!recent.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
   el.innerHTML = `<table class="data-table"><thead><tr><th>姓名</th><th>單位</th><th>類型</th><th>原因</th><th>月份</th></tr></thead><tbody>
     ${recent.map(r=>`<tr><td><strong>${gf(r,'英文名字')||'—'}</strong></td><td>${gf(r,'單位')||'—'}</td><td><span class="badge ${gf(r,'離職類型')==='自願離職'?'badge-amber':'badge-red'}">${gf(r,'離職類型')||'—'}</span></td><td style="font-size:11px;color:var(--text-sub)">${gf(r,'離職原因')||'—'}</td><td style="font-size:11px">${gf(r,'離職月份')||'—'}</td></tr>`).join('')}
@@ -573,26 +676,27 @@ function renderAttrition() {
 }
 
 function renderLeave() {
+  const fll = getFilteredLeaveList();
   const LEAVE_COLORS = {'病假':'#3B8BD4','特休假':'#EF9F27','福利假':'#1D9E75','生理假':'#E24B4A','公出假':'#6B4FA0','補休假':'#D85A30','事假':'#BA7517','喪假':'#534AB7'};
 
   // 假別月份趨勢（堆疊）
-  const months = [...new Set(leaveList.map(l=>gf(l,'月份')).filter(Boolean))].sort();
-  const types  = [...new Set(leaveList.map(l=>gf(l,'假別')).filter(Boolean))];
-  const datasets = types.map((t,i)=>({label:t,data:months.map(m=>leaveList.filter(l=>gf(l,'月份')===m&&gf(l,'假別')===t).reduce((a,l)=>a+n(gf(l,'天數')),0)),backgroundColor:LEAVE_COLORS[t]||CHART_COLORS[i],stack:'a'}));
+  const months = [...new Set(fll.map(l=>gf(l,'月份')).filter(Boolean))].sort();
+  const types  = [...new Set(fll.map(l=>gf(l,'假別')).filter(Boolean))];
+  const datasets = types.map((t,i)=>({label:t,data:months.map(m=>fll.filter(l=>gf(l,'月份')===m&&gf(l,'假別')===t).reduce((a,l)=>a+n(gf(l,'天數')),0)),backgroundColor:LEAVE_COLORS[t]||CHART_COLORS[i],stack:'a'}));
   mkChart('chart-leave-month',{type:'bar',data:{labels:months,datasets},options:{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}},plugins:{legend:{labels:{font:{size:10}}}},responsive:true,maintainAspectRatio:true}});
 
-  // 假別總量
-  const typeTotal = {}; leaveList.forEach(l=>{ const t=gf(l,'假別')||'其他'; typeTotal[t]=(typeTotal[t]||0)+n(gf(l,'天數')); });
+  // 假別總量（長條標值）
+  const typeTotal = {}; fll.forEach(l=>{ const t=gf(l,'假別')||'其他'; typeTotal[t]=(typeTotal[t]||0)+n(gf(l,'天數')); });
   const sortedTypes = Object.entries(typeTotal).sort((a,b)=>b[1]-a[1]);
-  mkChart('chart-leave-type',{type:'bar',data:{labels:sortedTypes.map(t=>t[0]),datasets:[{data:sortedTypes.map(t=>t[1].toFixed(2)),backgroundColor:sortedTypes.map(([t])=>LEAVE_COLORS[t]||'#aaa'),borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+  mkChart('chart-leave-type',{type:'bar',data:{labels:sortedTypes.map(t=>t[0]),datasets:[{data:sortedTypes.map(t=>parseFloat(t[1].toFixed(2))),backgroundColor:sortedTypes.map(([t])=>LEAVE_COLORS[t]||'#aaa'),borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
 
-  // 各單位請假天數
-  const deptMap = {}; leaveList.forEach(l=>{ const d=gf(l,'部門')||'其他'; deptMap[d]=(deptMap[d]||0)+n(gf(l,'天數')); });
+  // 各單位請假天數（長條標值）
+  const deptMap = {}; fll.forEach(l=>{ const d=gf(l,'部門')||'其他'; deptMap[d]=(deptMap[d]||0)+n(gf(l,'天數')); });
   const sortedDept = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
-  mkChart('chart-leave-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>d[1].toFixed(2)),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+  mkChart('chart-leave-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>parseFloat(d[1].toFixed(2))),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
 
   // 個人請假排行
-  const personMap = {}; leaveList.forEach(l=>{ const p=gf(l,'英文名字')||'未知'; if(!personMap[p]) personMap[p]={total:0,types:{}}; personMap[p].total+=n(gf(l,'天數')); const t=gf(l,'假別')||'其他'; personMap[p].types[t]=(personMap[p].types[t]||0)+n(gf(l,'天數')); });
+  const personMap = {}; fll.forEach(l=>{ const p=gf(l,'英文名字')||'未知'; if(!personMap[p]) personMap[p]={total:0,types:{}}; personMap[p].total+=n(gf(l,'天數')); const t=gf(l,'假別')||'其他'; personMap[p].types[t]=(personMap[p].types[t]||0)+n(gf(l,'天數')); });
   const topPersons = Object.entries(personMap).sort((a,b)=>b[1].total-a[1].total).slice(0,15);
   const el = document.getElementById('leave-person-wrap');
   if (!topPersons.length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
@@ -664,9 +768,7 @@ function computeHRStrategies(m, risks) {
     strategies.push({icon:'📚', title:'建立新進員工培訓與導師制度', tag:'中期 · 人才投資', body:`<li>為年資 0-1 年員工指定<strong>配對資深導師</strong>，每月進行一次非正式 Check-in</li><li>建立 <strong>30/60/90 天入職學習地圖</strong>，追蹤完成進度</li><li>每季舉辦跨部門交流活動，強化新進員工的組織認同感</li>`, steps:['配對導師制','30/60/90天地圖','每季交流活動']});
   }
 
-  strategies.push({icon:'💚', title:'啟用關懷小幫手 — 預防性員工關懷', tag:'長期 · 組織健康', body:`<li>針對<strong>差勤異常</strong>（病假 ≥ 3 天/月）或<strong>高離職風險部門</strong>同仁，觸發關懷流程</li><li>HR 每月透過關懷小幫手進行結構化關懷訪談，記錄員工狀態與需求</li><li>建立員工關懷指數趨勢，作為月度人資報告的健康度指標</li>`, steps:['差勤異常自動觸發','每月結構化訪談','建立關懷健康指數']});
-
-  strategies.push({icon:'📊', title:'人力資源月報標準化', tag:'長期 · 月報機制', body:`<li>以本儀表板為基礎，每月 5 日前完成人力月報，涵蓋：在職數、離職率、新進人數、病假趨勢</li><li>月報後立即銜接招募管理儀表板，說明人力補充計畫</li><li>季度會議加入<strong>員工滿意度調查</strong>結果，形成完整人力健康全圖</li>`, steps:['每月5日完成月報','銜接招募儀表板','季度滿意度調查']});
+  strategies.push({icon:'💚', title:'關懷小幫手 — 預防性員工關懷', tag:'長期 · 組織健康', body:`<li>差勤異常（如病假頻繁）時，<strong>建議主管主動關心</strong>，無需啟動正式關懷流程，以日常關懷為優先</li><li>每季由主管進行 <strong>1 on 1 關懷面談</strong>，了解員工狀態與工作需求，記錄重要反饋</li><li>HR 每年 <strong>10 月份</strong>進行全體員工關懷，評估整體組織氛圍與員工滿意度</li>`, steps:['差勤異常→主管主動關心','每季主管 1 on 1','每年10月全員關懷']});
 
   return strategies;
 }
