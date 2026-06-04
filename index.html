@@ -106,6 +106,50 @@
   .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-sub); line-height: 1; }
 
+  /* ── 風險預告 & 策略建議 ── */
+  .alert-banner { border-radius: 10px; padding: 11px 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; animation: fadeUp .4s ease both; }
+  .alert-banner.critical { background: #FFF0F0; border: 1px solid #F5C0C0; color: #8B2020; }
+  .alert-banner.warning  { background: #FFFBF0; border: 1px solid #F5DFA0; color: #7A4D00; }
+  .alert-banner.info     { background: #F0F6FF; border: 1px solid #B8D4F5; color: #1A4A80; }
+  .alert-banner-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .alert-banner-body { flex: 1; }
+  .alert-banner-title { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .alert-banner-desc  { font-size: 11px; opacity: .85; line-height: 1.5; }
+
+  .risk-card { border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid; animation: fadeUp .5s ease both; }
+  .risk-card.high   { background: #FFF2F2; border-color: #E24B4A; }
+  .risk-card.medium { background: #FFFBF0; border-color: #EF9F27; }
+  .risk-card.low    { background: #F0F6FF; border-color: #3B8BD4; }
+  .risk-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .risk-card-level  { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+  .risk-card.high   .risk-card-level { background: #E24B4A; color: #fff; }
+  .risk-card.medium .risk-card-level { background: #EF9F27; color: #fff; }
+  .risk-card.low    .risk-card-level { background: #3B8BD4; color: #fff; }
+  .risk-card-title  { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .risk-card-metric { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+  .risk-card-desc   { font-size: 12px; color: #444; line-height: 1.6; }
+
+  .strategy-card { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border: 0.5px solid var(--border); animation: fadeUp .5s ease both; }
+  .strategy-card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .strategy-icon { font-size: 20px; flex-shrink: 0; }
+  .strategy-meta { flex: 1; }
+  .strategy-title { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .strategy-tag   { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
+  .strategy-body  { font-size: 12px; color: #444; line-height: 1.7; padding-left: 30px; }
+  .strategy-body li { margin-bottom: 4px; }
+  .strategy-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-left: 30px; }
+  .strategy-step  { background: var(--gray); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #555; border: 0.5px solid var(--border); }
+
+  .report-section-title { font-size: 11px; font-weight: 700; color: var(--text-sub); letter-spacing: .06em; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+  .report-summary-box { background: var(--navy); color: #fff; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .report-summary-box .rs-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .report-summary-box .rs-sub   { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
+  .report-summary-box .rs-body  { font-size: 12px; color: #c8d8ea; line-height: 1.7; }
+  .report-summary-box .rs-kpi-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 0.5px solid rgba(255,255,255,.12); }
+  .report-summary-box .rs-kpi-item { text-align: center; }
+  .report-summary-box .rs-kpi-val  { font-size: 22px; font-weight: 700; line-height: 1; }
+  .report-summary-box .rs-kpi-lbl  { font-size: 10px; color: #8899aa; margin-top: 2px; }
+
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   select option { background: #1a1a2e; color: #fff; }
@@ -134,6 +178,7 @@
     <div class="tab" onclick="switchTab('candidates')">應徵者名單</div>
     <div class="tab" onclick="switchTab('funnel')">漏斗分析</div>
     <div class="tab" onclick="switchTab('kpi')">本月 KPI</div>
+    <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
   </div>
   <div class="header-right">
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
@@ -147,6 +192,8 @@
 
   <!-- 總覽 -->
   <div class="tab-content active" id="tab-overview">
+    <!-- 警示橫幅（自動由 renderAlertBanners 填入） -->
+    <div id="alert-banners"></div>
     <div class="stat-grid">
       <div class="stat-card blue"><div class="stat-label">本月履歷總數</div><div class="stat-value" id="s-total">—</div><div class="stat-sub" id="s-total-sub">載入中</div><div class="stat-icon">📄</div></div>
       <div class="stat-card teal"><div class="stat-label">電訪完成</div><div class="stat-value" id="s-phone">—</div><div class="stat-sub" id="s-phone-sub">載入中</div><div class="stat-icon">📞</div></div>
@@ -192,6 +239,18 @@
       <div class="panel"><div class="panel-title">🎯 本月 KPI 達成</div><div id="kpi-list"></div></div>
       <div class="panel"><div class="panel-title">📅 職缺招募進度</div><div id="job-progress"></div></div>
     </div>
+  </div>
+
+  <!-- 本月報告 -->
+  <div class="tab-content" id="tab-report">
+    <!-- 摘要總結 -->
+    <div id="report-summary-wrap"></div>
+    <!-- 風險預告 -->
+    <div class="report-section-title">🚨 風險預告</div>
+    <div id="report-risks"></div>
+    <!-- 策略建議 -->
+    <div class="report-section-title">💡 策略建議</div>
+    <div id="report-strategies"></div>
   </div>
 </div>
 
@@ -369,6 +428,7 @@ function renderAll() {
   renderStats(); renderRecentTable(); renderFullTable();
   renderFunnelBars(); renderLossAnalysis(); renderPhoneScores();
   renderKPI(); renderJobProgress(); renderCharts();
+  renderAlertBanners(); renderReport();
 }
 
 function renderStats() {
@@ -513,6 +573,303 @@ function renderPhoneScores() {
     </div></div>`;
 }
 
+// ══════════════════════════════════════
+//  風險預告 & 策略建議 核心邏輯
+// ══════════════════════════════════════
+
+function computeMetrics() {
+  const fc = getFilteredCandidates();
+  const fs = getFilteredStats();
+  const fp = getFilteredPhone();
+
+  const statsTotal   = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0),0);
+  const statsAI      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0),0);
+  const statsHR      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'HR推薦'))||0),0);
+  const statsMgr     = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主管篩選通過'))||0),0);
+  const statsSent    = statsAI + statsHR;
+
+  const total        = statsTotal || fc.length;
+  const phoneCount   = fc.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const interviewDone= interviewRecords.filter(r=>gf(r,'應徵者')).length;
+  const iReal        = interviewDone || fc.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const declined     = fc.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  const inProgress   = fc.filter(c=>gf(c,'關卡進度')==='進行中').length;
+  const hired        = fc.filter(c=>['錄取','到職'].includes(gf(c,'當前關卡'))).length;
+
+  const phoneRate    = total   ? Math.round(phoneCount/total*100)    : 0;
+  const interviewRate= phoneCount ? Math.round(iReal/phoneCount*100) : 0;
+  const lossRate     = total   ? Math.round(declined/total*100)      : 0;
+  const sentRate     = total   ? Math.round(statsSent/total*100)     : 0;
+  const mgrRate      = statsSent ? Math.round(statsMgr/statsSent*100): 0;
+  const avgPhoneScore= parseFloat(avgScoreFromList(fp)) || 0;
+
+  // 各職缺個別統計
+  const byPosition = {};
+  fc.forEach(c => {
+    const pos = gf(c,'應徵職務') || '未知';
+    if (!byPosition[pos]) byPosition[pos] = { total:0, declined:0, phone:0, interview:0 };
+    byPosition[pos].total++;
+    if (String(gf(c,'關卡進度')||'').includes('婉拒')) byPosition[pos].declined++;
+    if (['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))) byPosition[pos].phone++;
+    if (['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))) byPosition[pos].interview++;
+  });
+
+  return { total, phoneCount, iReal, declined, inProgress, hired,
+           statsTotal, statsAI, statsHR, statsSent, statsMgr,
+           phoneRate, interviewRate, lossRate, sentRate, mgrRate,
+           avgPhoneScore, byPosition, fp };
+}
+
+function computeRisks(m) {
+  const risks = [];
+
+  // R1 收件量不足
+  if (m.total < 10) {
+    risks.push({ level:'high', icon:'📉', title:'履歷收件量嚴重不足',
+      metric:`本期收件 ${m.total} 份，目標 ≥ 10 份`,
+      desc:`目前收件量僅達目標的 ${m.total*10}%，若持續不足將導致後續各關卡候選人稀缺，可能拖延整體招募時程。`,
+      tag:'量能風險' });
+  } else if (m.total < 20) {
+    risks.push({ level:'medium', icon:'📊', title:'履歷收件量偏低',
+      metric:`本期收件 ${m.total} 份`,
+      desc:`收件量雖達最低門檻，但相對於職缺需求仍屬偏低，建議擴大刊登渠道或調整職缺吸引力以提升來源多樣性。`,
+      tag:'量能風險' });
+  }
+
+  // R2 應徵者流失率過高
+  if (m.lossRate > 30) {
+    risks.push({ level:'high', icon:'🚪', title:'應徵者流失率超標',
+      metric:`流失率 ${m.lossRate}%，目標 ≤ 30%`,
+      desc:`${m.declined} 位候選人主動婉拒，可能原因包含：薪資期望落差、面試流程過長、其他公司競搶等。高流失率直接壓縮最終可錄取人選數。`,
+      tag:'流失風險' });
+  } else if (m.lossRate > 20) {
+    risks.push({ level:'medium', icon:'⚠️', title:'應徵者流失率偏高',
+      metric:`流失率 ${m.lossRate}%`,
+      desc:`流失率接近警戒線，需持續追蹤每位婉拒候選人的原因，作為後續薪資結構或流程優化的依據。`,
+      tag:'流失風險' });
+  }
+
+  // R3 電訪覆蓋率
+  if (m.phoneRate < 60) {
+    risks.push({ level:'high', icon:'📞', title:'電訪覆蓋率偏低',
+      metric:`電訪率 ${m.phoneRate}%（已電訪 ${m.phoneCount} / 收件 ${m.total}）`,
+      desc:`超過 ${100-m.phoneRate}% 的候選人尚未進入電訪評估，可能因主動篩選標準不一或聯絡未回覆，導致有效候選人流失於上游。`,
+      tag:'流程風險' });
+  }
+
+  // R4 初試達成率
+  if (m.phoneCount > 0 && m.interviewRate < 40) {
+    risks.push({ level:'high', icon:'🤝', title:'電訪轉初試率過低',
+      metric:`初試達成率 ${m.interviewRate}%（初試完成 ${m.iReal} / 電訪 ${m.phoneCount}）`,
+      desc:`電訪完成後大量候選人未能進入初試，可能為電訪評分標準過嚴、候選人等待期過長，或初試邀約後對方未回應，建議檢視電訪至邀約的 SLA 天數。`,
+      tag:'轉換風險' });
+  } else if (m.phoneCount > 0 && m.interviewRate < 60) {
+    risks.push({ level:'medium', icon:'📋', title:'電訪轉初試率待提升',
+      metric:`初試達成率 ${m.interviewRate}%`,
+      desc:`電訪→初試轉換率未達 60% 目標，建議縮短電訪後邀約等待天數，並確認主管檔期安排。`,
+      tag:'轉換風險' });
+  }
+
+  // R5 零進行中
+  if (m.inProgress === 0 && m.hired === 0 && m.total > 0) {
+    risks.push({ level:'medium', icon:'⏸️', title:'目前無進行中候選人',
+      metric:`進行中 0 人，錄取 ${m.hired} 人`,
+      desc:`所有候選人均已結案（婉拒/錄取），本期招募管道斷流，若職缺尚未填補，需立即重啟招募動作。`,
+      tag:'管道風險' });
+  }
+
+  // R6 來源單一化
+  const srcs = {};
+  getFilteredCandidates().forEach(c=>{ const s=gf(c,'履歷來源')||'未知'; srcs[s]=(srcs[s]||0)+1; });
+  const srcKeys = Object.keys(srcs);
+  if (srcKeys.length === 1 && m.total >= 3) {
+    risks.push({ level:'low', icon:'🔗', title:'履歷來源單一化',
+      metric:`100% 來自「${srcKeys[0]}」`,
+      desc:`過度依賴單一招募渠道存在系統風險，若該平台演算法調整或效果下降，將直接影響整體收件量。建議同步佈局其他管道分散風險。`,
+      tag:'管道風險' });
+  }
+
+  // R7 電訪評分
+  if (m.avgPhoneScore > 0 && m.avgPhoneScore < 3.0) {
+    risks.push({ level:'high', icon:'⭐', title:'電訪平均評分偏低',
+      metric:`平均 ${m.avgPhoneScore.toFixed(2)} / 5.0`,
+      desc:`候選人整體素質評分偏低，建議重新審視 JD 描述是否精準反映職位要求，以吸引更匹配的應徵者。`,
+      tag:'品質風險' });
+  }
+
+  return risks.sort((a,b) => ({'high':0,'medium':1,'low':2}[a.level]-{'high':0,'medium':1,'low':2}[b.level]));
+}
+
+function computeStrategies(m, risks) {
+  const strategies = [];
+  const riskTags = risks.map(r=>r.tag);
+
+  // 依風險動態推薦策略
+  if (riskTags.includes('量能風險')) {
+    strategies.push({ icon:'📢', title:'擴大招募渠道 — 提升收件量',
+      tag:'短期 · 立即執行',
+      body:`<li>同步開啟 <strong>LinkedIn、CakeResume、Yourator</strong> 刊登，避免依賴單一平台</li>
+            <li>請部門主管協助 <strong>內部轉介</strong>，推薦有潛力的前同事或學弟妹</li>
+            <li>評估是否調整 JD 措辭，降低不必要的硬性條件以擴大應徵母數</li>`,
+      steps:['重新審視 JD','多平台同步刊登','啟動員工轉介'] });
+  }
+
+  if (riskTags.includes('流失風險')) {
+    strategies.push({ icon:'🤝', title:'縮短決策週期 — 降低競搶流失',
+      tag:'短期 · 本週優先',
+      body:`<li>電訪評分 ≥ 4 分的候選人，建議 <strong>3 個工作日內</strong> 完成主管面試安排</li>
+            <li>每位婉拒候選人離開時留下原因記錄，每月彙整一次「流失原因分析」呈報管理層</li>
+            <li>若多人因薪資婉拒，需啟動 <strong>薪資結構檢討</strong>，對比市場行情</li>`,
+      steps:['建立電訪→邀約 SLA 3天','流失原因每月彙整','薪資市場行情校準'] });
+  }
+
+  if (riskTags.includes('轉換風險')) {
+    strategies.push({ icon:'⚡', title:'優化面試流程 — 提升電訪→初試轉換',
+      tag:'中期 · 流程優化',
+      body:`<li>建立標準化電訪評分門檻（例：總體評分 ≥ 3.5 分才推主管面試），減少主觀判斷差異</li>
+            <li>電訪後 <strong>48小時內</strong> 完成邀約動作，避免候選人失溫</li>
+            <li>主管面試日期應在電訪後 <strong>7 個工作日內</strong> 確定，超時需主動回報 HR 協調</li>`,
+      steps:['訂定電訪門檻分數','48h內完成邀約','7天內確定主管面試日'] });
+  }
+
+  if (riskTags.includes('管道風險')) {
+    strategies.push({ icon:'🔄', title:'建立候選人備援池 — 避免管道斷流',
+      tag:'中期 · 預防措施',
+      body:`<li>即使職缺暫無急缺，也應保持 <strong>passive candidate 名單</strong>，定期更新接觸意願</li>
+            <li>與業界社群、學校校友會建立長期關係，培養非急迫期的人才接觸點</li>
+            <li>過去婉拒但評分良好的候選人，可在 3-6 個月後 <strong>重新接觸</strong></li>`,
+      steps:['建立被動候選人名單','社群關係經營','定期重啟接觸'] });
+  }
+
+  // 常態性策略（固定呈現）
+  strategies.push({ icon:'📊', title:'每月招募健診 — 數據驅動決策',
+    tag:'長期 · 月報機制',
+    body:`<li>以本儀表板數據為基礎，每月營運會議前 <strong>3 個工作日</strong> 完成招募月報</li>
+          <li>報告應包含：漏斗轉換率、流失原因排行、候選人評分趨勢、下月預計開缺數</li>
+          <li>若連續兩個月流失率 > 30%，應提案啟動 <strong>薪資結構或雇主品牌專案</strong></li>`,
+    steps:['月報標準化','會議前3天完成','連2月超標啟動專案'] });
+
+  if (m.avgPhoneScore >= 3.5 && m.total >= 10) {
+    strategies.push({ icon:'🌟', title:'強化雇主品牌 — 維持高品質候選人來源',
+      tag:'長期 · 品牌投資',
+      body:`<li>目前電訪評分良好，顯示來源品質有一定水準，可藉此整理 <strong>成功招募案例</strong> 作為雇主品牌素材</li>
+            <li>請已到職員工撰寫 Glassdoor / 104 公司評論，提升潛在應徵者信任感</li>
+            <li>定期更新職缺頁面的 <strong>團隊文化與福利說明</strong>，吸引主動應徵者</li>`,
+      steps:['整理成功案例','蒐集員工評論','更新職缺頁面'] });
+  }
+
+  return strategies;
+}
+
+function renderAlertBanners() {
+  const m = computeMetrics();
+  const risks = computeRisks(m);
+  const el = document.getElementById('alert-banners');
+  if (!el) return;
+
+  const highRisks = risks.filter(r=>r.level==='high');
+  const medRisks  = risks.filter(r=>r.level==='medium');
+
+  if (!risks.length) {
+    el.innerHTML = `<div class="alert-banner info">
+      <div class="alert-banner-icon">✅</div>
+      <div class="alert-banner-body">
+        <div class="alert-banner-title">招募狀態良好</div>
+        <div class="alert-banner-desc">本期各項指標均在健康範圍，請維持現有招募節奏。</div>
+      </div></div>`;
+    return;
+  }
+
+  let html = '';
+  if (highRisks.length) {
+    html += `<div class="alert-banner critical">
+      <div class="alert-banner-icon">🚨</div>
+      <div class="alert-banner-body">
+        <div class="alert-banner-title">高風險預警（${highRisks.length} 項）— 需立即處理</div>
+        <div class="alert-banner-desc">${highRisks.map(r=>`<strong>${r.title}</strong>：${r.metric}`).join('　｜　')}</div>
+      </div></div>`;
+  }
+  if (medRisks.length) {
+    html += `<div class="alert-banner warning">
+      <div class="alert-banner-icon">⚠️</div>
+      <div class="alert-banner-body">
+        <div class="alert-banner-title">中風險提醒（${medRisks.length} 項）— 本週跟進</div>
+        <div class="alert-banner-desc">${medRisks.map(r=>`${r.title}`).join('、')}</div>
+      </div></div>`;
+  }
+  html += `<div style="text-align:right;margin-bottom:6px"><button onclick="switchTab('report')" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;text-decoration:underline">→ 查看完整風險分析與策略建議</button></div>`;
+  el.innerHTML = html;
+}
+
+function renderReport() {
+  const m = computeMetrics();
+  const risks = computeRisks(m);
+  const strategies = computeStrategies(m, risks);
+
+  // ── 摘要總結 ──
+  const highCount = risks.filter(r=>r.level==='high').length;
+  const now = new Date();
+  const periodLabel = document.getElementById('period-select')?.selectedOptions[0]?.text || '本期';
+  const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
+  const statusText  = highCount > 0 ? `⚠ 高風險` : risks.length > 0 ? `注意` : `✓ 健康`;
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">招募狀況摘要 — ${periodLabel}</div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        本期共收件 <strong style="color:#fff">${m.total}</strong> 份，
+        送審人選 <strong style="color:#fff">${m.statsSent}</strong> 人（AI評分 ${m.statsAI} + HR推薦 ${m.statsHR}），
+        主管篩選通過 <strong style="color:#fff">${m.statsMgr}</strong> 人，
+        完成電訪 <strong style="color:#fff">${m.phoneCount}</strong> 人，
+        完成初試 <strong style="color:#fff">${m.iReal}</strong> 人，
+        應徵者婉拒 <strong style="color:${m.lossRate>30?'#F08080':'#fff'}">${m.declined}</strong> 人（流失率 ${m.lossRate}%）。
+        ${m.avgPhoneScore > 0 ? `電訪平均評分 <strong style="color:${m.avgPhoneScore>=3.5?'#5DCAA5':'#F08080'}">${m.avgPhoneScore.toFixed(2)}</strong> 分。` : ''}
+        共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項，建議優先處理。
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.total>=10?'#5DCAA5':'#F08080'}">${m.total}</div><div class="rs-kpi-lbl">收件份數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.phoneRate>=80?'#5DCAA5':'#F08080'}">${m.phoneRate}%</div><div class="rs-kpi-lbl">電訪覆蓋率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.lossRate<=30?'#5DCAA5':'#F08080'}">${m.lossRate}%</div><div class="rs-kpi-lbl">應徵者流失率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.interviewRate>=60?'#5DCAA5':'#F08080'}">${m.interviewRate}%</div><div class="rs-kpi-lbl">初試達成率</div></div>
+        ${m.avgPhoneScore>0?`<div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.avgPhoneScore>=3.5?'#5DCAA5':'#F08080'}">${m.avgPhoneScore.toFixed(1)}</div><div class="rs-kpi-lbl">電訪平均分</div></div>`:''}
+      </div>
+    </div>`;
+
+  // ── 風險卡片 ──
+  const riskEl = document.getElementById('report-risks');
+  if (!risks.length) {
+    riskEl.innerHTML = `<div style="color:var(--text-sub);font-size:13px;padding:16px 0;text-align:center">🎉 本期無顯著風險，招募狀況良好！</div>`;
+  } else {
+    riskEl.innerHTML = risks.map(r=>`
+      <div class="risk-card ${r.level}">
+        <div class="risk-card-header">
+          <span style="font-size:18px">${r.icon}</span>
+          <span class="risk-card-level">${r.level==='high'?'高風險':r.level==='medium'?'中風險':'低風險'}</span>
+          <span class="risk-card-title">${r.title}</span>
+          <span style="font-size:10px;color:var(--text-sub);margin-left:auto">${r.tag}</span>
+        </div>
+        <div class="risk-card-metric">📌 ${r.metric}</div>
+        <div class="risk-card-desc">${r.desc}</div>
+      </div>`).join('');
+  }
+
+  // ── 策略卡片 ──
+  const stratEl = document.getElementById('report-strategies');
+  stratEl.innerHTML = strategies.map(s=>`
+    <div class="strategy-card">
+      <div class="strategy-card-header">
+        <div class="strategy-icon">${s.icon}</div>
+        <div class="strategy-meta">
+          <div class="strategy-title">${s.title}</div>
+          <div class="strategy-tag">${s.tag}</div>
+        </div>
+      </div>
+      <ul class="strategy-body">${s.body}</ul>
+      <div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div>
+    </div>`).join('');
+}
+
 function renderKPI() {
   const total = allCandidates.length;
   // 電訪完成：有進入電訪關卡或之後的人數
@@ -644,7 +1001,8 @@ function showDetail(c) {
 
 function closeModal(e) { if (e.target===document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('open'); }
 function switchTab(n) {
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['overview','candidates','funnel','kpi'][i]===n));
+  const tabNames = ['overview','candidates','funnel','kpi','report'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', tabNames[i]===n));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   document.getElementById('tab-'+n).classList.add('active');
 }
