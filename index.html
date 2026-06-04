@@ -150,6 +150,20 @@
   .report-summary-box .rs-kpi-val  { font-size: 22px; font-weight: 700; line-height: 1; }
   .report-summary-box .rs-kpi-lbl  { font-size: 10px; color: #8899aa; margin-top: 2px; }
 
+  /* ── Donut 圖外部標籤佈局 ── */
+  .donut-wrap { display: flex; align-items: center; justify-content: center; gap: 0; width: 100%; }
+  .donut-labels-left  { display: flex; flex-direction: column; justify-content: center; gap: 7px; flex: 1; align-items: flex-end; padding-right: 12px; }
+  .donut-labels-right { display: flex; flex-direction: column; justify-content: center; gap: 7px; flex: 1; align-items: flex-start; padding-left: 12px; }
+  .donut-canvas-wrap  { position: relative; flex-shrink: 0; }
+  .donut-center-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .donut-center-val   { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .donut-center-sub   { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
+  .donut-label-item   { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .donut-label-item .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .donut-label-item .lbl { font-size: 11px; color: #444; }
+  .donut-label-item .val { font-size: 11px; font-weight: 600; color: var(--navy); }
+  .donut-label-item .pct { font-size: 10px; color: var(--text-sub); }
+
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   select option { background: #1a1a2e; color: #fff; }
@@ -166,7 +180,7 @@
     <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
     <select id="period-select" onchange="onPeriodChange(this.value)" style="background:#2a2a45;border:0.5px solid #3a3a5e;border-radius:6px;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer;font-family:'Noto Sans TC',sans-serif">
       <option value="current">當月</option>
-      <option value="prev">上個月</option>
+      <option value="prev" selected>上個月</option>
       <option value="3m">近三個月</option>
       <option value="6m">近半年</option>
       <option value="1y">整年度</option>
@@ -205,7 +219,17 @@
     </div>
     <div class="panel-grid-2">
       <div class="panel"><div class="panel-title">📊 各關卡人數分佈</div><canvas id="chart-funnel" height="190"></canvas></div>
-      <div class="panel"><div class="panel-title">🔵 履歷來源分佈</div><canvas id="chart-source" height="190"></canvas></div>
+      <div class="panel">
+        <div class="panel-title">🔵 履歷來源分佈</div>
+        <div class="donut-wrap">
+          <div class="donut-labels-left" id="source-labels-left"></div>
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-source" width="170" height="170"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="source-total"></div><div class="donut-center-sub">總數</div></div>
+          </div>
+          <div class="donut-labels-right" id="source-labels-right"></div>
+        </div>
+      </div>
     </div>
     <div class="panel"><div class="panel-title">👤 最新應徵者狀態</div><div id="recent-wrap"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
   </div>
@@ -297,7 +321,7 @@ const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'ba
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
-let selectedPeriod = 'current';   // current | prev | 3m | 6m | 1y | all
+let selectedPeriod = 'prev';   // current | prev | 3m | 6m | 1y | all
 let selectedPosition = '全部職缺'; // 從招募名單動態產生
 let currentFilter = '全部';
 let funnelChart = null, sourceChart = null;
@@ -933,6 +957,22 @@ function renderJobProgress() {
     </div></div>`).join('');
 }
 
+// ── Donut 外部標籤渲染（左右分欄）──
+function renderDonutLabels(entries, colors, total, leftId, rightId, totalId) {
+  if (totalId) { const el = document.getElementById(totalId); if (el) el.textContent = total; }
+  const half  = Math.ceil(entries.length / 2);
+  const left  = entries.slice(0, half);
+  const right = entries.slice(half);
+  function mkItem(k, v, color) {
+    const pct = total ? Math.round(v / total * 100) : 0;
+    return `<div class="donut-label-item"><span class="dot" style="background:${color}"></span><span class="lbl">${k}:</span><span class="val">${v}</span><span class="pct">(${pct}%)</span></div>`;
+  }
+  const lEl = document.getElementById(leftId);
+  const rEl = document.getElementById(rightId);
+  if (lEl) lEl.innerHTML = left.map(([k,v],i) => mkItem(k, v, colors[i])).join('');
+  if (rEl) rEl.innerHTML = right.map(([k,v],i) => mkItem(k, v, colors[half+i])).join('');
+}
+
 function renderCharts() {
   const fc2 = getFilteredCandidates();
   const fs = getFilteredStats();
@@ -983,9 +1023,14 @@ function renderCharts() {
 
   const srcCounts = {};
   fc2.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
-  const sCtx = document.getElementById('chart-source').getContext('2d');
+  const srcColors = ['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'];
+  const srcEntries = Object.entries(srcCounts);
+  const srcColorArr = srcEntries.map((_,i)=>srcColors[i%srcColors.length]);
+  const srcTotal = srcEntries.reduce((a,[,v])=>a+v,0);
   if (sourceChart) sourceChart.destroy();
-  sourceChart = new Chart(sCtx, { type:'doughnut', data:{ labels:Object.keys(srcCounts), datasets:[{ data:Object.values(srcCounts), backgroundColor:['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'], borderWidth:2, borderColor:'#fff' }] }, options:{ plugins:{legend:{position:'right',labels:{font:{size:11}}}}, responsive:true, maintainAspectRatio:true } });
+  const sCtx = document.getElementById('chart-source').getContext('2d');
+  sourceChart = new Chart(sCtx, { type:'doughnut', data:{ labels:srcEntries.map(e=>e[0]), datasets:[{ data:srcEntries.map(e=>e[1]), backgroundColor:srcColorArr, borderWidth:2, borderColor:'#fff' }] }, options:{ cutout:'65%', plugins:{legend:{display:false}}, responsive:false } });
+  renderDonutLabels(srcEntries, srcColorArr, srcTotal, 'source-labels-left', 'source-labels-right', 'source-total');
 }
 
 function showDetail(c) {
