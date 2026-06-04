@@ -289,7 +289,7 @@ function loadDemoData() {
     { 應徵者:'許晉瑜', 電訪日期:'2026/05/22', 總體評分:3.67, 是否建議主管面試:'是', 期望薪資:80000, 對公司理解度_1_5分_:3, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
   ];
   statsRecords = [
-    { 統計日期:'2026/05/31', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:27, AI評分通過:2, HR推薦:0, 主管篩選通過:3, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/05/31', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:27, AI評分:2, HR推薦:0, 主管篩選通過:3, 主要來源:'104主動應徵' },
   ];
   renderAll();
   setSyncStatus('📋 示範資料', '#EF9F27');
@@ -439,27 +439,27 @@ function renderFunnelBars() {
   const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
-  // 從篩選後招募名單取得後五層
+  // 從篩選後招募名單取得後四層（AI評分已被送審人選吸收）
   const stageMap = { '電訪':0,'AI評分':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
   fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
 
-  const statsAI  = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分通過'))||0),0);
-  const statsSent = statsAI + statsHR; // 送審人選 = AI評分通過 + HR推薦
+  // 履歷收件統計的欄位名為「AI評分」（非AI評分通過）
+  const statsAI  = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0),0);
+  const statsSent = statsAI + statsHR; // 送審人選 = AI評分 + HR推薦
 
   const FULL_STAGES = [
-    { label:'📥 收件總數',   n: statsTotal || fc.length,
+    { label:'📥 收件總數',    n: statsTotal || fc.length,
       sub: null, src:'履歷收件統計', color:'#3B8BD4' },
-    { label:'📋 送審人選',   n: statsSent || statsMgr || fc.length,
-      sub: statsAI || statsHR ? `AI通過 ${statsAI}　＋　HR推薦 ${statsHR}` : null,
+    { label:'📋 送審人選',    n: statsSent || statsMgr || fc.length,
+      sub: `AI評分 ${statsAI} 人　＋　HR推薦 ${statsHR} 人`,
       src:'履歷收件統計', color:'#1D9E75' },
-    { label:'👔 主管篩選通過', n: statsMgr || fc.length,
+    { label:'👔 主管篩選通過', n: statsMgr || 0,
       sub: null, src:'履歷收件統計', color:'#0F6E56' },
-    { label:'📞 電訪',       n: stageMap['電訪'], sub: null, src:'招募名單', color:'#EF9F27' },
-    { label:'🤖 AI評分',     n: stageMap['AI評分'], sub: null, src:'招募名單', color:'#D4AC0D' },
-    { label:'🤝 初試',       n: stageMap['初試'], sub: null, src:'招募名單', color:'#E67E22' },
-    { label:'🔄 複試',       n: stageMap['複試'], sub: null, src:'招募名單', color:'#BA7517' },
-    { label:'🎉 錄取',       n: stageMap['錄取'], sub: null, src:'招募名單', color:'#639922' },
-    { label:'🏢 到職',       n: stageMap['到職'], sub: null, src:'招募名單', color:'#534AB7' },
+    { label:'📞 電訪',        n: stageMap['電訪'], sub: null, src:'招募名單', color:'#EF9F27' },
+    { label:'🤝 初試',        n: stageMap['初試'], sub: null, src:'招募名單', color:'#E67E22' },
+    { label:'🔄 複試',        n: stageMap['複試'], sub: null, src:'招募名單', color:'#BA7517' },
+    { label:'🎉 錄取',        n: stageMap['錄取'], sub: null, src:'招募名單', color:'#639922' },
+    { label:'🏢 到職',        n: stageMap['到職'], sub: null, src:'招募名單', color:'#534AB7' },
   ];
 
   const max = Math.max(...FULL_STAGES.map(s=>s.n), 1);
@@ -515,15 +515,20 @@ function renderPhoneScores() {
 
 function renderKPI() {
   const total = allCandidates.length;
+  // 電訪完成：有進入電訪關卡或之後的人數
   const pCount = allCandidates.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  // 初試達成：招募名單中當前關卡為初試/複試/錄取/到職（代表真正完成初試）
   const iCount = allCandidates.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  // 或從面談紀錄算有效筆數（有應徵者名稱）
+  const interviewDone = interviewRecords.filter(r => gf(r,'應徵者')).length;
+  const iReal = interviewDone || iCount; // 優先用面談紀錄
   const dec = allCandidates.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
   const kpis = [
-    { name:'每月履歷收件數', target:'≥ 10 份', val:total, unit:'份', ok:total>=10 },
-    { name:'電訪完成率', target:'100%', val:total?Math.round(pCount/total*100):0, unit:'%', ok:pCount===total },
-    { name:'初試邀約率', target:'≥ 60%', val:pCount?Math.round(iCount/pCount*100):0, unit:'%', ok:pCount?iCount/pCount>=0.6:false },
-    { name:'應徵者流失率', target:'≤ 30%', val:total?Math.round(dec/total*100):0, unit:'%', ok:total?dec/total<=0.3:true },
-    { name:'電訪平均評分', target:'≥ 3.5 / 5', val:avgScore(), unit:'/5', ok:parseFloat(avgScore())>=3.5 },
+    { name:'每月履歷收件數',  target:'≥ 10 份', val:total, unit:'份', ok:total>=10 },
+    { name:'電訪完成率',      target:'100%',    val:total?Math.round(pCount/total*100):0, unit:'%', ok:pCount===total },
+    { name:'初試達成率',      target:'≥ 60%',   val:pCount?Math.round(iReal/pCount*100):0, unit:'%', ok:pCount?iReal/pCount>=0.6:false },
+    { name:'應徵者流失率',    target:'≤ 30%',   val:total?Math.round(dec/total*100):0, unit:'%', ok:total?dec/total<=0.3:true },
+    { name:'電訪平均評分',    target:'≥ 3.5 / 5', val:avgScore(), unit:'/5', ok:parseFloat(avgScore())>=3.5 },
   ];
   document.getElementById('kpi-list').innerHTML = kpis.map(k=>`<div class="kpi-row">
     <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
@@ -556,25 +561,25 @@ function renderCharts() {
   const fc2 = getFilteredCandidates();
   const fs = getFilteredStats();
 
-  // 上游三層從「履歷收件統計」取數
+  // 上游三層從「履歷收件統計」取數（欄位名為「AI評分」）
   const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
   const statsHR    = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||0), 0);
-  const statsAI    = fs.reduce((a,r) => a + (parseFloat(gf(r,'AI評分通過'))||0), 0);
+  const statsAI    = fs.reduce((a,r) => a + (parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0), 0);
   const statsMgr   = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
-  const statsSent  = statsAI + statsHR;
+  const statsSent  = statsAI + statsHR; // 送審人選 = AI評分 + HR推薦
 
-  // 下游從招募名單取當前關卡
-  const stageCountsLower = STAGE_ORDER.map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
+  // 下游從招募名單取當前關卡（AI評分已併入送審，不獨立顯示）
+  const stageCountsLower = ['電訪','初試','複試','錄取','到職'].map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
 
-  // 合併成完整 8 段
-  const labels = ['收件總數','送審人選','主管篩選\n通過','電訪','AI評分','初試','複試','錄取','到職'];
+  // 合併成完整 8 段（無 AI評分 獨立欄）
+  const labels = ['收件總數','送審人選','主管篩選\n通過','電訪','初試','複試','錄取','到職'];
   const counts = [
     statsTotal || fc2.length,
     statsSent  || statsMgr || fc2.length,
     statsMgr   || 0,
     ...stageCountsLower
   ];
-  const barColors = ['#3B8BD4','#1D9E75','#0F6E56','#EF9F27','#D4AC0D','#E67E22','#BA7517','#639922','#534AB7'];
+  const barColors = ['#3B8BD4','#1D9E75','#0F6E56','#EF9F27','#E67E22','#BA7517','#639922','#534AB7'];
 
   const fCtx = document.getElementById('chart-funnel').getContext('2d');
   if (funnelChart) funnelChart.destroy();
