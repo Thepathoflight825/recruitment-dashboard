@@ -606,7 +606,10 @@ function computeMetrics() {
   const inProgress   = fc.filter(c=>gf(c,'關卡進度')==='進行中').length;
   const hired        = fc.filter(c=>['錄取','到職'].includes(gf(c,'當前關卡'))).length;
 
-  const phoneRate    = total   ? Math.round(phoneCount/total*100)    : 0;
+  // 電訪覆蓋率 = 已電訪 / 主管篩選通過（電訪的正確母數）
+  // 若無統計資料則 fallback 到收件總數
+  const phoneDenominator = statsMgr || total;
+  const phoneRate    = phoneDenominator ? Math.round(phoneCount/phoneDenominator*100) : 0;
   const interviewRate= phoneCount ? Math.round(iReal/phoneCount*100) : 0;
   const lossRate     = total   ? Math.round(declined/total*100)      : 0;
   const sentRate     = total   ? Math.round(statsSent/total*100)     : 0;
@@ -659,12 +662,18 @@ function computeRisks(m) {
       tag:'流失風險' });
   }
 
-  // R3 電訪覆蓋率
-  if (m.phoneRate < 60) {
+  // R3 電訪覆蓋率（母數為主管篩選通過人數，非收件總數）
+  if (m.statsMgr > 0 && m.phoneRate < 60) {
     risks.push({ level:'high', icon:'📞', title:'電訪覆蓋率偏低',
-      metric:`電訪率 ${m.phoneRate}%（已電訪 ${m.phoneCount} / 收件 ${m.total}）`,
-      desc:`超過 ${100-m.phoneRate}% 的候選人尚未進入電訪評估，可能因主動篩選標準不一或聯絡未回覆，導致有效候選人流失於上游。`,
+      metric:`電訪率 ${m.phoneRate}%（已電訪 ${m.phoneCount} / 主管篩選通過 ${m.statsMgr}）`,
+      desc:`主管篩選通過後僅 ${m.phoneRate}% 進入電訪，可能有候選人在聯絡階段失聯或流程延誤，建議確認每位通過者的聯絡狀態。`,
       tag:'流程風險' });
+  } else if (m.statsMgr === 0 && m.total > 0 && m.phoneRate < 30) {
+    // fallback：無統計資料時，才以收件量估算，且門檻放寬為 30%
+    risks.push({ level:'medium', icon:'📞', title:'電訪人數偏少',
+      metric:`電訪 ${m.phoneCount} 人 / 收件 ${m.total} 份（無主管篩選統計）`,
+      desc:`目前缺乏主管篩選通過資料，無法精確計算電訪覆蓋率。建議補齊「履歷收件統計」表的主管篩選通過欄位以取得正確數據。`,
+      tag:'資料完整性' });
   }
 
   // R4 初試達成率
@@ -839,7 +848,7 @@ function renderReport() {
       </div>
       <div class="rs-kpi-row">
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.total>=10?'#5DCAA5':'#F08080'}">${m.total}</div><div class="rs-kpi-lbl">收件份數</div></div>
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.phoneRate>=80?'#5DCAA5':'#F08080'}">${m.phoneRate}%</div><div class="rs-kpi-lbl">電訪覆蓋率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.phoneRate>=60?'#5DCAA5':'#F08080'}">${m.phoneRate}%</div><div class="rs-kpi-lbl">電訪覆蓋率${m.statsMgr?'':'*'}</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.lossRate<=30?'#5DCAA5':'#F08080'}">${m.lossRate}%</div><div class="rs-kpi-lbl">應徵者流失率</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.interviewRate>=60?'#5DCAA5':'#F08080'}">${m.interviewRate}%</div><div class="rs-kpi-lbl">初試達成率</div></div>
         ${m.avgPhoneScore>0?`<div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.avgPhoneScore>=3.5?'#5DCAA5':'#F08080'}">${m.avgPhoneScore.toFixed(1)}</div><div class="rs-kpi-lbl">電訪平均分</div></div>`:''}
