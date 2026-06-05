@@ -301,6 +301,9 @@
           <select id="dept-filter" onchange="renderEmployees()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部部門</option>
           </select>
+          <select id="mgr-filter" onchange="renderEmployees()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部主管</option>
+          </select>
           <select id="risk-filter" onchange="renderEmployees()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部風險</option>
             <option value="高">高風險</option>
@@ -316,7 +319,28 @@
   <!-- ══ 關懷紀錄 ══ -->
   <div class="tab-content" id="tab-records">
     <div class="panel">
-      <div class="panel-title">💬 關懷面談紀錄</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="panel-title" style="margin:0">💬 關懷面談紀錄</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="rec-emp-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部員工</option>
+          </select>
+          <select id="rec-mgr-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部主管</option>
+          </select>
+          <select id="rec-type-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部類型</option>
+          </select>
+          <select id="rec-risk-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部風險</option>
+            <option value="高">高風險</option>
+            <option value="中">中風險</option>
+            <option value="低">低風險</option>
+          </select>
+          <button onclick="resetRecordFilters()" style="font-size:11px;color:var(--text-sub);background:none;border:0.5px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'Noto Sans TC',sans-serif;white-space:nowrap">✕ 清除篩選</button>
+        </div>
+      </div>
+      <div id="rec-result-count" style="font-size:11px;color:var(--text-sub);margin-bottom:8px"></div>
       <div class="table-wrap"><div id="care-records"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
     </div>
   </div>
@@ -935,10 +959,12 @@ function renderAlertBanners(m) {
 // ── Render employees ──
 function renderEmployees() {
   const deptF  = document.getElementById('dept-filter').value;
+  const mgrF   = document.getElementById('mgr-filter').value;
   const riskF  = document.getElementById('risk-filter').value;
   const active = employees.filter(e => !gf(e,'在職狀態')?.includes('離職'));
   const filtered = active.filter(e => {
     if (deptF && gf(e,'部門') !== deptF) return false;
+    if (mgrF  && (gf(e,'直屬主管')||'').replace('KR-','').replace(/^ /,'') !== mgrF) return false;
     if (riskF && !gf(e,'當前風險等級')?.includes(riskF)) return false;
     return true;
   });
@@ -971,14 +997,48 @@ function renderEmployees() {
 }
 
 function populateDeptFilter() {
+  // 部門篩選
   const depts = [...new Set(employees.map(e => gf(e,'部門')).filter(Boolean))].sort();
-  const el = document.getElementById('dept-filter');
-  depts.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; el.appendChild(o); });
+  const dEl = document.getElementById('dept-filter');
+  depts.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dEl.appendChild(o); });
+  // 直屬主管篩選（顯示英文名，value 也用英文名比對）
+  const mgrIds = [...new Set(employees.map(e => (gf(e,'直屬主管')||'').trim()).filter(Boolean))].sort();
+  const mEl = document.getElementById('mgr-filter');
+  mgrIds.forEach(id => {
+    const engId = id.replace('KR-','').replace(/^ /,'');
+    // 嘗試從員工主檔找到對應的英文名
+    const mgrEmp = employees.find(e => (gf(e,'Lark 帳號 ID')||'').trim() === id.trim());
+    const label  = mgrEmp ? ((gf(mgrEmp,'英文名')||'').trim() || engId) : engId;
+    const o = document.createElement('option'); o.value = engId; o.textContent = label;
+    mEl.appendChild(o);
+  });
 }
 
 // ── Render care records ──
 function renderCareRecords() {
-  const fr = getFilteredRecords();
+  // 先依時間範圍過濾（主篩選）
+  let fr = getFilteredRecords();
+
+  // 再套用四個獨立篩選器
+  const empF  = document.getElementById('rec-emp-filter')?.value  || '';
+  const mgrF  = document.getElementById('rec-mgr-filter')?.value  || '';
+  const typeF = document.getElementById('rec-type-filter')?.value || '';
+  const riskF = document.getElementById('rec-risk-filter')?.value || '';
+
+  if (empF)  fr = fr.filter(r => gf(r,'關懷員工') === empF);
+  if (mgrF)  fr = fr.filter(r => (gf(r,'主管')||'').replace('KR-','').replace(/^ /,'') === mgrF);
+  if (typeF) fr = fr.filter(r => gf(r,'面談類型') === typeF);
+  if (riskF) fr = fr.filter(r => (gf(r,'留任風險等級')||'').includes(riskF));
+
+  // 顯示筆數提示
+  const countEl = document.getElementById('rec-result-count');
+  if (countEl) {
+    const total = getFilteredRecords().length;
+    countEl.textContent = (empF || mgrF || typeF || riskF)
+      ? `篩選結果：${fr.length} 筆（時間範圍內共 ${total} 筆）`
+      : `共 ${fr.length} 筆`;
+  }
+
   document.getElementById('care-records').innerHTML = fr.length
     ? `<table class="data-table">
         <thead><tr><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
@@ -995,7 +1055,39 @@ function renderCareRecords() {
           </tr>`;
         }).join('')}</tbody>
       </table>`
-    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">本期無關懷紀錄</div>';
+    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">無符合條件的關懷紀錄</div>';
+}
+
+function resetRecordFilters() {
+  ['rec-emp-filter','rec-mgr-filter','rec-type-filter','rec-risk-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderCareRecords();
+}
+
+function populateRecordFilters() {
+  // 員工選單（英文名顯示，Lark ID 作為 value）
+  const empEl = document.getElementById('rec-emp-filter');
+  if (!empEl) return;
+  const seenEmps = new Map();
+  careRecords.forEach(r => {
+    const lkId = gf(r,'關懷員工');
+    if (lkId && !seenEmps.has(lkId)) seenEmps.set(lkId, empName(lkId));
+  });
+  [...seenEmps.entries()].sort((a,b)=>a[1].localeCompare(b[1])).forEach(([id,name]) => {
+    const o = document.createElement('option'); o.value = id; o.textContent = name; empEl.appendChild(o);
+  });
+
+  // 主管選單
+  const mgrEl = document.getElementById('rec-mgr-filter');
+  const mgrs = [...new Set(careRecords.map(r => (gf(r,'主管')||'').replace('KR-','').replace(/^ /,'')).filter(Boolean))].sort();
+  mgrs.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mgrEl.appendChild(o); });
+
+  // 面談類型選單
+  const typeEl = document.getElementById('rec-type-filter');
+  const types = [...new Set(careRecords.map(r => gf(r,'面談類型')).filter(Boolean))].sort();
+  types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; typeEl.appendChild(o); });
 }
 
 // ── Render promises ──
@@ -1217,6 +1309,7 @@ async function initDashboard() {
   try {
     await fetchAllTables();
     populateDeptFilter();
+    populateRecordFilters();
     renderAll();
     setSyncStatus('⚡ 即時同步', '#5DCAA5');
     document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
@@ -1225,6 +1318,7 @@ async function initDashboard() {
     setSyncStatus('📋 示範資料', '#EF9F27');
     loadDemoData();
     populateDeptFilter();
+    populateRecordFilters();
     renderAll();
     document.getElementById('last-updated').textContent = '示範資料：' + new Date().toLocaleTimeString('zh-TW');
   }
