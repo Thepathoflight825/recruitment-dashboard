@@ -198,6 +198,9 @@
     <button onclick="goToHR()" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#aac4e0;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.14)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.color='#aac4e0'">
       <span>👥</span> 人力資源 <span style="font-size:10px">←</span>
     </button>
+    <button onclick="goToCare()" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:0.5px solid rgba(29,158,117,.4);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#7DCFB6;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.14)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.color='#7DCFB6'">
+      <span>💚</span> 關懷小幫手 <span style="font-size:10px">→</span>
+    </button>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -278,6 +281,26 @@
     <!-- 策略建議 -->
     <div class="report-section-title">💡 策略建議</div>
     <div id="report-strategies"></div>
+    <!-- 跨儀表板連結 -->
+    <div class="report-section-title">🔗 人力資源全圖</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+      <div class="bridge-card recruit" style="background:linear-gradient(135deg,#1a1a2e 0%,#185FA5 180%);border-radius:14px;padding:20px 24px;display:flex;align-items:center;gap:18px">
+        <div style="font-size:32px">👥</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">人力資源儀表板</div>
+          <div style="font-size:12px;color:#8899aa;line-height:1.5">查看在職人力結構、離職分析、差勤記錄與整體組織健康狀況。</div>
+        </div>
+        <button onclick="goToHR()" style="background:#378ADD;border:none;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#2872C4'" onmouseout="this.style.background='#378ADD'">前往人力資源 →</button>
+      </div>
+      <div class="bridge-card care" style="background:linear-gradient(135deg,#1a1a2e 0%,#1D9E75 180%);border-radius:14px;padding:20px 24px;display:flex;align-items:center;gap:18px">
+        <div style="font-size:32px">💚</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">關懷小幫手</div>
+          <div style="font-size:12px;color:#8899aa;line-height:1.5">針對高離職風險同仁或差勤異常者，啟動關懷流程，提升員工留任率與組織健康度。</div>
+        </div>
+        <button onclick="goToCare()" style="background:#1D9E75;border:none;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#178060'" onmouseout="this.style.background='#1D9E75'">前往關懷小幫手 →</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -295,6 +318,22 @@
 
 
 <script>
+// ══ 自動跳轉：預設首頁為人力資源儀表板 ══
+// 若不是從人力資源儀表板跳轉過來（即直接輸入網址），自動導向 hr.html
+// 只在 GitHub Pages 環境（hostname 包含 github.io）執行跳轉，
+// 避免在 Claude 預覽或本地開啟時出現 404
+(function() {
+  const isGitHubPages = window.location.hostname.includes('github.io');
+  if (!isGitHubPages) return;   // 非 GitHub Pages 環境不跳轉
+  const param = new URLSearchParams(window.location.search).get('from');
+  const ref = document.referrer;
+  // 若帶有 ?from=recruit 表示是從 hr.html 明確跳轉過來，不再重導
+  if (!param && !ref.includes('hr.html')) {
+    window.location.replace('hr.html');
+  }
+})();
+// ══════════════════════════════════════
+
 // ══════════════════════════════════════
 //  設定區 — 僅需修改以下值
 // ══════════════════════════════════════
@@ -313,6 +352,10 @@ const CARE_DASHBOARD_URL = '';   // ← 填入關懷小幫手 URL（未來使用
 function goToHR() {
   if (HR_DASHBOARD_URL) { window.location.href = HR_DASHBOARD_URL; }
   else { alert('尚未設定人力資源儀表板連結，請在程式碼 HR_DASHBOARD_URL 填入對應 URL。'); }
+}
+function goToCare() {
+  if (CARE_DASHBOARD_URL) { window.location.href = CARE_DASHBOARD_URL; }
+  else { alert('關懷小幫手尚未建置，請在程式碼 CARE_DASHBOARD_URL 填入對應 URL。'); }
 }
 
 const STAGE_ORDER = ['電訪','AI評分','初試','複試','錄取','到職'];
