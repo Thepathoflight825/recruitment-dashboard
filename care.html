@@ -758,16 +758,9 @@ function computeStrategies(m, risks) {
     steps: ['收到提醒後安排面談','24h內填寫表單','中高風險縮短頻率'],
   });
 
-  // 入職三節點：在職狀態 = '試用期' 且 試用期結束日 ≥ 今天（雙重確認）
-  const _today = new Date(); _today.setHours(0,0,0,0);
-  const newEmps = m.activeEmps.filter(e => {
-    if (gf(e,'在職狀態') !== '試用期') return false;
-    const probEnd = gf(e,'試用期結束日');
-    if (!probEnd) return true;  // 在職狀態已是試用期，即使無結束日也算入
-    const d = fmtDate(probEnd);
-    if (d === '—') return true;
-    return new Date(d.replace(/\//g,'-')) >= _today;
-  });
+  // 入職三節點：在職狀態 = '試用期' 即列入
+  // 試用期結束日已過但狀態仍為試用期 = 試用期展延，仍需追蹤
+  const newEmps = m.activeEmps.filter(e => gf(e,'在職狀態') === '試用期');
   if (newEmps.length > 0) {
     strats.push({
       icon: '🌱', title: `新進員工入職關懷 — ${newEmps.length} 位在追蹤期（${newEmps.map(e=>(gf(e,'英文名')||'').trim()||(gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、')}）`,
