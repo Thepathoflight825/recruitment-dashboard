@@ -790,29 +790,43 @@ function renderLeave() {
 
 // ── 風險計算 ──
 function computeHRMetrics() {
-  const latest     = summaries[summaries.length-1] || {};
-  const prev       = summaries[summaries.length-2] || {};
+  // 使用篩選後的資料（依時間範圍連動）
+  const fs         = getFilteredSummaries();
+  const fel        = getFilteredExitList();
+  const fll        = getFilteredLeaveList();
+  const latest     = fs[fs.length-1] || {};
   const actives    = employees.filter(e=>gf(e,'在職狀態')==='在職中');
-  const exitCnt    = n(gf(latest,'當月離職人數'));
-  const newCnt     = n(gf(latest,'當月新進人數'));
-  const cumRate    = n(gf(latest,'累計離職率（歷史總覽）'));
-  const activeCnt  = actives.length;
-  const monthlyRate= activeCnt ? parseFloat((exitCnt/activeCnt*100).toFixed(1)) : 0;
-  const netChange  = n(gf(latest,'淨人力變化'));
 
-  // 年資 0-1 年佔比
+  // 若期間為多月（3m/6m/1y/all），則彙總期間內所有離職/新進數
+  const isMultiMonth = ['3m','6m','1y','all'].includes(selectedPeriod);
+  const exitCnt    = isMultiMonth
+    ? fs.reduce((a,r)=>a+n(gf(r,'當月離職人數')),0)
+    : n(gf(latest,'當月離職人數'));
+  const newCnt     = isMultiMonth
+    ? fs.reduce((a,r)=>a+n(gf(r,'當月新進人數')),0)
+    : n(gf(latest,'當月新進人數'));
+  const cumRate    = n(gf(latest,'累計離職率（歷史總覽）'));
+  const activeCnt  = n(gf(latest,'當月在職總人數')) || actives.length;
+  const monthlyRate= isMultiMonth
+    ? (fs.length ? parseFloat((exitCnt/fs.length/(activeCnt||1)*100).toFixed(1)) : 0)
+    : (activeCnt ? parseFloat((exitCnt/activeCnt*100).toFixed(1)) : 0);
+  const netChange  = isMultiMonth
+    ? fs.reduce((a,r)=>a+n(gf(r,'淨人力變化')),0)
+    : n(gf(latest,'淨人力變化'));
+
+  // 年資 0-1 年佔比（以在職中員工為準）
   const juniorPct  = actives.length ? Math.round(actives.filter(e=>gf(e,'年資區間')==='0-1年').length/actives.length*100) : 0;
-  // 單一單位最高離職數
-  const exitByDept = {}; exitList.forEach(e=>{ const d=gf(e,'單位')||'其他'; exitByDept[d]=(exitByDept[d]||0)+1; });
+  // 單一單位最高離職數（依篩選後離職清單）
+  const exitByDept = {}; fel.forEach(e=>{ const d=gf(e,'單位')||'其他'; exitByDept[d]=(exitByDept[d]||0)+1; });
   const maxDeptExit= Math.max(...Object.values(exitByDept),0);
   const maxDeptName= Object.entries(exitByDept).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
-  // 最新月份病假率
+  // 最新月份病假率（依篩選後差勤清單）
   const latestMonth= gf(latest,'月份');
-  const sickDays   = leaveList.filter(l=>gf(l,'假別')==='病假'&&gf(l,'月份')===latestMonth).reduce((a,l)=>a+n(gf(l,'天數')),0);
-  // 自願離職 vs 非自願
-  const voluntaryPct = exitList.length ? Math.round(exitList.filter(e=>gf(e,'離職類型')==='自願離職').length/exitList.length*100) : 0;
+  const sickDays   = fll.filter(l=>gf(l,'假別')==='病假').reduce((a,l)=>a+n(gf(l,'天數')),0);
+  // 自願離職 vs 非自願（依篩選後離職清單）
+  const voluntaryPct = fel.length ? Math.round(fel.filter(e=>gf(e,'離職類型')==='自願離職').length/fel.length*100) : 0;
 
-  return { latest, exitCnt, newCnt, cumRate, activeCnt, monthlyRate, netChange, juniorPct, maxDeptExit, maxDeptName, sickDays, latestMonth, voluntaryPct };
+  return { latest, exitCnt, newCnt, cumRate, activeCnt, monthlyRate, netChange, juniorPct, maxDeptExit, maxDeptName, sickDays, latestMonth, voluntaryPct, isMultiMonth, periodMonths: fs.length };
 }
 
 function computeHRRisks(m) {
@@ -879,14 +893,18 @@ function renderReportHR() {
   const now = new Date();
   const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
   const statusText  = highCount > 0 ? '⚠ 高風險' : risks.length > 0 ? '注意' : '✓ 健康';
+  const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[selectedPeriod]||'';
+  const exitLabel   = m.isMultiMonth ? '期間合計離職' : '本月離職';
+  const newLabel    = m.isMultiMonth ? '期間合計新進' : '本月新進';
+  const kpiExitLbl  = m.isMultiMonth ? '期間離職' : '本月離職';
 
   document.getElementById('report-summary-wrap').innerHTML = `
     <div class="report-summary-box">
-      <div class="rs-title">人力資源狀況摘要</div>
+      <div class="rs-title">人力資源狀況摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 時間範圍：${periodLabel}</span></div>
       <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
       <div class="rs-body">
         截至 <strong style="color:#fff">${gf(m.latest,'月份')||'—'}</strong>，在職人數 <strong style="color:#fff">${m.activeCnt}</strong> 人，
-        本月離職 <strong style="color:${m.exitCnt>5?'#F08080':'#fff'}">${m.exitCnt}</strong> 人、新進 <strong style="color:#fff">${m.newCnt}</strong> 人，
+        ${exitLabel} <strong style="color:${m.exitCnt>5?'#F08080':'#fff'}">${m.exitCnt}</strong> 人、${newLabel} <strong style="color:#fff">${m.newCnt}</strong> 人，
         淨變化 <strong style="color:${m.netChange<0?'#F08080':'#5DCAA5'}">${m.netChange>=0?'+':''}${m.netChange}</strong>。
         累計離職率（2025 起歷史）<strong style="color:${m.cumRate>40?'#F08080':'#fff'}">${m.cumRate}%</strong>。
         在職員工年資 0-1 年佔比 <strong style="color:${m.juniorPct>30?'#F08080':'#fff'}">${m.juniorPct}%</strong>，
@@ -895,7 +913,7 @@ function renderReportHR() {
       </div>
       <div class="rs-kpi-row">
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${m.activeCnt}</div><div class="rs-kpi-lbl">在職人數</div></div>
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.exitCnt>5?'#F08080':'#EF9F27'}">${m.exitCnt}</div><div class="rs-kpi-lbl">本月離職</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.exitCnt>5?'#F08080':'#EF9F27'}">${m.exitCnt}</div><div class="rs-kpi-lbl">${kpiExitLbl}</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.cumRate>40?'#F08080':'#EF9F27'}">${m.cumRate}%</div><div class="rs-kpi-lbl">累計離職率</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.monthlyRate>10?'#F08080':'#5DCAA5'}">${m.monthlyRate}%</div><div class="rs-kpi-lbl">月離職率</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.netChange<0?'#F08080':'#5DCAA5'}">${m.netChange>=0?'+':''}${m.netChange}</div><div class="rs-kpi-lbl">淨人力</div></div>
