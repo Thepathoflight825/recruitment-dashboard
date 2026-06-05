@@ -758,10 +758,15 @@ function computeStrategies(m, risks) {
     steps: ['收到提醒後安排面談','24h內填寫表單','中高風險縮短頻率'],
   });
 
-  // 入職三節點
+  // 入職三節點：在職狀態 = '試用期' 且 試用期結束日 ≥ 今天（雙重確認）
+  const _today = new Date(); _today.setHours(0,0,0,0);
   const newEmps = m.activeEmps.filter(e => {
-    const tenure = parseFloat(gf(e,'年資(月)')) || 0;
-    return tenure <= 3;
+    if (gf(e,'在職狀態') !== '試用期') return false;
+    const probEnd = gf(e,'試用期結束日');
+    if (!probEnd) return true;  // 在職狀態已是試用期，即使無結束日也算入
+    const d = fmtDate(probEnd);
+    if (d === '—') return true;
+    return new Date(d.replace(/\//g,'-')) >= _today;
   });
   if (newEmps.length > 0) {
     strats.push({
