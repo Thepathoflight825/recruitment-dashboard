@@ -478,8 +478,14 @@ function avatarColor(name) {
   return colors[Math.abs(h) % colors.length];
 }
 function empName(larkId) {
+  // 優先顯示英文名
   const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
-  return emp ? (gf(emp,'員工姓名') || gf(emp,'英文名') || larkId) : (larkId || '—');
+  return emp ? ((gf(emp,'英文名')||'').trim() || (gf(emp,'員工姓名')||'').trim() || larkId) : (larkId || '—');
+}
+function empChineseName(larkId) {
+  // 取中文姓名，用於輔助小字顯示
+  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  return emp ? (gf(emp,'員工姓名')||'').trim() : '';
 }
 
 // ── Data fetch ──
@@ -561,14 +567,22 @@ function computeMetrics() {
 }
 
 // ── 制度節點判斷輔助 ──
-function getCareMonthLabel() {
-  const m = new Date().getMonth() + 1;
-  if (m <= 6)  return '6 月';
-  if (m <= 9)  return '9 月';
-  if (m <= 12) return '12 月';
-  return '3 月';
+// 每季關懷月：2026年 = 6/9/12月；2027年起 = 3/6/9/12月（結合7月H1、1月H2績效面談）
+function getCareMonths() {
+  const yr = new Date().getFullYear();
+  return yr <= 2026 ? [6, 9, 12] : [3, 6, 9, 12];
 }
+function getCareMonthLabel() {
+  const now = new Date(); const m = now.getMonth() + 1; const yr = now.getFullYear();
+  const careMonths = getCareMonths();
+  // 找下一個（含當月）關懷月
+  const next = careMonths.find(cm => cm >= m) || careMonths[0];
+  return `${next} 月`;
+}
+// 是否為績效面談月（7月 H1 / 1月 H2）
+function isPerfReviewMonth(mo) { return mo === 7 || mo === 1; }
 function isNearPerfReview() {
+  // 6月=準備H1、7月=執行H1、12月=準備H2、1月=執行H2
   const m = new Date().getMonth() + 1;
   return m === 6 || m === 7 || m === 12 || m === 1;
 }
@@ -584,7 +598,7 @@ function computeRisks(m) {
   // ① 高風險員工
   if (m.highRisk > 0) {
     const highEmps = m.activeEmps.filter(e => gf(e,'當前風險等級')?.includes('高'));
-    const names = highEmps.map(e => (gf(e,'員工姓名')||gf(e,'英文名')||'').trim()).filter(Boolean).join('、');
+    const names = highEmps.map(e => (gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、');
     risks.push({
       level: 'high', icon: '🔴', title: '高風險員工 — 需立即介入',
       tag: '留任風險 · 立即行動',
@@ -646,10 +660,17 @@ function computeRisks(m) {
   }
 
   // ⑤ 本季關懷覆蓋率不足
+  // 依當年關懷月切分「本季」：找最近一個已過的關懷月作為起點
   const thisQuarterStart = (() => {
-    const now = new Date(); const mo = now.getMonth();
-    const qStart = [0,0,0,3,3,3,6,6,6,9,9,9][mo];
-    return new Date(now.getFullYear(), qStart, 1);
+    const now = new Date(); const mo = now.getMonth() + 1; const yr = now.getFullYear();
+    const careMonths = getCareMonths();
+    // 找最近已過（含當月）的關懷月
+    let startMo = null;
+    for (let i = careMonths.length - 1; i >= 0; i--) {
+      if (careMonths[i] <= mo) { startMo = careMonths[i]; break; }
+    }
+    if (!startMo) startMo = careMonths[careMonths.length - 1]; // 年初前，取上年最後關懷月
+    return new Date(yr, startMo - 1, 1);
   })();
   const caredThisQ = new Set(
     careRecords.filter(r => {
@@ -660,10 +681,10 @@ function computeRisks(m) {
   );
   const uncaredEmps = m.activeEmps.filter(e => !caredThisQ.has(gf(e,'Lark 帳號 ID')));
   if (uncaredEmps.length > 0) {
-    const uncaredNames = uncaredEmps.slice(0,5).map(e=>(gf(e,'員工姓名')||gf(e,'英文名')||'').trim()).filter(Boolean).join('、');
+    const uncaredNames = uncaredEmps.slice(0,5).map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、');
     risks.push({
       level: 'medium', icon: '💬', title: '本季尚未完成關懷面談',
-      tag: `覆蓋率 · 請於 ${getCareMonthLabel()}底前完成`,
+      tag: `覆蓋率 · 請於 ${getCareMonthLabel()} 底前完成`,
       metric: `${uncaredEmps.length} 位員工本季尚無關懷紀錄`,
       desc: `每季至少完成一次主管 1on1 關懷，關懷月為 6月、9月、12月。<br>
              ▶ 待關懷員工：${uncaredNames}${uncaredEmps.length>5?` 等共 ${uncaredEmps.length} 人`:''}<br>
@@ -730,10 +751,10 @@ function computeStrategies(m, risks) {
   strats.push({
     icon: '📅', title: '每季 1on1 關懷 — 本季執行節奏',
     tag: `季度關懷 · 請於 ${getCareMonthLabel()}底前完成`,
-    body: `<li>每季關懷月（<strong>6月、9月、12月</strong>）1 日，系統自動發送提醒給主管，含下屬名單與填寫連結</li>
+    body: `<li>${getCareMonths().map(m=>m+'月').join('、')}為關懷月，每月 1 日系統自動發送提醒給主管，含下屬名單與填寫連結</li>
            <li>主管完成 10–30 分鐘面談後，請於 <strong>24 小時內</strong>填寫並提交關懷紀錄表單</li>
            <li>中風險員工縮短關懷頻率至 <strong>每月一次</strong>；高風險員工請立即聯繫 HR</li>
-           <li>績效面談月（<strong>7月、1月</strong>）不重複安排季度 1on1</li>`,
+           <li>績效面談月（<strong>7月、隔年1月</strong>）不重複安排季度 1on1</li>`,
     steps: ['收到提醒後安排面談','24h內填寫表單','中高風險縮短頻率'],
   });
 
@@ -874,12 +895,12 @@ function renderOverview() {
   const sorted = [...m.fr].sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||'')).slice(0,5);
   document.getElementById('recent-care').innerHTML = sorted.length
     ? sorted.map(r => {
-        const lk = gf(r,'關懷員工'); const name = empName(lk);
+        const lk = gf(r,'關懷員工'); const name = empName(lk); const cnName2 = empChineseName(lk);
         const risk = gf(r,'留任風險等級') || '';
         return `<div class="emp-row" onclick="openCareDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
           <div class="emp-avatar" style="background:${avatarColor(name)}">${name.charAt(0)}</div>
           <div class="emp-meta">
-            <div class="emp-name">${name}</div>
+            <div class="emp-name">${name}${cnName2 && cnName2 !== name ? `<span style="font-size:10px;color:var(--text-sub);font-weight:400;margin-left:5px">${cnName2}</span>` : ''}</div>
             <div class="emp-dept">${fmtDate(gf(r,'面談日期'))}・${gf(r,'面談類型')||'—'}</div>
           </div>
           <div>${riskBadge(risk)}</div>
@@ -923,7 +944,9 @@ function renderEmployees() {
         <th>員工</th><th>部門 / 職務</th><th>年資</th><th>直屬主管</th><th>風險等級</th><th>最新 1on1</th><th>狀態</th>
       </tr></thead>
       <tbody>${filtered.map(e => {
-        const name = (gf(e,'員工姓名') || gf(e,'英文名') || '—').trim();
+        const engName = (gf(e,'英文名')||'').trim() || (gf(e,'員工姓名')||'—').trim();
+        const cnName  = (gf(e,'員工姓名')||'').trim();
+        const name = engName;  // avatar/color key
         const dept = gf(e,'部門') || '—'; const job = gf(e,'職務') || '—';
         const tenure = gf(e,'年資(月)') || '—';
         const mgr = gf(e,'直屬主管') || '—';
@@ -931,7 +954,7 @@ function renderEmployees() {
         const last1on1 = fmtDate(gf(e,'最新 1on1 日期'));
         const status = gf(e,'在職狀態') || '在職';
         return `<tr onclick="openEmpDetail(${JSON.stringify(e).replace(/"/g,'&quot;')})">
-          <td><div style="display:flex;align-items:center;gap:8px"><div class="emp-avatar" style="background:${avatarColor(name)};width:28px;height:28px;font-size:11px">${name.charAt(0)}</div><div><div style="font-weight:600">${name}</div><div style="font-size:10px;color:var(--text-sub)">${gf(e,'Lark 帳號 ID')||''}</div></div></div></td>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="emp-avatar" style="background:${avatarColor(name)};width:28px;height:28px;font-size:11px">${name.charAt(0)}</div><div><div style="font-weight:600">${engName}</div><div style="font-size:10px;color:var(--text-sub)">${cnName ? cnName + ' · ' : ''}${gf(e,'Lark 帳號 ID')||''}</div></div></div></td>
           <td>${dept}<br><span style="font-size:11px;color:var(--text-sub)">${job}</span></td>
           <td>${tenure} 月</td>
           <td style="font-size:12px">${mgr.replace('KR-','')}</td>
@@ -956,10 +979,10 @@ function renderCareRecords() {
     ? `<table class="data-table">
         <thead><tr><th>紀錄 ID</th><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
         <tbody>${fr.map(r => {
-          const name = empName(gf(r,'關懷員工'));
+          const name = empName(gf(r,'關懷員工')); const cnCare = empChineseName(gf(r,'關懷員工'));
           return `<tr onclick="openCareDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
             <td style="font-size:11px;color:var(--text-sub)">${gf(r,'紀錄 ID')||'—'}</td>
-            <td><strong>${name}</strong></td>
+            <td><strong>${name}</strong>${cnCare && cnCare !== name ? `<br><span style="font-size:10px;color:var(--text-sub)">${cnCare}</span>` : ''}</td>
             <td>${fmtDate(gf(r,'面談日期'))}</td>
             <td><span class="badge badge-blue">${gf(r,'面談類型')||'—'}</span></td>
             <td>${gf(r,'面談方式')||'—'}</td>
@@ -1100,9 +1123,12 @@ function renderReport() {
 // ── Modals ──
 function openEmpDetail(e) {
   if (typeof e === 'string') e = JSON.parse(e.replace(/&quot;/g, '"'));
-  const name = (gf(e,'員工姓名') || gf(e,'英文名') || '—').trim();
-  document.getElementById('modal-name').textContent = name;
-  document.getElementById('modal-sub').textContent = `${gf(e,'部門')||''} · ${gf(e,'職務')||''} · ${gf(e,'職等')||''}`;
+  const engN = (gf(e,'英文名')||'').trim() || (gf(e,'員工姓名')||'—').trim();
+  const cnN  = (gf(e,'員工姓名')||'').trim();
+  document.getElementById('modal-name').textContent = engN;
+  // 中文名顯示在 modal-sub 前綴
+  const cnTag = cnN && cnN !== engN ? `${cnN} · ` : '';
+  document.getElementById('modal-sub').textContent = `${cnTag}${gf(e,'部門')||''} · ${gf(e,'職務')||''} · ${gf(e,'職等')||''}`;
   const empCare = careRecords.filter(r => gf(r,'關懷員工') === gf(e,'Lark 帳號 ID'));
   const empPromise = promises.filter(p => gf(p,'關懷員工') === gf(e,'Lark 帳號 ID'));
   document.getElementById('modal-body').innerHTML = `
