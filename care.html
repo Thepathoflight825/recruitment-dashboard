@@ -561,28 +561,17 @@ function computeMetrics() {
 }
 
 // ── 制度節點判斷輔助 ──
-function getCurrentQuarter() {
-  const m = new Date().getMonth() + 1; // 1-12
-  if (m <= 3) return 1;
-  if (m <= 6) return 2;
-  if (m <= 9) return 3;
-  return 4;
-}
-// 當季關懷月份：6月、9月、12月（不含績效面談月 7月、1月）
-// W1 自動化每季最後一個月 1 日觸發（6/1、9/1、12/1，3月為彈性補充）
 function getCareMonthLabel() {
   const m = new Date().getMonth() + 1;
-  if (m <= 6)  return '6 月（Q2 關懷月）';
-  if (m <= 9)  return '9 月（Q3 關懷月）';
-  if (m <= 12) return '12 月（Q4 關懷月）';
-  return '3 月（Q1 關懷月）';
+  if (m <= 6)  return '6 月';
+  if (m <= 9)  return '9 月';
+  if (m <= 12) return '12 月';
+  return '3 月';
 }
-// 是否接近績效面談期（7月=H1、1月=H2）
 function isNearPerfReview() {
   const m = new Date().getMonth() + 1;
   return m === 6 || m === 7 || m === 12 || m === 1;
 }
-// 是否接近 10 月 HR 年度關懷
 function isNearAnnualCare() {
   const m = new Date().getMonth() + 1;
   return m === 9 || m === 10;
@@ -592,35 +581,35 @@ function isNearAnnualCare() {
 function computeRisks(m) {
   const risks = [];
 
-  // ① 高風險員工 → W5 機制：HR 24小時內介入
+  // ① 高風險員工
   if (m.highRisk > 0) {
     const highEmps = m.activeEmps.filter(e => gf(e,'當前風險等級')?.includes('高'));
     const names = highEmps.map(e => (gf(e,'員工姓名')||gf(e,'英文名')||'').trim()).filter(Boolean).join('、');
     risks.push({
-      level: 'high', icon: '🔴', title: '高風險員工 — W5 自動通知已觸發',
+      level: 'high', icon: '🔴', title: '高風險員工 — 需立即介入',
       tag: '留任風險 · 立即行動',
       metric: `共 ${m.highRisk} 位：${names || '詳見員工名單'}`,
-      desc: `依現行制度（W5），系統已自動通知 HR 與直屬主管。<br>
+      desc: `系統已自動通知 HR 與直屬主管。<br>
              ▶ HR 應於 <strong>24 小時內</strong>聯繫直屬主管，共同評估留任策略<br>
-             ▶ 若連續 2 次 1on1 問題未改善，進入 <strong>PIP 預警期</strong>評估<br>
-             ▶ 若第 3 個月仍無改善，HR 主導啟動 <strong>PIP 書面改善計畫</strong>`,
+             ▶ 評估方向：能力問題 → 制定發展計畫；意願問題 → 留才談話（薪酬／職涯／環境調整）<br>
+             ▶ 若連續 2 次 1on1 問題未改善，啟動書面改善計畫流程（需備有完整面談紀錄）`,
     });
   }
 
-  // ② 待處理事件（事件觸發表）
+  // ② 待處理事件
   if (m.openEvents > 0) {
     risks.push({
-      level: 'high', icon: '🚨', title: '事件觸發紀錄尚未結案',
+      level: 'high', icon: '🚨', title: '事件紀錄尚未結案',
       tag: '事件管理 · 立即追蹤',
       metric: `${m.openEvents} 件事件處理中`,
-      desc: `依制度，HR 收到事件通知後應於 <strong>24 小時內</strong>聯繫主管啟動協同流程。<br>
-             ▶ 確認每件事件的處理狀態與負責 HR<br>
+      desc: `HR 收到事件通知後應於 <strong>24 小時內</strong>聯繫主管，啟動協同處理流程。<br>
+             ▶ 確認每件事件的處理負責人與目前進度<br>
              ▶ 涉及人際衝突或主管本身為問題來源時，由 HR 直接介入<br>
-             ▶ 完成後更新「處理狀態」為結案，關閉追蹤`,
+             ▶ 處理完成後，請更新「處理狀態」為結案`,
     });
   }
 
-  // ③ 承諾逾期超過 3 天 → W4B 已升級通知 HR
+  // ③ 主管承諾逾期超過 3 天
   const overduePromises = promises.filter(p => {
     const days = parseFloat(gf(p,'逾期天數')) || 0;
     const status = gf(p,'兌現狀態') || '';
@@ -628,37 +617,38 @@ function computeRisks(m) {
   });
   if (overduePromises.length > 0) {
     risks.push({
-      level: 'high', icon: '📋', title: '主管承諾逾期逾 3 天 — W4B 已通知 HR',
+      level: 'high', icon: '📋', title: '主管承諾逾期超過 3 天',
       tag: '信任風險 · 本週處理',
-      metric: `${overduePromises.length} 項承諾逾期超過 3 天`,
-      desc: `依制度（W4B），逾期超過 3 天系統已自動通知 HR。<br>
-             ▶ HR 確認主管是否已更新完成狀態或延後日期<br>
-             ▶ 逾期承諾直接影響員工對主管的信任感，優先催辦<br>
-             ▶ 承諾 SLA：簡單事項 24h、協調事項 3 天、複雜問題 2 週`,
+      metric: `${overduePromises.length} 項承諾逾期未兌現`,
+      desc: `逾期超過 3 天系統已自動通知 HR，請優先催辦。<br>
+             ▶ 請確認主管是否已更新完成狀態，或重新設定延後日期<br>
+             ▶ 逾期承諾會直接影響員工對主管的信任感<br>
+             ▶ 承諾時效參考：簡單事項 24 小時、需協調事項 3 天、複雜問題 2 週`,
     });
   }
 
-  // ④ 連續中風險（連續 2 次中風險 → W5 觸發）
+  // ④ 連續中風險（連續 2 次以上）
   const consecutiveMidRisk = careRecords.filter(r => {
     const cnt = parseFloat(gf(r,'連續風險次數')) || 0;
     return cnt >= 2 && gf(r,'留任風險等級')?.includes('中');
   });
   if (consecutiveMidRisk.length > 0) {
+    const midNames = [...new Set(consecutiveMidRisk.map(r => empName(gf(r,'關懷員工'))))].join('、');
     risks.push({
-      level: 'high', icon: '🟡', title: '連續中風險員工 — 已達 W5 升級門檻',
+      level: 'high', icon: '🟡', title: '員工連續出現中風險 — 需升級關注',
       tag: '預防升級 · 本週介入',
-      metric: `${consecutiveMidRisk.length} 位員工連續 2 次以上中風險`,
-      desc: `依制度（W5），連續中風險 ≥ 2 次會自動通知 HR 升級處理。<br>
-             ▶ 主管應將 1on1 頻率縮短至 <strong>每 1 個月</strong>一次（從每季縮短）<br>
-             ▶ HR 建議主動介入評估，了解是否有主管觀察不到的壓力來源<br>
-             ▶ 若連續 2 次問題未改善，進入 PIP 觀察期`,
+      metric: `${consecutiveMidRisk.length} 位員工連續 2 次以上評為中風險`,
+      desc: `連續中風險訊號已達升級門檻，系統已自動通知 HR。<br>
+             ▶ 涉及員工：${midNames}<br>
+             ▶ 主管應將關懷頻率縮短至 <strong>每月一次</strong>，持續追蹤<br>
+             ▶ HR 建議主動介入評估，了解是否有主管不易察覺的壓力來源`,
     });
   }
 
-  // ⑤ 本季關懷覆蓋率不足（當季應有 1on1 紀錄）
+  // ⑤ 本季關懷覆蓋率不足
   const thisQuarterStart = (() => {
-    const now = new Date(); const m = now.getMonth();
-    const qStart = [0,0,0,3,3,3,6,6,6,9,9,9][m];
+    const now = new Date(); const mo = now.getMonth();
+    const qStart = [0,0,0,3,3,3,6,6,6,9,9,9][mo];
     return new Date(now.getFullYear(), qStart, 1);
   })();
   const caredThisQ = new Set(
@@ -670,41 +660,46 @@ function computeRisks(m) {
   );
   const uncaredEmps = m.activeEmps.filter(e => !caredThisQ.has(gf(e,'Lark 帳號 ID')));
   if (uncaredEmps.length > 0) {
+    const uncaredNames = uncaredEmps.slice(0,5).map(e=>(gf(e,'員工姓名')||gf(e,'英文名')||'').trim()).filter(Boolean).join('、');
     risks.push({
-      level: 'medium', icon: '💬', title: `本季尚未完成 1on1 關懷`,
-      tag: `覆蓋率 · ${getCareMonthLabel()}前完成`,
+      level: 'medium', icon: '💬', title: '本季尚未完成關懷面談',
+      tag: `覆蓋率 · 請於 ${getCareMonthLabel()}底前完成`,
       metric: `${uncaredEmps.length} 位員工本季尚無關懷紀錄`,
-      desc: `依制度（W1），每季自動提醒主管於季末關懷月（6/9/12月）完成 1on1。<br>
-             ▶ 待關懷員工：${uncaredEmps.slice(0,5).map(e=>(gf(e,'員工姓名')||gf(e,'英文名')||'').trim()).filter(Boolean).join('、')}${uncaredEmps.length>5?` 等 ${uncaredEmps.length} 人`:''}
-             <br>▶ 主管收到 W1 提醒後，請於當季內安排面談並 <strong>24 小時內填寫表單</strong>`,
+      desc: `每季至少完成一次主管 1on1 關懷，關懷月為 6月、9月、12月。<br>
+             ▶ 待關懷員工：${uncaredNames}${uncaredEmps.length>5?` 等共 ${uncaredEmps.length} 人`:''}<br>
+             ▶ 主管每季首日會收到自動提醒，請於當季完成面談並填寫紀錄表單`,
     });
   }
 
-  // ⑥ 績效面談期提醒（7月H1 / 1月H2）
+  // ⑥ 即將到來：上半年績效面談（6-7月）
   if (isNearPerfReview()) {
-    const now = new Date(); const mo = now.getMonth() + 1;
+    const mo = new Date().getMonth() + 1;
     const isH1 = (mo === 6 || mo === 7);
+    const isBeforeStart = (mo === 6 && isH1) || (mo === 12 && !isH1);
     risks.push({
-      level: 'low', icon: '📊', title: `${isH1 ? 'H1 上半年' : 'H2 下半年'}績效面談期`,
-      tag: `績效管理 · ${isH1 ? '7 月初' : '1 月初'}截止`,
-      metric: `P1 自動化預計於 ${isH1 ? '7/1' : '1/1'} 提醒各主管`,
-      desc: `依制度，${isH1?'上半年（H1）績效面談於 7 月初、下半年（H2）於隔年 1 月初':'本期績效面談'}進行。<br>
-             ▶ P2 自動化：主管提交後系統自動通知 HR 審核，含評等摘要<br>
-             ▶ 請確認每位員工的績效面談流程狀態是否已更新<br>
-             ▶ 若同仁有異議，系統自動通知 HR 確認「同仁異議」欄位`,
+      level: 'low', icon: '📊',
+      title: isH1 ? '上半年績效面談 — 7月執行' : '下半年績效面談 — 1月執行',
+      tag: isH1 ? '績效管理 · 7/1–7/31' : '績效管理 · 1/1–1/31',
+      metric: isBeforeStart
+        ? `系統將於 ${isH1?'7/1':'1/1'} 自動提醒各主管安排面談`
+        : `績效面談進行中，請確認各主管提交進度`,
+      desc: `${isH1?'上半年':'下半年'}績效面談執行期間為整個${isH1?'7':'1'}月，請依序完成。<br>
+             ▶ 主管完成面談後，填寫績效紀錄並將流程狀態更新為「已提交」<br>
+             ▶ 提交後系統自動通知 HR 審核，請 HR 於 5 個工作天內完成<br>
+             ▶ 若同仁對評等有異議，請在「同仁異議說明」欄填寫，HR 將收到通知`,
     });
   }
 
-  // ⑦ HR 年度關懷月提醒（10月）
+  // ⑦ HR 年度全體關懷（9-10月）
   if (isNearAnnualCare()) {
     risks.push({
       level: 'low', icon: '🏢', title: 'HR 年度全體員工關懷訪談',
       tag: '年度關懷 · 10 月執行',
       metric: `全體 ${m.activeEmps.length} 位在職員工`,
-      desc: `依制度，每年 10 月由 HR 進行全體員工一對一關懷訪談。<br>
-             ▶ 訪談重點：組織氣氛、對主管的感受、個人發展需求<br>
-             ▶ 與主管 1on1 不同，HR 年度訪談可讓員工直接反應主管層面的問題<br>
-             ▶ 訪談結果匯入關懷紀錄，更新各員工風險等級`,
+      desc: `每年 10 月由 HR 進行全體員工一對一訪談，獨立於主管 1on1 之外。<br>
+             ▶ 訪談重點：組織氣氛感受、對直屬主管的回饋、個人職涯期待與支援需求<br>
+             ▶ 此訪談讓員工有機會直接向 HR 反應主管層面的問題<br>
+             ▶ 訪談結果記錄至關懷紀錄，並更新各員工的當前風險等級`,
     });
   }
 
@@ -718,28 +713,28 @@ function computeStrategies(m, risks) {
   const hasOverdue = promises.some(p => (parseFloat(gf(p,'逾期天數'))||0) > 3 || gf(p,'兌現狀態')?.includes('逾期'));
   const hasOpenEvent = m.openEvents > 0;
 
-  // 緊急：高風險處理流程
+  // 緊急：高風險 / 事件處理
   if (hasHighRisk || hasOpenEvent) {
     strats.push({
       icon: '🔴', title: '高風險員工協同處理流程',
       tag: '緊急 · 24 小時內啟動',
-      body: `<li>HR 確認 W5 通知已送達直屬主管，於 <strong>24 小時內</strong>完成三方對焦</li>
-             <li>評估方向：能力問題 → IDP 發展計畫；意願問題 → 留才談話（薪酬/職涯/環境調整）</li>
-             <li>若評估需啟動 PIP：確認已有 <strong>2 次以上完整 1on1 紀錄</strong>作為依據</li>
-             <li>PIP 三階段：觀察期（1-2月）→ 預警期（2月末）→ 書面 PIP（3月末）</li>`,
-      steps: ['24h三方對焦','能力vs意願評估','確認PIP啟動條件'],
+      body: `<li>HR 與直屬主管於 <strong>24 小時內</strong>完成三方對焦，了解員工核心訴求</li>
+             <li>評估方向：能力問題 → 制定個人發展計畫；意願問題 → 留才談話（薪酬／職涯／環境調整）</li>
+             <li>若需啟動書面改善計畫，請確認已備有 <strong>2 次以上完整關懷面談紀錄</strong>作為依據</li>
+             <li>改善計畫三階段：觀察期（第 1–2 個月）→ 預警期（第 2 個月末）→ 書面改善計畫（第 3 個月末）</li>`,
+      steps: ['24h HR 與主管對焦','評估留才方向','視情況啟動改善計畫'],
     });
   }
 
-  // 本季 1on1 關懷執行
+  // 每季 1on1 關懷執行節奏
   strats.push({
     icon: '📅', title: '每季 1on1 關懷 — 本季執行節奏',
-    tag: `季度關懷 · ${getCareMonthLabel()}完成`,
-    body: `<li>W1 自動提醒：每季關懷月（<strong>6月、9月、12月</strong>）1 日，Lark 自動發送主管提醒，含下屬名單與表單連結</li>
-           <li>主管完成 10–30 分鐘面談後，<strong>24 小時內</strong>填寫並提交關懷紀錄表單</li>
-           <li>中高風險員工縮短頻率：中風險 → 每 <strong>1 個月</strong>一次；高風險 → 立即聯繫 HR</li>
-           <li>績效面談月（<strong>7月 H1、1月 H2</strong>）不重複安排</li>`,
-    steps: ['W1自動提醒已設定','24h內填寫表單','中高風險縮短頻率'],
+    tag: `季度關懷 · 請於 ${getCareMonthLabel()}底前完成`,
+    body: `<li>每季關懷月（<strong>6月、9月、12月</strong>）1 日，系統自動發送提醒給主管，含下屬名單與填寫連結</li>
+           <li>主管完成 10–30 分鐘面談後，請於 <strong>24 小時內</strong>填寫並提交關懷紀錄表單</li>
+           <li>中風險員工縮短關懷頻率至 <strong>每月一次</strong>；高風險員工請立即聯繫 HR</li>
+           <li>績效面談月（<strong>7月、1月</strong>）不重複安排季度 1on1</li>`,
+    steps: ['收到提醒後安排面談','24h內填寫表單','中高風險縮短頻率'],
   });
 
   // 入職三節點
@@ -750,12 +745,12 @@ function computeStrategies(m, risks) {
   if (newEmps.length > 0) {
     strats.push({
       icon: '🌱', title: `新進員工入職關懷 — ${newEmps.length} 位在追蹤期`,
-      tag: '入職關懷 · Day14 / Day30 / Day90',
-      body: `<li><strong>Day 14</strong>：主管進行入職第一次關懷，確認工作適應狀況與需要的支援</li>
-             <li><strong>Day 30</strong>：任務釐清面談，確認工作目標、職責範圍與短期里程碑</li>
-             <li><strong>Day 90（試用期末）</strong>：主管 + HR 共同評估試用期表現，決定是否轉正</li>
-             <li>每次面談後填寫關懷紀錄，選擇面談類型「入職關懷」，由系統自動通知 HR</li>`,
-      steps: ['Day14入職關懷','Day30任務釐清','Day90試用期末評估'],
+      tag: '入職關懷 · 到職後三節點',
+      body: `<li><strong>到職第 14 天</strong>：主管進行入職第一次關懷，了解適應狀況與需要的支援</li>
+             <li><strong>到職第 30 天</strong>：任務釐清面談，確認工作目標、職責範圍與短期里程碑</li>
+             <li><strong>到職第 90 天（試用期末）</strong>：主管與 HR 共同評估試用期表現，確認是否轉正</li>
+             <li>每次面談後，請填寫關懷紀錄並選擇面談類型為「入職關懷」，HR 將自動收到通知</li>`,
+      steps: ['第14天入職關懷','第30天任務釐清','第90天試用期末評估'],
     });
   }
 
@@ -764,26 +759,30 @@ function computeStrategies(m, risks) {
     strats.push({
       icon: '📋', title: '主管承諾追蹤 — 兌現率維護',
       tag: '信任建立 · 持續執行',
-      body: `<li>承諾 SLA 標準：簡單事項 <strong>24 小時</strong>、需協調事項 <strong>3 天</strong>、複雜問題 <strong>2 週</strong></li>
-             <li>W4A：到期當天早上 10 點自動提醒主管，請點選「✅ 已完成」或「⏳ 延後」並更新日期</li>
-             <li>W4B：逾期超過 <strong>3 天</strong>自動通知 HR，協助追蹤；避免員工產生承諾被遺忘的感受</li>
-             <li>每季承諾兌現率建議 ≥ 80%，作為主管管理品質的參考指標</li>`,
-      steps: ['W4A到期提醒','W4B逾期升級HR','每季兌現率檢視'],
+      body: `<li>承諾時效參考：簡單事項 <strong>24 小時</strong>、需協調事項 <strong>3 天</strong>、複雜問題 <strong>2 週</strong></li>
+             <li>承諾到期當天早上，系統自動提醒主管，請點選「✅ 已完成並回覆同仁」或「⏳ 需要延後」並更新日期</li>
+             <li>逾期超過 <strong>3 天</strong>，系統自動通知 HR 協助追蹤，避免員工產生承諾被遺忘的感受</li>
+             <li>每季承諾兌現率建議達 <strong>80% 以上</strong>，是主管管理品質的重要指標</li>`,
+      steps: ['到期當天提醒主管','逾期自動通知HR','每季兌現率檢視'],
     });
   }
 
-  // 績效面談提醒（接近H1/H2）
+  // 績效面談（6-7月 / 12-1月）
   if (isNearPerfReview()) {
     const mo = new Date().getMonth() + 1;
     const isH1 = (mo === 6 || mo === 7);
+    const isBeforeStart = (mo === 6) || (mo === 12);
     strats.push({
-      icon: '📊', title: `${isH1 ? 'H1 上半年' : 'H2 下半年'}績效面談執行`,
-      tag: `績效管理 · ${isH1 ? '7月初' : '1月初'}截止`,
-      body: `<li>P1 已於 ${isH1?'7/1':'1/1'} 自動提醒各主管安排績效面談，請確認排程</li>
-             <li>面談完成後，主管填寫績效紀錄表並將流程狀態更新為「已提交」</li>
-             <li>P2 自動通知 HR：系統自動發送評等摘要，請 HR 於 5 個工作天內完成審核</li>
-             <li>若有同仁對評等有異議，請在「同仁異議說明」欄填寫，系統自動通知 HR 處理</li>`,
-      steps: ['確認面談排程','主管提交紀錄','HR審核與異議處理'],
+      icon: '📊', title: isH1 ? '上半年績效面談 — 7月執行' : '下半年績效面談 — 1月執行',
+      tag: isH1 ? '績效管理 · 7/1–7/31' : '績效管理 · 1/1–1/31',
+      body: `<li>${isBeforeStart
+               ? `系統預計於 <strong>${isH1?'7/1':'1/1'}</strong> 自動提醒各主管安排績效面談，請確認排程`
+               : `績效面談進行中，請確認各主管已安排並填寫完畢`}
+             </li>
+             <li>面談完成後，主管填寫績效紀錄並將流程狀態更新為「<strong>已提交</strong>」</li>
+             <li>提交後系統自動通知 HR 審核，請於 <strong>5 個工作天</strong>內完成</li>
+             <li>若同仁對評等有異議，請在「同仁異議說明」欄填寫，HR 將收到通知進行確認</li>`,
+      steps: [isBeforeStart?'確認7/1前排定面談':'確認面談完成進度','主管填寫並提交','HR審核與異議確認'],
     });
   }
 
@@ -792,10 +791,10 @@ function computeStrategies(m, risks) {
     strats.push({
       icon: '🏢', title: 'HR 年度全體員工關懷訪談準備',
       tag: '年度普查 · 10 月執行',
-      body: `<li>HR 主導，與全體 ${m.activeEmps.length} 位在職員工進行一對一訪談，獨立於主管 1on1 之外</li>
+      body: `<li>HR 主導，與全體 <strong>${m.activeEmps.length}</strong> 位在職員工進行一對一訪談，獨立於主管 1on1 之外</li>
              <li>訪談重點：組織氣氛感受、對直屬主管的回饋、個人職涯期待與支援需求</li>
-             <li>訪談結果記錄至關懷紀錄，面談類型選「HR 年度關懷」，更新員工風險等級</li>
-             <li>訪談完成後，彙整各部門風險分布報告，呈報管理層</li>`,
+             <li>此訪談讓員工有機會直接向 HR 反應主管層面的問題，請確保保密原則</li>
+             <li>訪談完成後記錄至關懷紀錄，更新各員工風險等級，並彙整部門風險報告呈報管理層</li>`,
       steps: ['排定HR訪談時程','更新員工風險等級','彙整部門風險報告'],
     });
   }
@@ -1056,12 +1055,12 @@ function renderReport() {
       <div class="rs-body">
         在職員工共 <strong style="color:#fff">${m.activeEmps.length}</strong> 人，
         本期完成關懷面談 <strong style="color:#fff">${m.fr.length}</strong> 次。
-        高風險員工 <strong style="color:${m.highRisk>0?'#F08080':'#5DCAA5'}">${m.highRisk}</strong> 人（W5 已通知）、
-        中風險 <strong style="color:${m.midRisk>0?'#EF9F27':'#5DCAA5'}">${m.midRisk}</strong> 人。
+        高風險員工 <strong style="color:${m.highRisk>0?'#F08080':'#5DCAA5'}">${m.highRisk}</strong> 人、
+        中風險 <strong style="color:${m.midRisk>0?'#EF9F27':'#5DCAA5'}">${m.midRisk}</strong> 人，
         待兌現主管承諾 <strong style="color:${m.pendingPromises>3?'#F08080':'#fff'}">${m.pendingPromises}</strong> 項，
         待處理事件 <strong style="color:${m.openEvents>0?'#F08080':'#fff'}">${m.openEvents}</strong> 件。
-        ${isNearPerfReview() ? `⚡ <strong style="color:#EF9F27">績效面談期</strong>：請確認主管已排定面談並完成提交。` : ''}
-        ${isNearAnnualCare() ? `🏢 <strong style="color:#EF9F27">HR 年度關懷月</strong>（10月）：請安排全體員工訪談。` : ''}
+        ${isNearPerfReview() ? `⚡ <strong style="color:#EF9F27">績效面談月</strong>：請確認各主管已安排並填寫紀錄。` : ''}
+        ${isNearAnnualCare() ? `🏢 <strong style="color:#EF9F27">HR 年度關懷月（10 月）</strong>：請安排全體員工一對一訪談。` : ''}
         共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。
       </div>
       <div class="rs-kpi-row">
