@@ -242,6 +242,10 @@
   <div class="header-right">
     <button class="nav-bridge" onclick="goTo('hr')">👥 人力資源 ←</button>
     <button class="nav-bridge" onclick="goTo('recruit')" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)">🎯 招募管理 ←</button>
+    <button class="nav-bridge" onclick="goTo('attendance')" title="前往考勤儀表板" style="color:#F5A623;border-color:rgba(245,166,35,.4)">
+      <span class="nb-icon">🕐</span> 考勤
+      <span class="nb-arrow">→</span>
+    </button>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -393,8 +397,9 @@ const TABLE_IDS = {
   事件確認: 'tblr4p6LrWYFL0HG',
 };
 const LINKS = {
-  hr:      'https://thepathoflight825.github.io/recruitment-dashboard/hr.html',
-  recruit: 'https://thepathoflight825.github.io/recruitment-dashboard/?from=recruit',
+  hr:         'https://thepathoflight825.github.io/recruitment-dashboard/hr.html',
+  recruit:    'https://thepathoflight825.github.io/recruitment-dashboard/?from=recruit',
+  attendance: 'https://applink.larksuite.com/client/web_app/open?appId=cli_aa868ded22b99ed3',
 };
 // ══════════════════════════════════════
 
@@ -403,8 +408,9 @@ let selectedPeriod = 'prev';
 let riskChart = null, deptChart = null;
 
 function goTo(key) {
-  if (LINKS[key]) window.location.href = LINKS[key];
-  else alert('尚未設定跳轉連結');
+  if (!LINKS[key]) { alert('尚未設定跳轉連結'); return; }
+  if (key === 'attendance') { window.open(LINKS[key], '_blank'); return; }
+  window.location.href = LINKS[key];
 }
 
 // ── Helpers ──

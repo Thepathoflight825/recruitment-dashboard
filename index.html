@@ -201,6 +201,9 @@
     <button onclick="goToCare()" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:0.5px solid rgba(29,158,117,.4);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#7DCFB6;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.14)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.color='#7DCFB6'">
       <span>💚</span> 關懷小幫手 <span style="font-size:10px">→</span>
     </button>
+    <button onclick="goToAttendance()" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:0.5px solid rgba(245,166,35,.4);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#F5A623;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.14)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.color='#F5A623'">
+      <span>🕐</span> 考勤 <span style="font-size:10px">→</span>
+    </button>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -346,7 +349,8 @@ const TABLE_IDS = {
   履歷收件統計: 'tblHKMr3Xlf3g6KS'
 };
 const HR_DASHBOARD_URL = 'https://thepathoflight825.github.io/recruitment-dashboard/hr.html';     // ← 填入人力資源儀表板 URL
-const CARE_DASHBOARD_URL = 'https://thepathoflight825.github.io/recruitment-dashboard/care.html';   // 關懷小幫手
+const CARE_DASHBOARD_URL       = 'https://thepathoflight825.github.io/recruitment-dashboard/care.html';   // 關懷小幫手
+const ATTENDANCE_DASHBOARD_URL = 'https://applink.larksuite.com/client/web_app/open?appId=cli_aa868ded22b99ed3';  // 考勤儀表板
 // ══════════════════════════════════════
 
 function goToHR() {
@@ -356,6 +360,9 @@ function goToHR() {
 function goToCare() {
   if (CARE_DASHBOARD_URL) { window.location.href = CARE_DASHBOARD_URL; }
   else { alert('關懷小幫手尚未建置，請在程式碼 CARE_DASHBOARD_URL 填入對應 URL。'); }
+}
+function goToAttendance() {
+  window.open(ATTENDANCE_DASHBOARD_URL, '_blank');
 }
 
 const STAGE_ORDER = ['電訪','AI評分','初試','複試','錄取','到職'];

@@ -231,6 +231,10 @@
       <span class="nb-icon">💚</span> 關懷小幫手
       <span class="nb-arrow">→</span>
     </button>
+    <button class="nav-bridge" onclick="goTo('attendance')" title="前往考勤儀表板" style="color:#F5A623;border-color:rgba(245,166,35,.4)">
+      <span class="nb-icon">🕐</span> 考勤
+      <span class="nb-arrow">→</span>
+    </button>
     <span class="sync-badge" id="sync-status">⟳ 載入中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -358,8 +362,9 @@ const TABLE_IDS_HR  = {
 };
 // 跳轉 URL — 填入各儀表板在 Lark App 的網址
 const LINKS = {
-  recruit: 'https://thepathoflight825.github.io/recruitment-dashboard/?from=recruit',   // ← 填入招募管理儀表板 URL
-  care:    'https://thepathoflight825.github.io/recruitment-dashboard/care.html',   // 關懷小幫手
+  recruit:    'https://thepathoflight825.github.io/recruitment-dashboard/?from=recruit',
+  care:       'https://thepathoflight825.github.io/recruitment-dashboard/care.html',
+  attendance: 'https://applink.larksuite.com/client/web_app/open?appId=cli_aa868ded22b99ed3',
 };
 // ══════════════════════════════════════
 
