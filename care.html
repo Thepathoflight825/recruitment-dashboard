@@ -765,7 +765,7 @@ function computeStrategies(m, risks) {
   });
   if (newEmps.length > 0) {
     strats.push({
-      icon: '🌱', title: `新進員工入職關懷 — ${newEmps.length} 位在追蹤期`,
+      icon: '🌱', title: `新進員工入職關懷 — ${newEmps.length} 位在追蹤期（${newEmps.map(e=>(gf(e,'英文名')||'').trim()||(gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、')}）`,
       tag: '入職關懷 · 到職後三節點',
       body: `<li><strong>到職第 14 天</strong>：主管進行入職第一次關懷，了解適應狀況與需要的支援</li>
              <li><strong>到職第 30 天</strong>：任務釐清面談，確認工作目標、職責範圍與短期里程碑</li>
@@ -977,11 +977,10 @@ function renderCareRecords() {
   const fr = getFilteredRecords();
   document.getElementById('care-records').innerHTML = fr.length
     ? `<table class="data-table">
-        <thead><tr><th>紀錄 ID</th><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
+        <thead><tr><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
         <tbody>${fr.map(r => {
           const name = empName(gf(r,'關懷員工')); const cnCare = empChineseName(gf(r,'關懷員工'));
           return `<tr onclick="openCareDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
-            <td style="font-size:11px;color:var(--text-sub)">${gf(r,'紀錄 ID')||'—'}</td>
             <td><strong>${name}</strong>${cnCare && cnCare !== name ? `<br><span style="font-size:10px;color:var(--text-sub)">${cnCare}</span>` : ''}</td>
             <td>${fmtDate(gf(r,'面談日期'))}</td>
             <td><span class="badge badge-blue">${gf(r,'面談類型')||'—'}</span></td>
@@ -1014,7 +1013,7 @@ function renderPromises() {
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
             <div>
               <div class="promise-title">${name} ｜ ${(gf(p,'承諾內容')||'—').slice(0,60)}${(gf(p,'承諾內容')||'').length>60?'…':''}</div>
-              <div class="promise-meta">承諾 ID：${gf(p,'承諾 ID')||'—'}　承諾人：${(gf(p,'承諾人（主管）')||'—').replace('KR-','').replace(/^ /,'')}　預計完成：${fmtDate(gf(p,'預計完成日期'))}</div>
+              <div class="promise-meta">承諾人：${(gf(p,'承諾人（主管）')||'—').replace('KR-','').replace(/^ /,'')}　預計完成：${fmtDate(gf(p,'預計完成日期'))}</div>
               ${gf(p,'處理說明') ? `<div class="promise-meta" style="margin-top:4px">📝 ${gf(p,'處理說明').slice(0,80)}…</div>` : ''}
             </div>
             <div style="flex-shrink:0">
@@ -1082,8 +1081,6 @@ function renderReport() {
         中風險 <strong style="color:${m.midRisk>0?'#EF9F27':'#5DCAA5'}">${m.midRisk}</strong> 人，
         待兌現主管承諾 <strong style="color:${m.pendingPromises>3?'#F08080':'#fff'}">${m.pendingPromises}</strong> 項，
         待處理事件 <strong style="color:${m.openEvents>0?'#F08080':'#fff'}">${m.openEvents}</strong> 件。
-        ${isNearPerfReview() ? `⚡ <strong style="color:#EF9F27">績效面談月</strong>：請確認各主管已安排並填寫紀錄。` : ''}
-        ${isNearAnnualCare() ? `🏢 <strong style="color:#EF9F27">HR 年度關懷月（10 月）</strong>：請安排全體員工一對一訪談。` : ''}
         共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。
       </div>
       <div class="rs-kpi-row">
@@ -1093,6 +1090,12 @@ function renderReport() {
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.fr.length>0?'#5DCAA5':'#EF9F27'}">${m.fr.length}</div><div class="rs-kpi-lbl">關懷次數</div></div>
         <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.pendingPromises>3?'#F08080':'#EF9F27'}">${m.pendingPromises}</div><div class="rs-kpi-lbl">待兌現承諾</div></div>
       </div>
+      ${(isNearPerfReview() || isNearAnnualCare()) ? `
+      <div style="margin-top:14px;border-top:0.5px solid rgba(255,255,255,.1);padding-top:12px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:11px;color:#6c9bc8;font-weight:600;letter-spacing:.5px;margin-bottom:2px">📌 本期制度提醒</div>
+        ${isNearPerfReview() ? `<div style="font-size:12px;color:#EF9F27">⚡ <strong>績效面談月</strong>（${new Date().getMonth()+1===6||new Date().getMonth()+1===7?'上半年 7/1–7/31':'下半年 1/1–1/31'}）：請確認各主管已排定面談並於期限內填寫完畢。</div>` : ''}
+        ${isNearAnnualCare() ? `<div style="font-size:12px;color:#7DCFB6">🏢 <strong>HR 年度關懷月</strong>（10 月）：請安排全體員工一對一訪談，訪談後更新各員工風險等級。</div>` : ''}
+      </div>` : ''}
     </div>`;
 
   document.getElementById('report-risks').innerHTML = !risks.length
@@ -1133,7 +1136,7 @@ function openEmpDetail(e) {
   const empPromise = promises.filter(p => gf(p,'關懷員工') === gf(e,'Lark 帳號 ID'));
   document.getElementById('modal-body').innerHTML = `
     <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:14px">
-      ${[['Lark ID',gf(e,'Lark 帳號 ID')],['到職日期',fmtDate(gf(e,'到職日期'))],['年資',gf(e,'年資(月)')+'月'],['直屬主管',(gf(e,'直屬主管')||'—').replace('KR-','').replace(/^ /,'')],['HR負責人',gf(e,'HR 負責人')||'—'],['風險等級',gf(e,'當前風險等級')||'—'],['最新1on1',fmtDate(gf(e,'最新 1on1 日期'))]].map(([k,v])=>`<tr><td style="color:var(--text-sub);padding:5px 0;width:80px;font-size:11px">${k}</td><td style="font-weight:500">${v||'—'}</td></tr>`).join('')}
+      ${[['到職日期',fmtDate(gf(e,'到職日期'))],['年資',gf(e,'年資(月)')+'月'],['直屬主管',(gf(e,'直屬主管')||'—').replace('KR-','').replace(/^ /,'')],['HR負責人',gf(e,'HR 負責人')||'—'],['風險等級',gf(e,'當前風險等級')||'—'],['最新1on1',fmtDate(gf(e,'最新 1on1 日期'))]].map(([k,v])=>`<tr><td style="color:var(--text-sub);padding:5px 0;width:80px;font-size:11px">${k}</td><td style="font-weight:500">${v||'—'}</td></tr>`).join('')}
     </table>
     ${empCare.length ? `<div class="modal-section">關懷紀錄 (${empCare.length})</div>${empCare.slice(0,3).map(r=>`<div class="modal-block">${fmtDate(gf(r,'面談日期'))}・${gf(r,'面談類型')||'—'}・${riskBadge(gf(r,'留任風險等級'))}<br>${(gf(r,'工作狀態摘要')||'').slice(0,80)}…</div>`).join('')}` : ''}
     ${empPromise.length ? `<div class="modal-section">主管承諾 (${empPromise.length})</div>${empPromise.map(p=>`<div class="modal-block"><strong>${gf(p,'兌現狀態')||'待完成'}</strong> · ${(gf(p,'承諾內容')||'').slice(0,60)}…<br><span style="font-size:11px;color:var(--text-sub)">預計：${fmtDate(gf(p,'預計完成日期'))}</span></div>`).join('')}` : ''}
