@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>關懷小幫手</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:        #1a1a2e;
+    --teal:        #1D9E75;
+    --teal-light:  #E1F5EE;
+    --teal-mid:    #5DCAA5;
+    --blue:        #185FA5;
+    --blue-light:  #E6F1FB;
+    --amber:       #EF9F27;
+    --amber-light: #FAEEDA;
+    --red:         #E24B4A;
+    --red-light:   #FCEBEB;
+    --purple:      #7B5EA7;
+    --purple-light:#F0EBF9;
+    --gray:        #F7F6F2;
+    --border:      #E8E6DF;
+    --text:        #1a1a2e;
+    --text-sub:    #888780;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  .header {
+    background: var(--navy); padding: 0 24px;
+    display: flex; align-items: stretch; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; flex-direction: column; justify-content: center; padding: 14px 0; }
+  .header-title { font-size: 17px; font-weight: 700; color: #fff; }
+  .header-sub { font-size: 11px; color: #6c9bc8; margin-top: 2px; }
+  .header-tabs { display: flex; align-items: flex-end; gap: 2px; }
+  .tab { padding: 12px 18px 10px; font-size: 13px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
+  .tab.active { color: #fff; border-bottom-color: var(--teal-mid); }
+  .tab:hover:not(.active) { color: #ccc; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .sync-badge { font-size: 11px; color: var(--teal-mid); background: rgba(29,158,117,.12); border: 0.5px solid var(--teal-mid); border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+  .refresh-btn { background: rgba(255,255,255,.08); border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; color: #fff; font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
+  .refresh-btn:hover { background: rgba(255,255,255,.15); }
+  .nav-bridge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.06); border: 0.5px solid rgba(255,255,255,.18); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 11px; color: #aac4e0; font-family: 'Noto Sans TC', sans-serif; white-space: nowrap; transition: all .2s; }
+  .nav-bridge:hover { background: rgba(255,255,255,.14); color: #fff; }
+
+  /* ── Period selector ── */
+  .period-select { background: #2a2a45; border: 0.5px solid #3a3a5e; border-radius: 6px; color: #fff; font-size: 12px; padding: 4px 8px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
+
+  /* ── Main ── */
+  .main { padding: 18px 24px 40px; max-width: 1200px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Stat cards ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 16px 18px; position: relative; overflow: hidden; animation: fadeUp .4s ease both; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .stat-card.teal::before   { background: var(--teal); }
+  .stat-card.blue::before   { background: var(--blue); }
+  .stat-card.amber::before  { background: var(--amber); }
+  .stat-card.red::before    { background: var(--red); }
+  .stat-card.purple::before { background: var(--purple); }
+  .stat-label { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .stat-sub { font-size: 11px; color: #b4b2a9; margin-top: 5px; }
+  .stat-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 24px; opacity: .1; }
+
+  /* ── Panels ── */
+  .panel-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 18px; animation: fadeUp .5s ease both; margin-bottom: 14px; }
+  .panel:last-child { margin-bottom: 0; }
+  .panel-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+
+  /* ── Tables ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { text-align: left; padding: 7px 10px; font-size: 11px; font-weight: 500; color: var(--text-sub); background: var(--gray); border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  .data-table td { padding: 9px 10px; border-bottom: 0.5px solid #F1EFE8; color: #333; vertical-align: top; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAFAF8; cursor: pointer; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-teal   { background: var(--teal-light); color: var(--teal); }
+  .badge-blue   { background: var(--blue-light); color: var(--blue); }
+  .badge-amber  { background: var(--amber-light); color: #854F0B; }
+  .badge-red    { background: var(--red-light); color: #A32D2D; }
+  .badge-purple { background: var(--purple-light); color: var(--purple); }
+  .badge-gray   { background: #F1EFE8; color: #5F5E5A; }
+
+  /* ── Risk indicator ── */
+  .risk-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .risk-high   { background: var(--red); }
+  .risk-medium { background: var(--amber); }
+  .risk-low    { background: var(--teal); }
+  .risk-none   { background: #ccc; }
+
+  /* ── Alert banners ── */
+  .alert-banner { border-radius: 10px; padding: 11px 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; animation: fadeUp .4s ease both; }
+  .alert-banner.critical { background: #FFF0F0; border: 1px solid #F5C0C0; color: #8B2020; }
+  .alert-banner.warning  { background: #FFFBF0; border: 1px solid #F5DFA0; color: #7A4D00; }
+  .alert-banner.info     { background: #F0F6FF; border: 1px solid #B8D4F5; color: #1A4A80; }
+  .alert-banner-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .alert-banner-title { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .alert-banner-desc  { font-size: 11px; opacity: .85; line-height: 1.5; }
+
+  /* ── Risk cards (report) ── */
+  .risk-card { border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid; animation: fadeUp .5s ease both; }
+  .risk-card.high   { background: #FFF2F2; border-color: var(--red); }
+  .risk-card.medium { background: #FFFBF0; border-color: var(--amber); }
+  .risk-card.low    { background: #F0F6FF; border-color: var(--blue); }
+  .risk-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .risk-card-level  { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+  .risk-card.high   .risk-card-level { background: var(--red); color: #fff; }
+  .risk-card.medium .risk-card-level { background: var(--amber); color: #fff; }
+  .risk-card.low    .risk-card-level { background: var(--blue); color: #fff; }
+  .risk-card-title  { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .risk-card-metric { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+  .risk-card-desc   { font-size: 12px; color: #444; line-height: 1.6; }
+
+  /* ── Strategy cards ── */
+  .strategy-card { background: #fff; border-radius: 12px; border: 0.5px solid var(--border); padding: 18px; margin-bottom: 12px; animation: fadeUp .5s ease both; }
+  .strategy-card-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .strategy-icon { font-size: 24px; flex-shrink: 0; }
+  .strategy-title { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .strategy-tag { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+  .strategy-body { padding-left: 18px; font-size: 12px; line-height: 1.9; color: #444; }
+  .strategy-steps { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .strategy-step { background: var(--gray); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #555; }
+
+  /* ── Report summary ── */
+  .report-summary-box { background: var(--navy); border-radius: 14px; padding: 22px 24px; margin-bottom: 18px; color: #aac4e0; }
+  .rs-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .rs-sub { font-size: 11px; color: #6c9bc8; margin-bottom: 12px; }
+  .rs-body { font-size: 13px; line-height: 1.9; }
+  .rs-kpi-row { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; border-top: 0.5px solid rgba(255,255,255,.1); padding-top: 14px; }
+  .rs-kpi-item { text-align: center; }
+  .rs-kpi-val { font-size: 24px; font-weight: 700; line-height: 1; }
+  .rs-kpi-lbl { font-size: 11px; color: #6c9bc8; margin-top: 3px; }
+  .report-section-title { font-size: 13px; font-weight: 700; color: var(--navy); border-left: 3px solid var(--teal); padding-left: 10px; margin: 18px 0 10px; }
+
+  /* ── Employee list ── */
+  .emp-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 0.5px solid #F1EFE8; cursor: pointer; transition: background .15s; border-radius: 6px; padding: 9px 8px; margin: 0 -8px; }
+  .emp-row:hover { background: #FAFAF8; }
+  .emp-row:last-child { border-bottom: none; }
+  .emp-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .emp-name { font-size: 13px; font-weight: 600; color: var(--navy); }
+  .emp-dept { font-size: 11px; color: var(--text-sub); }
+  .emp-meta { flex: 1; }
+  .emp-right { text-align: right; }
+
+  /* ── Promise / commitment ── */
+  .promise-row { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid; font-size: 12px; }
+  .promise-row.overdue   { background: #FFF0F0; border-color: var(--red); }
+  .promise-row.pending   { background: #FFFBF0; border-color: var(--amber); }
+  .promise-row.fulfilled { background: var(--teal-light); border-color: var(--teal); }
+  .promise-row.unknown   { background: var(--gray); border-color: #ccc; }
+  .promise-title { font-weight: 600; margin-bottom: 3px; }
+  .promise-meta  { font-size: 11px; color: var(--text-sub); }
+
+  /* ── Event cards ── */
+  .event-card { border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; border: 0.5px solid var(--border); background: #fff; animation: fadeUp .5s ease both; display: flex; gap: 12px; align-items: flex-start; }
+  .event-level { flex-shrink: 0; width: 40px; text-align: center; }
+  .event-level-icon { font-size: 20px; }
+  .event-level-tag { font-size: 10px; font-weight: 700; margin-top: 2px; }
+  .event-body { flex: 1; }
+  .event-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+  .event-meta  { font-size: 11px; color: var(--text-sub); line-height: 1.6; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 22px; width: 560px; max-width: 92vw; max-height: 82vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-sub); }
+  .modal-section { font-size: 12px; color: var(--text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin: 14px 0 6px; }
+  .modal-block { background: var(--gray); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.7; color: #444; margin-bottom: 8px; }
+
+  /* ── Loading ── */
+  .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: var(--text-sub); font-size: 13px; gap: 8px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--teal); border-radius: 50%; animation: spin .8s linear infinite; }
+  .error-box { background: var(--red-light); border: 0.5px solid #F7C1C1; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #A32D2D; margin-bottom: 14px; }
+
+  /* ── Bridge cards (report bottom) ── */
+  .bridge-section { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+
+  /* ── Progress bar ── */
+  .prog-bar-bg { height: 6px; background: var(--gray); border-radius: 3px; overflow: hidden; }
+  .prog-bar-fill { height: 100%; border-radius: 3px; transition: width .8s ease; }
+
+  /* ── Donut wrap ── */
+  .donut-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .donut-canvas-wrap { position: relative; flex-shrink: 0; }
+  .donut-center-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .donut-center-val { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .donut-center-sub { font-size: 11px; color: var(--text-sub); }
+  .donut-labels { display: flex; flex-direction: column; gap: 5px; }
+  .donut-label-item { display: flex; align-items: center; gap: 5px; font-size: 11px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .lbl { color: var(--text-sub); }
+  .val { font-weight: 700; color: var(--navy); }
+  .pct { color: var(--text-sub); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollable table wrap ── */
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">💚 關懷小幫手</div>
+    <div class="header-sub" id="last-updated">連線中...</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:0 16px">
+    <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
+    <select id="period-select" class="period-select" onchange="onPeriodChange(this.value)">
+      <option value="current">當月</option>
+      <option value="prev" selected>上個月</option>
+      <option value="3m">近三個月</option>
+      <option value="6m">近半年</option>
+      <option value="1y">整年度</option>
+      <option value="all">全部</option>
+    </select>
+  </div>
+  <div class="header-tabs">
+    <div class="tab active" onclick="switchTab('overview')">總覽</div>
+    <div class="tab" onclick="switchTab('employees')">員工名單</div>
+    <div class="tab" onclick="switchTab('records')">關懷紀錄</div>
+    <div class="tab" onclick="switchTab('promises')">承諾追蹤</div>
+    <div class="tab" onclick="switchTab('events')">⚠ 事件管理</div>
+    <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
+  </div>
+  <div class="header-right">
+    <button class="nav-bridge" onclick="goTo('hr')">👥 人力資源 ←</button>
+    <button class="nav-bridge" onclick="goTo('recruit')" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)">🎯 招募管理 ←</button>
+    <span class="sync-badge" id="sync-status">⟳ 連線中</span>
+    <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="error-box" class="error-box" style="display:none"></div>
+
+  <!-- ══ 總覽 ══ -->
+  <div class="tab-content active" id="tab-overview">
+    <div id="alert-banners"></div>
+    <div class="stat-grid">
+      <div class="stat-card teal">  <div class="stat-label">關懷員工人數</div><div class="stat-value" id="s-emp">—</div><div class="stat-sub" id="s-emp-sub">在職中</div><div class="stat-icon">👥</div></div>
+      <div class="stat-card blue">  <div class="stat-label">本期關懷次數</div><div class="stat-value" id="s-care">—</div><div class="stat-sub" id="s-care-sub">1on1 紀錄</div><div class="stat-icon">💬</div></div>
+      <div class="stat-card amber"> <div class="stat-label">待兌現承諾</div><div class="stat-value" id="s-promise">—</div><div class="stat-sub" id="s-promise-sub">主管承諾追蹤</div><div class="stat-icon">📋</div></div>
+      <div class="stat-card red">   <div class="stat-label">高風險員工</div><div class="stat-value" id="s-highrisk">—</div><div class="stat-sub" id="s-risk-sub">需優先關注</div><div class="stat-icon">⚠</div></div>
+      <div class="stat-card purple"><div class="stat-label">待處理事件</div><div class="stat-value" id="s-event">—</div><div class="stat-sub" id="s-event-sub">事件管理</div><div class="stat-icon">🚨</div></div>
+    </div>
+    <div class="panel-grid-2">
+      <div class="panel">
+        <div class="panel-title">🔴 員工風險分布</div>
+        <div class="donut-wrap">
+          <div class="donut-canvas-wrap">
+            <canvas id="chart-risk" width="150" height="150"></canvas>
+            <div class="donut-center-label"><div class="donut-center-val" id="risk-total">—</div><div class="donut-center-sub">總人數</div></div>
+          </div>
+          <div class="donut-labels" id="risk-labels"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">💬 各部門關懷次數</div>
+        <canvas id="chart-dept" height="160"></canvas>
+      </div>
+    </div>
+    <div class="panel-grid-2">
+      <div class="panel">
+        <div class="panel-title">📋 近期承諾到期提醒</div>
+        <div id="promise-reminders"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">👤 最新關懷紀錄</div>
+        <div id="recent-care"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 員工名單 ══ -->
+  <div class="tab-content" id="tab-employees">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="panel-title" style="margin:0">👥 員工主檔</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="dept-filter" onchange="renderEmployees()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部部門</option>
+          </select>
+          <select id="risk-filter" onchange="renderEmployees()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部風險</option>
+            <option value="高">高風險</option>
+            <option value="中">中風險</option>
+            <option value="低">低風險</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap"><div id="emp-list"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ 關懷紀錄 ══ -->
+  <div class="tab-content" id="tab-records">
+    <div class="panel">
+      <div class="panel-title">💬 關懷面談紀錄</div>
+      <div class="table-wrap"><div id="care-records"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ 承諾追蹤 ══ -->
+  <div class="tab-content" id="tab-promises">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="panel-title" style="margin:0">📋 主管承諾追蹤</div>
+        <select id="promise-filter" onchange="renderPromises()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+          <option value="">全部狀態</option>
+          <option value="overdue">已逾期</option>
+          <option value="pending">待完成</option>
+          <option value="fulfilled">已兌現</option>
+        </select>
+      </div>
+      <div id="promises-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+    </div>
+  </div>
+
+  <!-- ══ 事件管理 ══ -->
+  <div class="tab-content" id="tab-events">
+    <div id="event-alert" style="margin-bottom:12px"></div>
+    <div class="panel">
+      <div class="panel-title">🚨 事件紀錄</div>
+      <div id="events-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+    </div>
+  </div>
+
+  <!-- ══ 本月報告 ══ -->
+  <div class="tab-content" id="tab-report">
+    <div id="report-summary-wrap"></div>
+    <div class="report-section-title">🚨 風險預告</div>
+    <div id="report-risks"></div>
+    <div class="report-section-title">💡 策略建議</div>
+    <div id="report-strategies"></div>
+    <div class="report-section-title">🔗 儀表板導覽</div>
+    <div class="bridge-section">
+      <div style="background:linear-gradient(135deg,#1a1a2e 0%,#185FA5 180%);border-radius:14px;padding:20px 24px;display:flex;align-items:center;gap:18px">
+        <div style="font-size:32px">👥</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">人力資源儀表板</div><div style="font-size:12px;color:#8899aa;line-height:1.5">查看整體在職人力、離職分析與組織健康狀況。</div></div>
+        <button onclick="goTo('hr')" style="background:#378ADD;border:none;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans TC',sans-serif">前往人力資源 →</button>
+      </div>
+      <div style="background:linear-gradient(135deg,#1a1a2e 0%,#8B5CF6 180%);border-radius:14px;padding:20px 24px;display:flex;align-items:center;gap:18px">
+        <div style="font-size:32px">🎯</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">招募管理儀表板</div><div style="font-size:12px;color:#8899aa;line-height:1.5">查看招募漏斗、應徵者名單與 KPI 達成狀況。</div></div>
+        <button onclick="goTo('recruit')" style="background:#7B5EA7;border:none;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans TC',sans-serif">前往招募管理 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Employee detail modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--navy)" id="modal-name">—</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:2px" id="modal-sub">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  設定區
+// ══════════════════════════════════════
+const WORKER_URL  = 'https://lark-recruitment-api.sherrya82255.workers.dev';
+const BASE_TOKEN  = 'E3X4blbxWa4DaLsSxsClZ3KbgYb';
+const TABLE_IDS = {
+  員工主檔: 'tblyywSnGtr4m1PO',
+  關懷紀錄: 'tblsPbqM9zqQ2UZo',
+  績效面談: 'tblLVAg8ddngVF0v',
+  承諾追蹤: 'tbliiEFQvWd1IvcU',
+  事件確認: 'tblr4p6LrWYFL0HG',
+};
+const LINKS = {
+  hr:      'https://thepathoflight825.github.io/recruitment-dashboard/hr.html',
+  recruit: 'https://thepathoflight825.github.io/recruitment-dashboard/?from=recruit',
+};
+// ══════════════════════════════════════
+
+let employees = [], careRecords = [], perfRecords = [], promises = [], events = [];
+let selectedPeriod = 'prev';
+let riskChart = null, deptChart = null;
+
+function goTo(key) {
+  if (LINKS[key]) window.location.href = LINKS[key];
+  else alert('尚未設定跳轉連結');
+}
+
+// ── Helpers ──
+function gf(obj, key) {
+  if (!obj || obj[key] == null) return null;
+  const v = obj[key];
+  if (Array.isArray(v)) return v.map(i => typeof i === 'object' ? (i.text || i.name || '') : i).join(', ');
+  if (typeof v === 'object' && v.text) return v.text;
+  return String(v).trim();
+}
+function n(v) { return parseFloat(v) || 0; }
+function fmtDate(d) {
+  if (!d) return '—';
+  const s = String(d).trim();
+  if (s.includes('/')) return s.split(' ')[0];
+  if (!isNaN(d) && Number(d) > 1000000) return new Date(Number(d)).toLocaleDateString('zh-TW');
+  return s.split('T')[0];
+}
+function getMonthKey(d) {
+  const s = fmtDate(d);
+  if (s === '—') return null;
+  return s.slice(0, 7);  // YYYY/MM
+}
+function currentYM()  { const n=new Date(); return `${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}`; }
+function prevYM()     { const n=new Date(); n.setMonth(n.getMonth()-1); return `${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}`; }
+function monthsAgo(k) { const n=new Date(); n.setMonth(n.getMonth()-k); return n; }
+
+function getFilteredRecords() {
+  return careRecords.filter(r => {
+    const d = fmtDate(gf(r, '面談日期'));
+    if (!d || d === '—') return false;
+    const ym = d.slice(0, 7);
+    if (selectedPeriod === 'current') return ym === currentYM();
+    if (selectedPeriod === 'prev')    return ym === prevYM();
+    const dt = new Date(d.replace(/\//g, '-'));
+    if (selectedPeriod === '3m') return dt >= monthsAgo(3);
+    if (selectedPeriod === '6m') return dt >= monthsAgo(6);
+    if (selectedPeriod === '1y') return dt >= monthsAgo(12);
+    return true;
+  });
+}
+
+function riskColor(level) {
+  if (!level) return '#ccc';
+  if (level.includes('高')) return '#E24B4A';
+  if (level.includes('中')) return '#EF9F27';
+  if (level.includes('低')) return '#1D9E75';
+  return '#ccc';
+}
+function riskBadge(level) {
+  if (!level) return '<span class="badge badge-gray">—</span>';
+  if (level.includes('高')) return `<span class="badge badge-red">高風險</span>`;
+  if (level.includes('中')) return `<span class="badge badge-amber">中風險</span>`;
+  if (level.includes('低')) return `<span class="badge badge-teal">低風險</span>`;
+  return `<span class="badge badge-gray">${level}</span>`;
+}
+function avatarColor(name) {
+  const colors = ['#185FA5','#1D9E75','#EF9F27','#7B5EA7','#E24B4A','#D85A30'];
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffffff;
+  return colors[Math.abs(h) % colors.length];
+}
+function empName(larkId) {
+  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  return emp ? (gf(emp,'員工姓名') || gf(emp,'英文名') || larkId) : (larkId || '—');
+}
+
+// ── Data fetch ──
+async function fetchTable(tableId) {
+  let records = [], pageToken = null;
+  do {
+    const path = `/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
+    const res = await fetch(WORKER_URL + path);
+    const data = await res.json();
+    if (!data.data) break;
+    records = records.concat(data.data.items || []);
+    pageToken = data.data.page_token || null;
+  } while (pageToken);
+  return records.map(r => r.fields || r);
+}
+
+async function fetchAllTables() {
+  [employees, careRecords, perfRecords, promises, events] = await Promise.all([
+    fetchTable(TABLE_IDS.員工主檔),
+    fetchTable(TABLE_IDS.關懷紀錄),
+    fetchTable(TABLE_IDS.績效面談),
+    fetchTable(TABLE_IDS.承諾追蹤),
+    fetchTable(TABLE_IDS.事件確認),
+  ]);
+}
+
+// ── Demo data ──
+function loadDemoData() {
+  employees = [
+    { '英文名': 'Mina', '員工姓名': '蔡美娜', 'Lark 帳號 ID': 'KR-Mina', '部門': '管理中心', '職務': '出納', '職等': 'P5', '直屬主管': 'KR-Tori', '當前風險等級': '低', '在職狀態': '在職', '到職日期': '2024/01/15', '年資(月)': 16 },
+    { '英文名': 'Felix', '員工姓名': '林柏安', 'Lark 帳號 ID': 'KR-Felix', '部門': '技術中心', '職務': 'BE 後端', '職等': 'P4', '直屬主管': 'KR-Tori', '當前風險等級': '中', '在職狀態': '在職', '到職日期': '2023/06/01', '年資(月)': 23 },
+    { '英文名': 'Sherry', '員工姓名': '楊雪莉', 'Lark 帳號 ID': 'KR-Sherry', '部門': '管理中心', '職務': 'HR', '職等': 'P4', '直屬主管': 'KR-Tori', '當前風險等級': '低', '在職狀態': '在職', '到職日期': '2026/04/01', '年資(月)': 2 },
+    { '英文名': 'Roy', '員工姓名': '林上景', 'Lark 帳號 ID': 'KR-Roy', '部門': '技術中心', '職務': 'BE 後端', '職等': 'P4', '直屬主管': 'KR-Max', '當前風險等級': '高', '在職狀態': '在職', '到職日期': '2021/03/01', '年資(月)': 62 },
+    { '英文名': 'Luka', '員工姓名': '黃靖', 'Lark 帳號 ID': 'KR-Luka', '部門': '技術中心', '職務': 'BE 後端', '職等': 'P5', '直屬主管': 'KR-Roy', '當前風險等級': '中', '在職狀態': '在職', '到職日期': '2021/07/01', '年資(月)': 58 },
+  ];
+  careRecords = [
+    { '紀錄 ID': 'CARE-001', '關懷員工': 'KR-Mina', '面談日期': '2026/05/25', '面談類型': '1on1 關懷', '面談方式': '視訊', '主管': 'KR-Tori', '留任風險等級': '低', '流程狀態': '已完成', '工作狀態摘要': '整體狀態穩定，轉換角色適應良好。' },
+    { '紀錄 ID': 'CARE-002', '關懷員工': 'KR-Felix', '面談日期': '2026/05/25', '面談類型': '1on1 關懷', '面談方式': '視訊', '主管': 'KR-Tori', '留任風險等級': '中', '流程狀態': '待跟進', '工作狀態摘要': '工作壓力可控，需加強跨部門溝通。' },
+    { '紀錄 ID': 'CARE-003', '關懷員工': 'KR-Sherry', '面談日期': '2026/05/25', '面談類型': '入職關懷', '面談方式': '視訊', '主管': 'KR-Tori', '留任風險等級': '低', '流程狀態': '已完成', '工作狀態摘要': '入職兩個月，適應順暢，工作投入度高。' },
+    { '紀錄 ID': 'CARE-004', '關懷員工': 'KR-Roy', '面談日期': '2026/05/20', '面談類型': '1on1 關懷', '面談方式': '面對面', '主管': 'KR-Max', '留任風險等級': '高', '流程狀態': '需HR協助', '工作狀態摘要': '近期情緒波動較大，有離職念頭。' },
+  ];
+  promises = [
+    { '承諾 ID': 'ACT-001', '關懷員工': 'KR-Mina', '承諾人（主管）': 'KR-Tori', '承諾內容': '協助釐清跨部門業務邊界，與行政主管溝通', '預計完成日期': '2026/06/16', '兌現狀態': '待完成', '逾期天數': '' },
+    { '承諾 ID': 'ACT-002', '關懷員工': 'KR-Felix', '承諾人（主管）': 'KR-Tori', '承諾內容': '持續 1on1 協助向上管理方法討論', '預計完成日期': '2026/05/25', '兌現狀態': '已兌現', '逾期天數': '' },
+    { '承諾 ID': 'ACT-003', '關懷員工': 'KR-Sherry', '承諾人（主管）': 'KR-Tori', '承諾內容': '舉辦跨公司 AI 使用研討會，分享 SOP', '預計完成日期': '2026/06/05', '兌現狀態': '待完成', '逾期天數': '' },
+    { '承諾 ID': 'ACT-004', '關懷員工': 'KR-Roy', '承諾人（主管）': 'KR-Max', '承諾內容': '安排職涯發展對談，了解留任意願', '預計完成日期': '2026/05/15', '兌現狀態': '已逾期', '逾期天數': 21 },
+  ];
+  events = [
+    { '事件 ID': 'EVT-001', '關懷員工': 'KR-Roy', '觸發主管': 'KR-Max', '觸發時間': '2026/05/08', '事件類型': '留任風險', '緊急程度': '高', '事件描述': '連續兩次 1on1 表達對職涯方向的不確定', '處理狀態': '處理中' },
+  ];
+}
+
+// ── Compute metrics ──
+function computeMetrics() {
+  const fr = getFilteredRecords();
+  const activeEmps = employees.filter(e => !gf(e,'在職狀態')?.includes('離職'));
+  const highRisk   = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('高')).length;
+  const midRisk    = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('中')).length;
+  const lowRisk    = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('低')).length;
+  const pendingPromises = promises.filter(p => {
+    const s = gf(p,'兌現狀態') || '';
+    return s.includes('待') || s.includes('逾期');
+  }).length;
+  const openEvents = events.filter(e => {
+    const s = gf(e,'處理狀態') || '';
+    return !s.includes('結案') && !s.includes('完成');
+  }).length;
+
+  // 部門關懷次數
+  const deptCount = {};
+  fr.forEach(r => {
+    const larkId = gf(r,'關懷員工');
+    const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId);
+    const dept = emp ? (gf(emp,'部門') || '未知') : '未知';
+    deptCount[dept] = (deptCount[dept] || 0) + 1;
+  });
+
+  return { activeEmps, highRisk, midRisk, lowRisk, pendingPromises, openEvents, fr, deptCount };
+}
+
+// ── Compute risks ──
+function computeRisks(m) {
+  const risks = [];
+  if (m.highRisk > 0) risks.push({
+    level: 'high', icon: '⚠️', title: '高風險員工需立即關注',
+    tag: '留任風險', metric: `共 ${m.highRisk} 位員工標記為高風險`,
+    desc: '建議 HR 在本週內安排面談，了解離職意圖，啟動留才方案。',
+  });
+  const overduePromises = promises.filter(p => gf(p,'兌現狀態')?.includes('逾期'));
+  if (overduePromises.length > 0) risks.push({
+    level: 'high', icon: '📋', title: '主管承諾逾期未兌現',
+    tag: '信任風險', metric: `${overduePromises.length} 項承諾已逾期`,
+    desc: '逾期承諾可能損害員工對主管的信任，建議盡速追蹤並完成。',
+  });
+  if (m.midRisk > 3) risks.push({
+    level: 'medium', icon: '📊', title: '中風險員工比例偏高',
+    tag: '預防風險', metric: `共 ${m.midRisk} 位員工為中風險`,
+    desc: '建議安排季度 1on1 深度面談，提前識別潛在離職因素。',
+  });
+  const noRecentCare = m.activeEmps.filter(e => !gf(e,'最新 1on1 日期')).length;
+  if (noRecentCare > 5) risks.push({
+    level: 'medium', icon: '💬', title: '部分員工缺乏定期關懷',
+    tag: '覆蓋率', metric: `${noRecentCare} 位員工無近期 1on1 紀錄`,
+    desc: '建議優先安排缺少關懷紀錄的員工進行定期面談。',
+  });
+  if (m.openEvents > 0) risks.push({
+    level: 'high', icon: '🚨', title: '待處理事件需跟進',
+    tag: '事件管理', metric: `${m.openEvents} 件事件尚未結案`,
+    desc: '請確認事件處理進度，避免問題擴大影響團隊氣氛。',
+  });
+  return risks;
+}
+
+// ── Compute strategies ──
+function computeStrategies(m, risks) {
+  const strats = [];
+  if (m.highRisk > 0) strats.push({
+    icon: '🔴', title: '高風險員工留才行動計畫',
+    tag: '緊急 · 立即執行',
+    body: `<li>本週內安排 HR + 直屬主管三方面談，了解員工核心訴求</li>
+           <li>評估是否啟動 <strong>薪酬調整</strong>、<strong>職涯發展計畫</strong>或 <strong>職務調整</strong></li>
+           <li>建立個人化留才追蹤表，每週確認狀態直到風險解除</li>`,
+    steps: ['三方面談','評估留才方案','每週追蹤'],
+  });
+  strats.push({
+    icon: '📅', title: '建立定期 1on1 機制',
+    tag: '中期 · 系統性',
+    body: `<li>所有在職員工每月至少一次主管 1on1，並在此系統記錄重點</li>
+           <li>入職 30/60/90 天設定關懷里程碑，HR 定期複查狀態</li>
+           <li>對中高風險員工增加頻率至每兩週一次</li>`,
+    steps: ['30-60-90天里程碑','中高風險加密面談','自動到期提醒'],
+  });
+  strats.push({
+    icon: '📋', title: '主管承諾管理制度',
+    tag: '中期 · 信任建立',
+    body: `<li>所有 1on1 中的主管承諾須在系統登記，設定到期提醒</li>
+           <li>逾期承諾自動通知上級主管，避免員工產生被忽視感</li>
+           <li>每季彙整承諾兌現率，作為主管管理能力評估指標</li>`,
+    steps: ['承諾強制登記','逾期自動升級','季度兌現率報告'],
+  });
+  strats.push({
+    icon: '🌱', title: '員工職涯發展關懷',
+    tag: '長期 · 組織健康',
+    body: `<li>每半年進行一次職涯發展對談（IDP），連結績效面談結果</li>
+           <li>對年資 3 年以上員工主動提供內部轉調或進階機會</li>
+           <li>建立員工技能盤點，讓成長路徑可視化</li>`,
+    steps: ['半年IDP面談','內部機會優先','技能盤點系統'],
+  });
+  return strats;
+}
+
+// ── Render overview ──
+function renderOverview() {
+  const m = computeMetrics();
+  // stat cards
+  document.getElementById('s-emp').textContent      = m.activeEmps.length;
+  document.getElementById('s-emp-sub').textContent  = `其中高風險 ${m.highRisk} 人`;
+  document.getElementById('s-care').textContent     = m.fr.length;
+  document.getElementById('s-care-sub').textContent = `${document.getElementById('period-select').selectedOptions[0].text}`;
+  document.getElementById('s-promise').textContent  = m.pendingPromises;
+  document.getElementById('s-highrisk').textContent = m.highRisk;
+  document.getElementById('s-event').textContent    = m.openEvents;
+
+  // risk donut
+  const riskLevels = ['高', '中', '低', '未設定'];
+  const riskCounts = riskLevels.map(lv => {
+    if (lv === '未設定') return m.activeEmps.filter(e => !gf(e,'當前風險等級')).length;
+    return m.activeEmps.filter(e => gf(e,'當前風險等級')?.includes(lv)).length;
+  });
+  const riskColors = ['#E24B4A', '#EF9F27', '#1D9E75', '#ccc'];
+  document.getElementById('risk-total').textContent = m.activeEmps.length;
+  const rLabels = document.getElementById('risk-labels');
+  rLabels.innerHTML = riskLevels.map((lv, i) => riskCounts[i] > 0 ? `
+    <div class="donut-label-item">
+      <span class="dot" style="background:${riskColors[i]}"></span>
+      <span class="lbl">${lv === '未設定' ? '未標記' : lv + '風險'}：</span>
+      <span class="val">${riskCounts[i]}</span>
+    </div>` : '').join('');
+  const rCtx = document.getElementById('chart-risk').getContext('2d');
+  if (riskChart) riskChart.destroy();
+  riskChart = new Chart(rCtx, {
+    type: 'doughnut',
+    data: { labels: riskLevels, datasets: [{ data: riskCounts, backgroundColor: riskColors, borderWidth: 2, borderColor: '#fff' }] },
+    options: { cutout: '65%', plugins: { legend: { display: false } }, responsive: false }
+  });
+
+  // dept bar chart
+  const deptCtx = document.getElementById('chart-dept').getContext('2d');
+  if (deptChart) deptChart.destroy();
+  const deptEntries = Object.entries(m.deptCount).sort((a,b) => b[1]-a[1]);
+  deptChart = new Chart(deptCtx, {
+    type: 'bar',
+    data: {
+      labels: deptEntries.map(e=>e[0]),
+      datasets: [{ data: deptEntries.map(e=>e[1]), backgroundColor: '#1D9E75', borderRadius: 5, borderSkipped: false }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }, x: { grid: { display: false } } }, responsive: true, maintainAspectRatio: true }
+  });
+
+  // promise reminders
+  const upcoming = promises
+    .filter(p => { const s = gf(p,'兌現狀態') || ''; return !s.includes('已兌現') && !s.includes('已完成'); })
+    .sort((a,b) => {
+      const da = gf(a,'預計完成日期') || '9999', db = gf(b,'預計完成日期') || '9999';
+      return da.localeCompare(db);
+    }).slice(0, 5);
+  document.getElementById('promise-reminders').innerHTML = upcoming.length
+    ? upcoming.map(p => {
+        const s = gf(p,'兌現狀態') || '待完成';
+        const isOverdue = s.includes('逾期') || gf(p,'逾期天數');
+        const cls = isOverdue ? 'overdue' : 'pending';
+        const name = empName(gf(p,'關懷員工'));
+        return `<div class="promise-row ${cls}">
+          <div class="promise-title">${name}・${(gf(p,'承諾內容')||'').slice(0,35)}${(gf(p,'承諾內容')||'').length>35?'…':''}</div>
+          <div class="promise-meta">承諾人：${gf(p,'承諾人（主管）')||'—'}　預計完成：${fmtDate(gf(p,'預計完成日期'))}${isOverdue?'　<span style="color:#E24B4A;font-weight:600">⚠ 已逾期</span>':''}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub);font-size:12px;padding:12px 0;text-align:center">✅ 無待追蹤承諾</div>';
+
+  // recent care
+  const sorted = [...m.fr].sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||'')).slice(0,5);
+  document.getElementById('recent-care').innerHTML = sorted.length
+    ? sorted.map(r => {
+        const lk = gf(r,'關懷員工'); const name = empName(lk);
+        const risk = gf(r,'留任風險等級') || '';
+        return `<div class="emp-row" onclick="openCareDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+          <div class="emp-avatar" style="background:${avatarColor(name)}">${name.charAt(0)}</div>
+          <div class="emp-meta">
+            <div class="emp-name">${name}</div>
+            <div class="emp-dept">${fmtDate(gf(r,'面談日期'))}・${gf(r,'面談類型')||'—'}</div>
+          </div>
+          <div>${riskBadge(risk)}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub);font-size:12px;padding:12px 0;text-align:center">本期無關懷紀錄</div>';
+
+  renderAlertBanners(m);
+}
+
+// ── Alert banners ──
+function renderAlertBanners(m) {
+  const risks = computeRisks(m);
+  const el = document.getElementById('alert-banners');
+  const high = risks.filter(r => r.level === 'high');
+  const med  = risks.filter(r => r.level === 'medium');
+  if (!risks.length) {
+    el.innerHTML = `<div class="alert-banner info"><div class="alert-banner-icon">✅</div><div class="alert-banner-body"><div class="alert-banner-title">關懷狀態良好</div><div class="alert-banner-desc">本期各項指標均在健康範圍，請維持現有關懷節奏。</div></div></div>`;
+    return;
+  }
+  let html = '';
+  if (high.length) html += `<div class="alert-banner critical"><div class="alert-banner-icon">🚨</div><div class="alert-banner-body"><div class="alert-banner-title">高風險預警（${high.length} 項）— 需立即處理</div><div class="alert-banner-desc">${high.map(r=>`<strong>${r.title}</strong>：${r.metric}`).join('　｜　')}</div></div></div>`;
+  if (med.length) html += `<div class="alert-banner warning"><div class="alert-banner-icon">⚠️</div><div class="alert-banner-body"><div class="alert-banner-title">中風險提醒（${med.length} 項）— 本週跟進</div><div class="alert-banner-desc">${med.map(r=>r.title).join('、')}</div></div></div>`;
+  html += `<div style="text-align:right;margin-bottom:6px"><button onclick="switchTab('report')" style="font-size:11px;color:var(--teal);background:none;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;text-decoration:underline">→ 查看完整風險分析與策略建議</button></div>`;
+  el.innerHTML = html;
+}
+
+// ── Render employees ──
+function renderEmployees() {
+  const deptF  = document.getElementById('dept-filter').value;
+  const riskF  = document.getElementById('risk-filter').value;
+  const active = employees.filter(e => !gf(e,'在職狀態')?.includes('離職'));
+  const filtered = active.filter(e => {
+    if (deptF && gf(e,'部門') !== deptF) return false;
+    if (riskF && !gf(e,'當前風險等級')?.includes(riskF)) return false;
+    return true;
+  });
+  document.getElementById('emp-list').innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>員工</th><th>部門 / 職務</th><th>年資</th><th>直屬主管</th><th>風險等級</th><th>最新 1on1</th><th>狀態</th>
+      </tr></thead>
+      <tbody>${filtered.map(e => {
+        const name = (gf(e,'員工姓名') || gf(e,'英文名') || '—').trim();
+        const dept = gf(e,'部門') || '—'; const job = gf(e,'職務') || '—';
+        const tenure = gf(e,'年資(月)') || '—';
+        const mgr = gf(e,'直屬主管') || '—';
+        const risk = gf(e,'當前風險等級') || '';
+        const last1on1 = fmtDate(gf(e,'最新 1on1 日期'));
+        const status = gf(e,'在職狀態') || '在職';
+        return `<tr onclick="openEmpDetail(${JSON.stringify(e).replace(/"/g,'&quot;')})">
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="emp-avatar" style="background:${avatarColor(name)};width:28px;height:28px;font-size:11px">${name.charAt(0)}</div><div><div style="font-weight:600">${name}</div><div style="font-size:10px;color:var(--text-sub)">${gf(e,'Lark 帳號 ID')||''}</div></div></div></td>
+          <td>${dept}<br><span style="font-size:11px;color:var(--text-sub)">${job}</span></td>
+          <td>${tenure} 月</td>
+          <td style="font-size:12px">${mgr.replace('KR-','')}</td>
+          <td>${riskBadge(risk)}</td>
+          <td style="font-size:12px">${last1on1}</td>
+          <td><span class="badge ${status.includes('在職')?'badge-teal':'badge-gray'}">${status}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+function populateDeptFilter() {
+  const depts = [...new Set(employees.map(e => gf(e,'部門')).filter(Boolean))].sort();
+  const el = document.getElementById('dept-filter');
+  depts.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; el.appendChild(o); });
+}
+
+// ── Render care records ──
+function renderCareRecords() {
+  const fr = getFilteredRecords();
+  document.getElementById('care-records').innerHTML = fr.length
+    ? `<table class="data-table">
+        <thead><tr><th>紀錄 ID</th><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
+        <tbody>${fr.map(r => {
+          const name = empName(gf(r,'關懷員工'));
+          return `<tr onclick="openCareDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+            <td style="font-size:11px;color:var(--text-sub)">${gf(r,'紀錄 ID')||'—'}</td>
+            <td><strong>${name}</strong></td>
+            <td>${fmtDate(gf(r,'面談日期'))}</td>
+            <td><span class="badge badge-blue">${gf(r,'面談類型')||'—'}</span></td>
+            <td>${gf(r,'面談方式')||'—'}</td>
+            <td style="font-size:12px">${(gf(r,'主管')||'—').replace('KR-','').replace(/^ /,'')}</td>
+            <td>${riskBadge(gf(r,'留任風險等級'))}</td>
+            <td><span class="badge ${gf(r,'流程狀態')?.includes('完成')?'badge-teal':'badge-amber'}">${gf(r,'流程狀態')||'—'}</span></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`
+    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">本期無關懷紀錄</div>';
+}
+
+// ── Render promises ──
+function renderPromises() {
+  const filter = document.getElementById('promise-filter').value;
+  let ps = [...promises];
+  if (filter === 'overdue')   ps = ps.filter(p => gf(p,'兌現狀態')?.includes('逾期') || n(gf(p,'逾期天數')) > 0);
+  if (filter === 'pending')   ps = ps.filter(p => { const s = gf(p,'兌現狀態')||''; return s.includes('待') && !s.includes('逾期'); });
+  if (filter === 'fulfilled') ps = ps.filter(p => gf(p,'兌現狀態')?.includes('兌現') || gf(p,'兌現狀態')?.includes('完成'));
+
+  document.getElementById('promises-list').innerHTML = ps.length
+    ? ps.map(p => {
+        const s = gf(p,'兌現狀態') || '待完成';
+        const isOverdue = s.includes('逾期') || n(gf(p,'逾期天數')) > 0;
+        const isFulfilled = s.includes('兌現') || s.includes('完成');
+        const cls = isFulfilled ? 'fulfilled' : isOverdue ? 'overdue' : 'pending';
+        const name = empName(gf(p,'關懷員工'));
+        return `<div class="promise-row ${cls}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div>
+              <div class="promise-title">${name} ｜ ${(gf(p,'承諾內容')||'—').slice(0,60)}${(gf(p,'承諾內容')||'').length>60?'…':''}</div>
+              <div class="promise-meta">承諾 ID：${gf(p,'承諾 ID')||'—'}　承諾人：${(gf(p,'承諾人（主管）')||'—').replace('KR-','').replace(/^ /,'')}　預計完成：${fmtDate(gf(p,'預計完成日期'))}</div>
+              ${gf(p,'處理說明') ? `<div class="promise-meta" style="margin-top:4px">📝 ${gf(p,'處理說明').slice(0,80)}…</div>` : ''}
+            </div>
+            <div style="flex-shrink:0">
+              <span class="badge ${isFulfilled?'badge-teal':isOverdue?'badge-red':'badge-amber'}">${s||'待完成'}</span>
+              ${n(gf(p,'逾期天數'))>0?`<div style="font-size:10px;color:#E24B4A;margin-top:3px;text-align:right">逾 ${n(gf(p,'逾期天數'))} 天</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">無符合條件的承諾記錄</div>';
+}
+
+// ── Render events ──
+function renderEvents() {
+  const el = document.getElementById('events-list');
+  const alertEl = document.getElementById('event-alert');
+  const openEvts = events.filter(e => { const s = gf(e,'處理狀態')||''; return !s.includes('結案')&&!s.includes('完成'); });
+
+  if (openEvts.length > 0) {
+    alertEl.innerHTML = `<div class="alert-banner critical"><div class="alert-banner-icon">🚨</div><div class="alert-banner-body"><div class="alert-banner-title">待處理事件（${openEvts.length} 件）— 需立即跟進</div><div class="alert-banner-desc">${openEvts.map(e=>`<strong>${empName(gf(e,'關懷員工'))}</strong>：${gf(e,'事件類型')||'未分類'}`).join('　｜　')}</div></div></div>`;
+  }
+
+  el.innerHTML = events.length
+    ? events.map(ev => {
+        const urg = gf(ev,'緊急程度') || '';
+        const status = gf(ev,'處理狀態') || '待處理';
+        const isClosed = status.includes('結案') || status.includes('完成');
+        return `<div class="event-card" onclick="openEventDetail(${JSON.stringify(ev).replace(/"/g,'&quot;')})">
+          <div class="event-level">
+            <div class="event-level-icon">${urg.includes('高')?'🔴':urg.includes('中')?'🟡':'🟢'}</div>
+            <div class="event-level-tag" style="color:${urg.includes('高')?'#E24B4A':urg.includes('中')?'#EF9F27':'#1D9E75'}">${urg||'一般'}</div>
+          </div>
+          <div class="event-body">
+            <div class="event-title">${gf(ev,'事件類型')||'事件'} — ${empName(gf(ev,'關懷員工'))}</div>
+            <div class="event-meta">
+              觸發時間：${fmtDate(gf(ev,'觸發時間'))}　觸發主管：${(gf(ev,'觸發主管')||'—').replace('KR-','').replace(/^ /,'')}
+              ${gf(ev,'事件描述') ? `<br>描述：${gf(ev,'事件描述').slice(0,60)}…` : ''}
+            </div>
+          </div>
+          <div style="flex-shrink:0"><span class="badge ${isClosed?'badge-gray':urg.includes('高')?'badge-red':'badge-amber'}">${status}</span></div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">🎉 目前無待處理事件</div>';
+}
+
+// ── Render report ──
+function renderReport() {
+  const m = computeMetrics();
+  const risks = computeRisks(m);
+  const strategies = computeStrategies(m, risks);
+  const highCount = risks.filter(r => r.level === 'high').length;
+  const now = new Date();
+  const periodLabel = document.getElementById('period-select').selectedOptions[0].text;
+  const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
+  const statusText  = highCount > 0 ? '⚠ 高風險' : risks.length > 0 ? '注意' : '✓ 健康';
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">關懷狀況摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 時間範圍：${periodLabel}</span></div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        在職員工共 <strong style="color:#fff">${m.activeEmps.length}</strong> 人，
+        本期完成關懷面談 <strong style="color:#fff">${m.fr.length}</strong> 次，
+        高風險員工 <strong style="color:${m.highRisk>0?'#F08080':'#5DCAA5'}">${m.highRisk}</strong> 人、中風險 <strong style="color:#EF9F27">${m.midRisk}</strong> 人。
+        待兌現主管承諾 <strong style="color:${m.pendingPromises>3?'#F08080':'#fff'}">${m.pendingPromises}</strong> 項，
+        待處理事件 <strong style="color:${m.openEvents>0?'#F08080':'#fff'}">${m.openEvents}</strong> 件。
+        共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${m.activeEmps.length}</div><div class="rs-kpi-lbl">在職人數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.highRisk>0?'#F08080':'#5DCAA5'}">${m.highRisk}</div><div class="rs-kpi-lbl">高風險員工</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#EF9F27">${m.midRisk}</div><div class="rs-kpi-lbl">中風險員工</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.fr.length>0?'#5DCAA5':'#EF9F27'}">${m.fr.length}</div><div class="rs-kpi-lbl">關懷次數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.pendingPromises>3?'#F08080':'#EF9F27'}">${m.pendingPromises}</div><div class="rs-kpi-lbl">待兌現承諾</div></div>
+      </div>
+    </div>`;
+
+  document.getElementById('report-risks').innerHTML = !risks.length
+    ? '<div style="color:var(--text-sub);font-size:13px;padding:16px 0;text-align:center">🎉 本期無顯著風險，關懷狀況良好！</div>'
+    : risks.map(r => `
+      <div class="risk-card ${r.level}">
+        <div class="risk-card-header">
+          <span style="font-size:18px">${r.icon}</span>
+          <span class="risk-card-level">${r.level==='high'?'高風險':r.level==='medium'?'中風險':'低風險'}</span>
+          <span class="risk-card-title">${r.title}</span>
+          <span style="font-size:10px;color:var(--text-sub);margin-left:auto">${r.tag}</span>
+        </div>
+        <div class="risk-card-metric">📌 ${r.metric}</div>
+        <div class="risk-card-desc">${r.desc}</div>
+      </div>`).join('');
+
+  document.getElementById('report-strategies').innerHTML = strategies.map(s => `
+    <div class="strategy-card">
+      <div class="strategy-card-header">
+        <div class="strategy-icon">${s.icon}</div>
+        <div><div class="strategy-title">${s.title}</div><div class="strategy-tag">${s.tag}</div></div>
+      </div>
+      <ul class="strategy-body">${s.body}</ul>
+      <div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div>
+    </div>`).join('');
+}
+
+// ── Modals ──
+function openEmpDetail(e) {
+  if (typeof e === 'string') e = JSON.parse(e.replace(/&quot;/g, '"'));
+  const name = (gf(e,'員工姓名') || gf(e,'英文名') || '—').trim();
+  document.getElementById('modal-name').textContent = name;
+  document.getElementById('modal-sub').textContent = `${gf(e,'部門')||''} · ${gf(e,'職務')||''} · ${gf(e,'職等')||''}`;
+  const empCare = careRecords.filter(r => gf(r,'關懷員工') === gf(e,'Lark 帳號 ID'));
+  const empPromise = promises.filter(p => gf(p,'關懷員工') === gf(e,'Lark 帳號 ID'));
+  document.getElementById('modal-body').innerHTML = `
+    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:14px">
+      ${[['Lark ID',gf(e,'Lark 帳號 ID')],['到職日期',fmtDate(gf(e,'到職日期'))],['年資',gf(e,'年資(月)')+'月'],['直屬主管',(gf(e,'直屬主管')||'—').replace('KR-','').replace(/^ /,'')],['HR負責人',gf(e,'HR 負責人')||'—'],['風險等級',gf(e,'當前風險等級')||'—'],['最新1on1',fmtDate(gf(e,'最新 1on1 日期'))]].map(([k,v])=>`<tr><td style="color:var(--text-sub);padding:5px 0;width:80px;font-size:11px">${k}</td><td style="font-weight:500">${v||'—'}</td></tr>`).join('')}
+    </table>
+    ${empCare.length ? `<div class="modal-section">關懷紀錄 (${empCare.length})</div>${empCare.slice(0,3).map(r=>`<div class="modal-block">${fmtDate(gf(r,'面談日期'))}・${gf(r,'面談類型')||'—'}・${riskBadge(gf(r,'留任風險等級'))}<br>${(gf(r,'工作狀態摘要')||'').slice(0,80)}…</div>`).join('')}` : ''}
+    ${empPromise.length ? `<div class="modal-section">主管承諾 (${empPromise.length})</div>${empPromise.map(p=>`<div class="modal-block"><strong>${gf(p,'兌現狀態')||'待完成'}</strong> · ${(gf(p,'承諾內容')||'').slice(0,60)}…<br><span style="font-size:11px;color:var(--text-sub)">預計：${fmtDate(gf(p,'預計完成日期'))}</span></div>`).join('')}` : ''}
+    ${gf(e,'備註') ? `<div class="modal-section">備註</div><div class="modal-block">${gf(e,'備註')}</div>` : ''}`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openCareDetail(r) {
+  if (typeof r === 'string') r = JSON.parse(r.replace(/&quot;/g, '"'));
+  const name = empName(gf(r,'關懷員工'));
+  document.getElementById('modal-name').textContent = name + '・' + (gf(r,'面談類型')||'關懷紀錄');
+  document.getElementById('modal-sub').textContent = `${fmtDate(gf(r,'面談日期'))} · ${gf(r,'面談方式')||'—'} · 主管：${(gf(r,'主管')||'—').replace('KR-','').replace(/^ /,'')}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      ${riskBadge(gf(r,'留任風險等級'))}
+      <span class="badge ${gf(r,'流程狀態')?.includes('完成')?'badge-teal':'badge-amber'}">${gf(r,'流程狀態')||'—'}</span>
+    </div>
+    ${gf(r,'工作狀態摘要') ? `<div class="modal-section">工作狀態摘要</div><div class="modal-block">${gf(r,'工作狀態摘要')}</div>` : ''}
+    ${gf(r,'成長與需求') ? `<div class="modal-section">成長與需求</div><div class="modal-block">${gf(r,'成長與需求')}</div>` : ''}
+    ${gf(r,'主管承諾') ? `<div class="modal-section">主管承諾</div><div class="modal-block">${gf(r,'主管承諾')}</div>` : ''}
+    ${gf(r,'下次面談預計主題') ? `<div class="modal-section">下次面談主題</div><div class="modal-block">${gf(r,'下次面談預計主題')}</div>` : ''}`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openEventDetail(ev) {
+  if (typeof ev === 'string') ev = JSON.parse(ev.replace(/&quot;/g, '"'));
+  const name = empName(gf(ev,'關懷員工'));
+  document.getElementById('modal-name').textContent = '⚠ ' + (gf(ev,'事件類型')||'事件') + ' — ' + name;
+  document.getElementById('modal-sub').textContent = `${fmtDate(gf(ev,'觸發時間'))} · 緊急程度：${gf(ev,'緊急程度')||'—'} · 狀態：${gf(ev,'處理狀態')||'—'}`;
+  document.getElementById('modal-body').innerHTML = `
+    ${gf(ev,'事件描述') ? `<div class="modal-section">事件描述</div><div class="modal-block">${gf(ev,'事件描述')}</div>` : ''}
+    ${gf(ev,'HR 初步評估') ? `<div class="modal-section">HR 初步評估</div><div class="modal-block">${gf(ev,'HR 初步評估')}</div>` : ''}
+    ${gf(ev,'需主管配合事項') ? `<div class="modal-section">需主管配合事項</div><div class="modal-block">${gf(ev,'需主管配合事項')}</div>` : ''}
+    ${gf(ev,'後續行動紀錄') ? `<div class="modal-section">後續行動</div><div class="modal-block">${gf(ev,'後續行動紀錄')}</div>` : ''}`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+// ── Tab / Period ──
+function switchTab(n) {
+  const tabs = ['overview','employees','records','promises','events','report'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === n));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + n).classList.add('active');
+  if (n === 'employees') renderEmployees();
+  if (n === 'records')   renderCareRecords();
+  if (n === 'promises')  renderPromises();
+  if (n === 'events')    renderEvents();
+  if (n === 'report')    renderReport();
+}
+
+function onPeriodChange(v) {
+  selectedPeriod = v;
+  renderAll();
+}
+
+function renderAll() {
+  renderOverview();
+  const activeTab = document.querySelector('.tab-content.active')?.id?.replace('tab-','');
+  if (activeTab === 'records') renderCareRecords();
+  if (activeTab === 'promises') renderPromises();
+  if (activeTab === 'report') renderReport();
+}
+
+// ── Status helpers ──
+function setSyncStatus(t, c) { const el = document.getElementById('sync-status'); el.textContent = t; el.style.color = c; el.style.borderColor = c; el.style.background = c + '18'; }
+function showError(m) { const el = document.getElementById('error-box'); el.textContent = '⚠️ ' + m; el.style.display = 'block'; }
+
+// ── Init ──
+async function initDashboard() {
+  setSyncStatus('⟳ 連線中', '#EF9F27');
+  document.getElementById('error-box').style.display = 'none';
+  try {
+    await fetchAllTables();
+    populateDeptFilter();
+    renderAll();
+    setSyncStatus('⚡ 即時同步', '#5DCAA5');
+    document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
+  } catch(e) {
+    showError('資料載入失敗：' + e.message + '（已載入示範資料）');
+    setSyncStatus('📋 示範資料', '#EF9F27');
+    loadDemoData();
+    populateDeptFilter();
+    renderAll();
+    document.getElementById('last-updated').textContent = '示範資料：' + new Date().toLocaleTimeString('zh-TW');
+  }
+}
+
+initDashboard();
+</script>
+</body>
+</html>
