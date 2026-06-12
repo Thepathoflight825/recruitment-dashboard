@@ -1225,6 +1225,11 @@ function renderEvents() {
 
 // ── Render report ──
 function renderReport() {
+  // ── 主管版：簡化報告 ──
+  if (currentUser && currentUser.role === 'manager') {
+    renderReportManager(); return;
+  }
+
   const m = computeMetrics();
   const risks = computeRisks(m);
   const strategies = computeStrategies(m, risks);
@@ -1285,6 +1290,123 @@ function renderReport() {
       <ul class="strategy-body">${s.body}</ul>
       <div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div>
     </div>`).join('');
+}
+
+// ── 主管版本月報告 ──
+function renderReportManager() {
+  const m = computeMetrics();
+  const now = new Date();
+  const periodLabel = document.getElementById('period-select').selectedOptions[0].text;
+  const mgrName = currentUser.name;
+
+  // 待辦：本季尚未關懷的成員
+  const uncared = m.activeEmps.filter(e => {
+    const larkId = gf(e,'Lark 帳號 ID');
+    return !careRecords.some(r => gf(r,'關懷員工') === larkId);
+  });
+
+  // 我的待兌現承諾
+  const myPending = promises.filter(p => {
+    const s = gf(p,'兌現狀態') || '';
+    return s.includes('待') && !s.includes('取消');
+  });
+
+  // 我的成員風險
+  const highRisk = m.activeEmps.filter(e => (gf(e,'當前風險等級')||'').includes('高'));
+  const midRisk  = m.activeEmps.filter(e => (gf(e,'當前風險等級')||'').includes('中'));
+
+  const statusColor = highRisk.length > 0 ? '#E24B4A' : midRisk.length > 0 ? '#EF9F27' : '#1D9E75';
+  const statusText  = highRisk.length > 0 ? '⚠ 需關注' : midRisk.length > 0 ? '留意' : '✓ 狀況良好';
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">我的團隊關懷摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 ${periodLabel}</span></div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        我的在職成員共 <strong style="color:#fff">${m.activeEmps.length}</strong> 人，
+        本期完成關懷面談 <strong style="color:#fff">${m.fr.length}</strong> 次。
+        高風險成員 <strong style="color:${highRisk.length>0?'#F08080':'#5DCAA5'}">${highRisk.length}</strong> 人、
+        中風險 <strong style="color:${midRisk.length>0?'#EF9F27':'#5DCAA5'}">${midRisk.length}</strong> 人，
+        待兌現承諾 <strong style="color:${myPending.length>3?'#F08080':'#fff'}">${myPending.length}</strong> 項。
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${m.activeEmps.length}</div><div class="rs-kpi-lbl">我的成員</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${highRisk.length>0?'#F08080':'#5DCAA5'}">${highRisk.length}</div><div class="rs-kpi-lbl">高風險成員</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${midRisk.length>0?'#EF9F27':'#5DCAA5'}">${midRisk.length}</div><div class="rs-kpi-lbl">中風險成員</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.fr.length>0?'#5DCAA5':'#EF9F27'}">${m.fr.length}</div><div class="rs-kpi-lbl">關懷次數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${myPending.length>3?'#F08080':'#EF9F27'}">${myPending.length}</div><div class="rs-kpi-lbl">待兌現承諾</div></div>
+      </div>
+    </div>`;
+
+  // ── 我的待辦提醒（取代「風險預告」）──
+  const todos = [];
+
+  if (uncared.length > 0) {
+    todos.push({
+      level: uncared.length > 2 ? 'high' : 'medium',
+      icon: '💬',
+      title: `本季尚未完成關懷面談（${uncared.length} 人）`,
+      desc: `待關懷成員：${uncared.map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、')}`,
+      action: '請於本季結束前安排 1on1 關懷面談，完成後填寫關懷紀錄表單。'
+    });
+  }
+
+  if (myPending.length > 0) {
+    const overdue = myPending.filter(p => isOverduePromise(p));
+    todos.push({
+      level: overdue.length > 0 ? 'high' : 'medium',
+      icon: '📋',
+      title: `待兌現主管承諾（${myPending.length} 項${overdue.length>0?`，其中 ${overdue.length} 項已逾期`:''}）`,
+      desc: myPending.slice(0,3).map(p => {
+        const empId = gf(p,'關懷員工');
+        const name = empName(empId) || empId;
+        const due = fmtDate(gf(p,'預計完成日期'));
+        return `${name}：${(gf(p,'承諾內容')||'').slice(0,30)}…${due&&due!=='—'?' (預計：'+due+')':''}`;
+      }).join('<br>'),
+      action: '請前往「承諾追蹤」頁籤確認進度，完成後更新兌現狀態。'
+    });
+  }
+
+  if (highRisk.length > 0) {
+    todos.push({
+      level: 'high',
+      icon: '🚨',
+      title: `高風險成員需優先關注（${highRisk.length} 人）`,
+      desc: `高風險成員：${highRisk.map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、')}`,
+      action: '建議本週優先安排關懷面談，了解成員近況，必要時與 HR 協同處理。'
+    });
+  }
+
+  if (isNearPerfReview()) {
+    const mo = new Date().getMonth() + 1;
+    todos.push({
+      level: 'low',
+      icon: '📊',
+      title: `上半年績效面談即將到來（7月執行）`,
+      desc: `績效面談執行期間為 7/1–7/31，請提前與成員溝通面談時程。`,
+      action: '完成面談後，填寫績效紀錄並將流程狀態更新為「已提交」，提交後 HR 將於 5 個工作日內審核。'
+    });
+  }
+
+  const levelLabel = { high:'需處理', medium:'請留意', low:'提醒' };
+  const levelColor = { high:'#E24B4A', medium:'#EF9F27', low:'#1D9E75' };
+
+  document.getElementById('report-risks').innerHTML = !todos.length
+    ? '<div style="color:var(--text-sub);font-size:13px;padding:16px 0;text-align:center">🎉 本期無待辦事項，團隊狀況良好！</div>'
+    : todos.map(t => `
+      <div class="risk-card ${t.level}" style="margin-bottom:12px">
+        <div class="risk-card-header">
+          <span style="font-size:18px">${t.icon}</span>
+          <span class="risk-card-level" style="background:${levelColor[t.level]}20;color:${levelColor[t.level]}">${levelLabel[t.level]}</span>
+          <span class="risk-card-title">${t.title}</span>
+        </div>
+        <div class="risk-card-metric" style="margin:6px 0;font-size:12px">${t.desc}</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:4px;padding-top:6px;border-top:0.5px solid var(--border)">▶ ${t.action}</div>
+      </div>`).join('');
+
+  // 主管版不顯示策略建議區塊
+  document.getElementById('report-strategies').innerHTML =
+    `<div style="color:var(--text-sub);font-size:12px;text-align:center;padding:12px 0">如需組織層級的策略分析，請聯絡 HR。</div>`;
 }
 
 // ── Render 績效面談 ──

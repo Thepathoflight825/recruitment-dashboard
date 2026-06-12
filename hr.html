@@ -920,6 +920,11 @@ function renderAlertBannersHR() {
 }
 
 function renderReportHR() {
+  // ── 主管版：簡化報告 ──
+  if (currentUser && currentUser.role === 'manager') {
+    renderReportManagerHR(); return;
+  }
+
   const m = computeHRMetrics();
   const risks = computeHRRisks(m);
   const strategies = computeHRStrategies(m, risks);
@@ -959,6 +964,94 @@ function renderReportHR() {
     : risks.map(r=>`<div class="risk-card ${r.level}"><div class="risk-card-header"><span style="font-size:18px">${r.icon}</span><span class="risk-card-level">${{high:'高風險',medium:'中風險',low:'低風險'}[r.level]}</span><span class="risk-card-title">${r.title}</span><span style="font-size:10px;color:var(--text-sub);margin-left:auto">${r.tag}</span></div><div class="risk-card-metric">📌 ${r.metric}</div><div class="risk-card-desc">${r.desc}</div></div>`).join('');
 
   document.getElementById('report-strategies').innerHTML = strategies.map(s=>`<div class="strategy-card"><div class="strategy-card-header"><div class="strategy-icon">${s.icon}</div><div class="strategy-meta"><div class="strategy-title">${s.title}</div><div class="strategy-tag">${s.tag}</div></div></div><ul class="strategy-body">${s.body}</ul><div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div></div>`).join('');
+}
+
+// ── 主管版本月報告（人力資源） ──
+function renderReportManagerHR() {
+  const now = new Date();
+  const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[selectedPeriod] || '';
+  const actives  = employees.filter(e => gf(e,'在職狀態') === '在職中');
+  const fel      = getFilteredExitList();
+  const fll      = getFilteredLeaveList();
+
+  // 我的成員差勤異常（病假天數 > 2 天）
+  const leaveByEmp = {};
+  fll.forEach(l => {
+    const name = (gf(l,'英文名字')||'').trim();
+    if (!name) return;
+    leaveByEmp[name] = (leaveByEmp[name] || 0) + (parseFloat(gf(l,'天數')) || 0);
+  });
+  const sickAlert = Object.entries(leaveByEmp).filter(([,d]) => d >= 2);
+
+  // 我的成員離職紀錄
+  const myExits = fel.filter(r => actives.find(e => (gf(e,'英文名字')||'').trim() === (gf(r,'英文名字')||'').trim()) === undefined);
+
+  const statusColor = myExits.length > 0 ? '#E24B4A' : sickAlert.length > 0 ? '#EF9F27' : '#1D9E75';
+  const statusText  = myExits.length > 0 ? '⚠ 需關注' : sickAlert.length > 0 ? '留意' : '✓ 狀況良好';
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">我的團隊人力摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 ${periodLabel}</span></div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        我的在職成員共 <strong style="color:#fff">${actives.length}</strong> 人。
+        ${fel.length > 0 ? `本期離職 <strong style="color:#F08080">${fel.length}</strong> 人。` : '本期無離職。'}
+        ${sickAlert.length > 0 ? `差勤異常成員 <strong style="color:#EF9F27">${sickAlert.length}</strong> 人需關注。` : ''}
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${actives.length}</div><div class="rs-kpi-lbl">在職成員</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${fel.length>0?'#F08080':'#5DCAA5'}">${fel.length}</div><div class="rs-kpi-lbl">本期離職</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${sickAlert.length>0?'#EF9F27':'#5DCAA5'}">${sickAlert.length}</div><div class="rs-kpi-lbl">差勤異常</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${fll.reduce((a,l)=>a+(parseFloat(gf(l,'天數'))||0),0).toFixed(1)}</div><div class="rs-kpi-lbl">本期請假天數</div></div>
+      </div>
+    </div>`;
+
+  // ── 待辦提醒 ──
+  const todos = [];
+
+  if (sickAlert.length > 0) {
+    todos.push({
+      level: 'medium', icon: '🏥',
+      title: `差勤異常成員需主動關心（${sickAlert.length} 人）`,
+      desc: sickAlert.map(([name, days]) => `${name}：本期病假 ${days} 天`).join('<br>'),
+      action: '病假偏多時建議主動以日常關心為優先，無需正式啟動關懷流程，若有需要可透過關懷小幫手記錄。'
+    });
+  }
+
+  if (fel.length > 0) {
+    todos.push({
+      level: 'high', icon: '👤',
+      title: `本期有成員離職（${fel.length} 人）`,
+      desc: fel.map(r => `${(gf(r,'英文名字')||'').trim()}：${gf(r,'離職原因')||'原因未填'}`).join('<br>'),
+      action: '請確認交接事項已完成，並與 HR 協調後續人力補充事宜。'
+    });
+  }
+
+  if (!todos.length) {
+    todos.push({
+      level: 'low', icon: '✅',
+      title: '本期無異常事項',
+      desc: '團隊差勤與人力狀況正常。',
+      action: '持續維持良好的 1on1 關懷節奏，預防性關懷優於事後補救。'
+    });
+  }
+
+  const levelLabel = { high:'需處理', medium:'請留意', low:'提醒' };
+  const levelColor = { high:'#E24B4A', medium:'#EF9F27', low:'#1D9E75' };
+
+  document.getElementById('report-risks').innerHTML = todos.map(t => `
+    <div class="risk-card ${t.level}" style="margin-bottom:12px">
+      <div class="risk-card-header">
+        <span style="font-size:18px">${t.icon}</span>
+        <span class="risk-card-level" style="background:${levelColor[t.level]}20;color:${levelColor[t.level]}">${levelLabel[t.level]}</span>
+        <span class="risk-card-title">${t.title}</span>
+      </div>
+      <div class="risk-card-metric" style="margin:6px 0;font-size:12px">${t.desc}</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:4px;padding-top:6px;border-top:0.5px solid var(--border)">▶ ${t.action}</div>
+    </div>`).join('');
+
+  document.getElementById('report-strategies').innerHTML =
+    `<div style="color:var(--text-sub);font-size:12px;text-align:center;padding:12px 0">如需組織層級的策略分析，請聯絡 HR。</div>`;
 }
 
 function switchTab(n) {
