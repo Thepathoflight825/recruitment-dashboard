@@ -926,6 +926,11 @@ function renderAlertBanners() {
 }
 
 function renderReport() {
+  // ── 主管版：簡化報告 ──
+  if (currentUser && currentUser.role === 'manager') {
+    renderReportManagerRecruit(); return;
+  }
+
   const m = computeMetrics();
   const risks = computeRisks(m);
   const strategies = computeStrategies(m, risks);
@@ -992,6 +997,94 @@ function renderReport() {
       <ul class="strategy-body">${s.body}</ul>
       <div class="strategy-steps">${s.steps.map(st=>`<span class="strategy-step">→ ${st}</span>`).join('')}</div>
     </div>`).join('');
+}
+
+// ── 主管版本月報告（招募） ──
+function renderReportManagerRecruit() {
+  const now = new Date();
+  const periodLabel = document.getElementById('period-select')?.selectedOptions[0]?.text || '本期';
+  const total    = allCandidates.length;
+  const active   = allCandidates.filter(c => !['應徵者婉拒','不通過'].includes(gf(c,'關卡進度')));
+  const declined = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒'));
+  const toInterview = allCandidates.filter(c => ['AI評分','主管篩選通過'].includes(gf(c,'當前關卡')));
+  const interviewed = allCandidates.filter(c => ['初試','複試','錄取','到職'].includes(gf(c,'當前關卡')));
+  const hired    = allCandidates.filter(c => ['錄取','到職'].includes(gf(c,'當前關卡')));
+
+  const statusColor = toInterview.length > 0 ? '#EF9F27' : total === 0 ? '#E24B4A' : '#1D9E75';
+  const statusText  = toInterview.length > 0 ? '待安排面試' : total === 0 ? '無進行中招募' : '✓ 進行中';
+
+  document.getElementById('report-summary-wrap').innerHTML = `
+    <div class="report-summary-box">
+      <div class="rs-title">我的招募摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 ${periodLabel}</span></div>
+      <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
+      <div class="rs-body">
+        本期與我相關的應徵者共 <strong style="color:#fff">${total}</strong> 位，
+        進行中 <strong style="color:#fff">${active.length}</strong> 位，
+        已完成初試 <strong style="color:#fff">${interviewed.length}</strong> 位，
+        錄取 <strong style="color:${hired.length>0?'#5DCAA5':'#fff'}">${hired.length}</strong> 位，
+        應徵者婉拒 <strong style="color:${declined.length>0?'#F08080':'#fff'}">${declined.length}</strong> 位。
+      </div>
+      <div class="rs-kpi-row">
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${total}</div><div class="rs-kpi-lbl">應徵者總數</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${toInterview.length>0?'#EF9F27':'#5DCAA5'}">${toInterview.length}</div><div class="rs-kpi-lbl">待安排面試</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#5DCAA5">${interviewed.length}</div><div class="rs-kpi-lbl">已完成初試</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${hired.length>0?'#5DCAA5':'#EF9F27'}">${hired.length}</div><div class="rs-kpi-lbl">錄取</div></div>
+      </div>
+    </div>`;
+
+  // ── 待辦提醒 ──
+  const todos = [];
+
+  if (toInterview.length > 0) {
+    todos.push({
+      level: 'medium', icon: '📅',
+      title: `待安排初試（${toInterview.length} 位）`,
+      desc: toInterview.map(c => `${gf(c,'應徵者')||'—'}　${gf(c,'應徵職務')||'—'}　當前關卡：${gf(c,'當前關卡')||'—'}`).join('<br>'),
+      action: '請確認面試時間並通知 HR 安排，完成後更新當前關卡狀態。'
+    });
+  }
+
+  if (declined.length > 0) {
+    todos.push({
+      level: 'low', icon: '👋',
+      title: `本期應徵者婉拒（${declined.length} 位）`,
+      desc: declined.map(c => `${gf(c,'應徵者')||'—'}　${gf(c,'備註') ? '備註：'+gf(c,'備註') : ''}`).join('<br>'),
+      action: '如需了解婉拒原因，可請 HR 進行後續追蹤，作為下次招募策略的參考。'
+    });
+  }
+
+  if (!todos.length && total === 0) {
+    todos.push({
+      level: 'low', icon: '📭',
+      title: '本期無招募進度',
+      desc: '目前沒有與我相關的應徵者資料。',
+      action: '如有新職缺需求，請與 HR 確認招募計畫。'
+    });
+  } else if (!todos.length) {
+    todos.push({
+      level: 'low', icon: '✅',
+      title: '本期招募進行順暢',
+      desc: `進行中 ${active.length} 位，無待辦事項。`,
+      action: '持續關注進行中應徵者的面試安排與跟進狀況。'
+    });
+  }
+
+  const levelLabel = { high:'需處理', medium:'請留意', low:'提醒' };
+  const levelColor = { high:'#E24B4A', medium:'#EF9F27', low:'#1D9E75' };
+
+  document.getElementById('report-risks').innerHTML = todos.map(t => `
+    <div class="risk-card ${t.level}" style="margin-bottom:12px">
+      <div class="risk-card-header">
+        <span style="font-size:18px">${t.icon}</span>
+        <span class="risk-card-level" style="background:${levelColor[t.level]}20;color:${levelColor[t.level]}">${levelLabel[t.level]}</span>
+        <span class="risk-card-title">${t.title}</span>
+      </div>
+      <div class="risk-card-metric" style="margin:6px 0;font-size:12px">${t.desc}</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:4px;padding-top:6px;border-top:0.5px solid var(--border)">▶ ${t.action}</div>
+    </div>`).join('');
+
+  document.getElementById('report-strategies').innerHTML =
+    `<div style="color:var(--text-sub);font-size:12px;text-align:center;padding:12px 0">如需組織層級的招募分析，請聯絡 HR。</div>`;
 }
 
 function renderKPI() {
