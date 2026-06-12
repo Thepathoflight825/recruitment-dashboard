@@ -25,11 +25,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
 
-  .header {
-    background: var(--navy); padding: 0 24px;
-    display: flex; align-items: stretch; justify-content: space-between;
-    position: sticky; top: 0; z-index: 100;
-  }
+  .header { background: var(--navy); padding: 0 24px; display: flex; align-items: stretch; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .header-left { display: flex; flex-direction: column; justify-content: center; padding: 14px 0; }
   .header-title { font-size: 17px; font-weight: 700; color: #fff; }
   .header-sub { font-size: 11px; color: #6c9bc8; margin-top: 2px; }
@@ -226,7 +222,6 @@
     <div class="tab" onclick="switchTab('kpi')">本月 KPI</div>
     <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
   </div>
-  <div class="header-right">
   <div class="header-right">
     <button class="nav-bridge" onclick="goToHR()"><span class="nb-icon">👥</span> 人力資源 <span class="nb-arrow">←</span></button>
     <button class="nav-bridge" onclick="goToCare()" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)"><span class="nb-icon">💚</span> 關懷小幫手 <span class="nb-arrow">→</span></button>

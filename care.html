@@ -29,16 +29,12 @@
   body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
 
   /* ── Header ── */
-  .header {
-    background: var(--navy); padding: 0 24px;
-    display: flex; align-items: stretch; justify-content: space-between;
-    position: sticky; top: 0; z-index: 100;
-  }
+  .header { background: var(--navy); padding: 0 24px; display: flex; align-items: stretch; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .header-left { display: flex; flex-direction: column; justify-content: center; padding: 14px 0; }
   .header-title { font-size: 17px; font-weight: 700; color: #fff; }
   .header-sub { font-size: 11px; color: #6c9bc8; margin-top: 2px; }
   .header-tabs { display: flex; align-items: flex-end; gap: 2px; }
-  .tab { padding: 12px 18px 10px; font-size: 13px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
+  .tab { padding: 12px 12px 10px; font-size: 12px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
   .tab.active { color: #fff; border-bottom-color: var(--teal-mid); }
   .tab:hover:not(.active) { color: #ccc; }
   .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: nowrap; }
@@ -275,9 +271,9 @@
     <div class="tab" onclick="switchTab('employees')">員工名單</div>
     <div class="tab" onclick="switchTab('records')">關懷紀錄</div>
     <div class="tab" onclick="switchTab('promises')">承諾追蹤</div>
-    <div class="tab" onclick="switchTab('perf')">📊 績效面談</div>
-    <div class="tab" onclick="switchTab('events')">⚠ 事件管理</div>
-    <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
+    <div class="tab" onclick="switchTab('perf')">績效面談</div>
+    <div class="tab" onclick="switchTab('events')">事件管理</div>
+    <div class="tab" onclick="switchTab('report')">本月報告</div>
   </div>
   <div class="header-right">
     <button class="nav-bridge" onclick="goTo('hr')"><span class="nb-icon">👥</span> 人力資源 <span class="nb-arrow">←</span></button>
