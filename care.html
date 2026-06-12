@@ -271,6 +271,7 @@
     <div class="tab" onclick="switchTab('employees')">員工名單</div>
     <div class="tab" onclick="switchTab('records')">關懷紀錄</div>
     <div class="tab" onclick="switchTab('promises')">承諾追蹤</div>
+    <div class="tab" onclick="switchTab('perf')">📊 績效面談</div>
     <div class="tab" onclick="switchTab('events')">⚠ 事件管理</div>
     <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
   </div>
@@ -394,6 +395,37 @@
         </select>
       </div>
       <div id="promises-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+    </div>
+  </div>
+
+
+  <!-- ══ 績效面談 ══ -->
+  <div class="tab-content" id="tab-perf">
+    <div class="panel">
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>📊 績效面談紀錄</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="perf-filter-emp" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部員工</option>
+          </select>
+          <select id="perf-filter-period" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部考核期間</option>
+            <option value="H1">上半年 (H1)</option>
+            <option value="H2">下半年 (H2)</option>
+          </select>
+          <select id="perf-filter-status" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部狀態</option>
+            <option value="已提交">已提交</option>
+            <option value="待完成">待完成</option>
+            <option value="同仁確認中">同仁確認中</option>
+            <option value="已完成">已完成</option>
+          </select>
+          <button onclick="document.getElementById('perf-filter-emp').value='';document.getElementById('perf-filter-period').value='';document.getElementById('perf-filter-status').value='';renderPerf();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
+        </div>
+      </div>
+      <div id="perf-stats" style="display:flex;gap:12px;margin:14px 0 10px;flex-wrap:wrap"></div>
+      <div id="perf-count" style="font-size:12px;color:var(--text-sub);margin-bottom:10px"></div>
+      <div id="perf-list"></div>
     </div>
   </div>
 
@@ -1255,7 +1287,137 @@ function renderReport() {
     </div>`).join('');
 }
 
-// ── Modals ──
+// ── Render 績效面談 ──
+function perfRatingBadge(r) {
+  if (!r) return '<span style="font-size:11px;color:var(--text-sub)">—</span>';
+  const map = {
+    '超越期望': 'background:#E6F9F4;color:#1D9E75;border:0.5px solid #1D9E75',
+    '達標':     'background:#E8F0FE;color:#1a73e8;border:0.5px solid #1a73e8',
+    '待改善':   'background:#FFF3E0;color:#E67E22;border:0.5px solid #E67E22',
+    '不符期望': 'background:#FFF0F0;color:#E24B4A;border:0.5px solid #E24B4A',
+  };
+  const st = map[r] || 'background:var(--gray);color:var(--text-sub)';
+  return `<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;${st}">${r}</span>`;
+}
+
+function renderPerf() {
+  const empF    = document.getElementById('perf-filter-emp')?.value || '';
+  const periodF = document.getElementById('perf-filter-period')?.value || '';
+  const statusF = document.getElementById('perf-filter-status')?.value || '';
+
+  // 填充員工篩選（第一次呼叫時）
+  const empSel = document.getElementById('perf-filter-emp');
+  if (empSel && empSel.options.length <= 1) {
+    const names = [...new Set(perfRecords.map(r => {
+      const larkId = gf(r,'面談員工');
+      return empName(larkId) || larkId || '';
+    }).filter(Boolean))].sort();
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; empSel.appendChild(o); });
+  }
+
+  let ps = [...perfRecords];
+  if (empF)    ps = ps.filter(r => { const n = empName(gf(r,'面談員工')) || gf(r,'面談員工') || ''; return n === empF; });
+  if (periodF) ps = ps.filter(r => (gf(r,'考核期間')||'').includes(periodF));
+  if (statusF) ps = ps.filter(r => (gf(r,'流程狀態')||'') === statusF);
+
+  // 統計列
+  const total     = ps.length;
+  const done      = ps.filter(r => (gf(r,'流程狀態')||'').includes('已完成')).length;
+  const submitted = ps.filter(r => (gf(r,'流程狀態')||'').includes('已提交')).length;
+  const pending   = ps.filter(r => { const s = gf(r,'流程狀態')||''; return s.includes('待') || s.includes('確認'); }).length;
+
+  const statsEl = document.getElementById('perf-stats');
+  if (statsEl) statsEl.innerHTML = [
+    ['本期總筆數', total, '#1a73e8'],
+    ['已完成', done, '#1D9E75'],
+    ['已提交', submitted, '#EF9F27'],
+    ['待處理', pending, '#E24B4A'],
+  ].map(([label, val, color]) => `
+    <div style="background:#f8f9fa;border-radius:8px;padding:10px 16px;min-width:80px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${label}</div>
+    </div>`).join('');
+
+  const countEl = document.getElementById('perf-count');
+  if (countEl) countEl.textContent = `共 ${ps.length} 筆`;
+
+  const listEl = document.getElementById('perf-list');
+  if (!listEl) return;
+
+  if (!ps.length) {
+    listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-sub);font-size:13px">
+      📋 尚無績效面談紀錄${empF||periodF||statusF ? '（符合篩選條件）' : ''}</div>`;
+    return;
+  }
+
+  // 依面談日期排序（新→舊）
+  ps.sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
+
+  listEl.innerHTML = ps.map(r => {
+    const empId   = gf(r,'面談員工') || '';
+    const name    = empName(empId) || empId;
+    const cnName  = empCnName(empId);
+    const period  = gf(r,'考核期間') || '—';
+    const date    = fmtDate(gf(r,'面談日期'));
+    const method  = gf(r,'面談方式') || '—';
+    const mgr     = (gf(r,'主管')||'—').replace('KR-','').replace(/^ /,'');
+    const rating  = gf(r,'整體績效評等') || '';
+    const status  = gf(r,'流程狀態') || '—';
+    const confirm = gf(r,'雙方確認狀態') || '—';
+    const idp     = gf(r,'個人發展計畫(IDP)') || '';
+    const nextGoal= gf(r,'下期目標摘要') || '';
+    const suggest = gf(r,'建議_薪酬職級異動') || '';
+    const highlight = gf(r,'亮點回饋') || '';
+    const improve = gf(r,'待加強項目') || '';
+    const goalSummary = gf(r,'目標達成摘要') || '';
+
+    const statusColor = status.includes('已完成') ? 'color:#1D9E75;font-weight:600'
+      : status.includes('已提交') ? 'color:#EF9F27;font-weight:600'
+      : 'color:var(--text-sub)';
+
+    const detailId = `perf-detail-${gf(r,'績效紀錄 ID')||Math.random()}`.replace(/[^a-zA-Z0-9-]/g,'');
+
+    return `
+      <div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:#fff" onclick="togglePerfDetail('${detailId}')">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--teal);flex-shrink:0">${(name[0]||'?').toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${name}${cnName&&cnName!==name?` <span style="font-weight:400;color:var(--text-sub);font-size:11px">${cnName}</span>`:''}
+              <span style="margin-left:8px">${perfRatingBadge(rating)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:3px">
+              ${period} ｜ ${date} ｜ ${method} ｜ 主管：${mgr}
+            </div>
+          </div>
+          <div style="font-size:12px;${statusColor};white-space:nowrap">${status}</div>
+          <div style="font-size:11px;color:var(--text-sub)">▾</div>
+        </div>
+        <div id="${detailId}" style="display:none;padding:12px 16px;background:#fafbfc;border-top:0.5px solid var(--border);font-size:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:10px">
+            <div><span style="color:var(--text-sub)">雙方確認</span>　${confirm}</div>
+            <div><span style="color:var(--text-sub)">薪酬職級建議</span>　${suggest||'—'}</div>
+          </div>
+          ${goalSummary?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">目標達成摘要</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${goalSummary}</div></div>`:''}
+          ${highlight?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">✨ 亮點回饋</div><div style="background:#E6F9F4;border-radius:6px;padding:8px 10px">${highlight}</div></div>`:''}
+          ${improve?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">🔧 待加強項目</div><div style="background:#FFF3E0;border-radius:6px;padding:8px 10px">${improve}</div></div>`:''}
+          ${idp?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">📌 個人發展計畫 (IDP)</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${idp}</div></div>`:''}
+          ${nextGoal?`<div><div style="color:var(--text-sub);margin-bottom:3px">🎯 下期目標摘要</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${nextGoal}</div></div>`:''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function togglePerfDetail(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function empCnName(larkId) {
+  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  return emp ? (gf(emp,'員工姓名')||'').trim() : '';
+}
+
+
 function openEmpDetail(e) {
   if (typeof e === 'string') e = JSON.parse(e.replace(/&quot;/g, '"'));
   const engN = (gf(e,'英文名')||'').trim() || (gf(e,'員工姓名')||'—').trim();
@@ -1310,13 +1472,14 @@ function closeModal() { document.getElementById('modal-overlay').classList.remov
 
 // ── Tab / Period ──
 function switchTab(n) {
-  const tabs = ['overview','employees','records','promises','events','report'];
+  const tabs = ['overview','employees','records','promises','perf','events','report'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === n));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + n).classList.add('active');
   if (n === 'employees') renderEmployees();
   if (n === 'records')   renderCareRecords();
   if (n === 'promises')  renderPromises();
+  if (n === 'perf')      renderPerf();
   if (n === 'events')    renderEvents();
   if (n === 'report')    renderReport();
 }
@@ -1331,6 +1494,7 @@ function renderAll() {
   const activeTab = document.querySelector('.tab-content.active')?.id?.replace('tab-','');
   if (activeTab === 'records') renderCareRecords();
   if (activeTab === 'promises') renderPromises();
+  if (activeTab === 'perf') renderPerf();
   if (activeTab === 'report') renderReport();
 }
 
