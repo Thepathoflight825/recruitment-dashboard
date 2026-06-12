@@ -197,8 +197,36 @@
   @keyframes spin   { to { transform: rotate(360deg); } }
   select option { background: #1a1a2e; color: #fff; }
 </style>
+
+<style>
+#auth-overlay{position:fixed;inset:0;background:#0d1b2a;display:flex;align-items:center;justify-content:center;z-index:9999;}
+#auth-box{background:#fff;border-radius:16px;padding:40px 36px;width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4);}
+#auth-box h2{font-size:20px;font-weight:700;color:#0d1b2a;margin:0 0 6px;}
+#auth-box p{font-size:13px;color:#6b7c93;margin:0 0 24px;}
+#auth-input{width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #dde3ec;border-radius:8px;font-size:15px;font-family:inherit;outline:none;transition:border .2s;}
+#auth-input:focus{border-color:#1D6FA5;}
+#auth-btn{margin-top:12px;width:100%;padding:12px;background:#0d1b2a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+#auth-btn:hover{background:#1a2e44;}
+#auth-error{margin-top:10px;font-size:12px;color:#E24B4A;min-height:16px;}
+#auth-hint{margin-top:16px;font-size:11px;color:#aab4be;}
+#user-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#6c9bc8;background:rgba(255,255,255,.07);border:0.5px solid rgba(108,155,200,.3);border-radius:20px;padding:4px 12px;}
+#user-badge span{font-weight:600;color:#7DCFB6;}
+#logout-btn{background:none;border:none;cursor:pointer;font-size:11px;color:#aab4be;padding:0;font-family:inherit;text-decoration:underline;}
+#logout-btn:hover{color:#E24B4A;}
+</style>
 </head>
 <body>
+<!-- ── Auth overlay ── -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>👥 人力資源儀表板</h2>
+    <p>勝海科技・人力資源系統<br>請輸入您的專屬密碼</p>
+    <input id="auth-input" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="auth-btn" onclick="doLogin()">進入</button>
+    <div id="auth-error"></div>
+    <div id="auth-hint">忘記密碼請聯絡 Sherry</div>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-left">
@@ -235,6 +263,7 @@
       <span class="nb-icon">🕐</span> 考勤
       <span class="nb-arrow">→</span>
     </button>
+    <div id="user-badge" style="display:none"><span id="user-name-label"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
     <span class="sync-badge" id="sync-status">⟳ 載入中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -941,8 +970,91 @@ function switchTab(n) {
 
 function setSyncStatus(t,c) { const el=document.getElementById('sync-status'); el.textContent=t; el.style.color=c; el.style.borderColor=c; el.style.background=c+'18'; }
 
+// ── Auth ──
+const HR_USERS = {
+  'SJAU2B5P': { role:'hr',      name:'Sherry' },
+  'QHHW8S7L': { role:'hr',      name:'Tori' },
+  'TYJ57JE7': { role:'hr',      name:'Kassy' },
+  '8J69TVSU': { role:'hr',      name:'Max' },
+  'WL14ZP92': { role:'manager', managerId:'Tamia',   name:'Tamia' },
+  'I1GPZ04B': { role:'manager', managerId:'Dennis',  name:'Dennis' },
+  '85TGOFU3': { role:'manager', managerId:'Slip',    name:'Slip' },
+  '0UT3RJTM': { role:'manager', managerId:'Satoshi', name:'Satoshi' },
+  'TJZ0U2YF': { role:'manager', managerId:'Roy',     name:'Roy' },
+  'S07XBOPU': { role:'manager', managerId:'Dana',    name:'Dana' },
+};
+
+let currentUser = null;
+
+function doLogin() {
+  const pwd = document.getElementById('auth-input').value.trim();
+  const user = HR_USERS[pwd];
+  if (!user) {
+    document.getElementById('auth-error').textContent = '密碼錯誤，請重新輸入';
+    document.getElementById('auth-input').value = '';
+    return;
+  }
+  localStorage.setItem('bb_auth', JSON.stringify({ pwd, ...user }));
+  applyAuth(HR_USERS[pwd]);
+}
+
+function applyAuth(user) {
+  currentUser = user;
+  document.getElementById('auth-overlay').style.display = 'none';
+  const badge = document.getElementById('user-badge');
+  badge.style.display = 'inline-flex';
+  document.getElementById('user-name-label').textContent = user.name;
+  initDashboard();
+}
+
+function doLogout() {
+  localStorage.removeItem('bb_auth');
+  location.reload();
+}
+
+function applyRoleFilter() {
+  if (!currentUser || currentUser.role === 'hr') return;
+  const mgr = currentUser.managerId;
+  // 只保留在職且直屬主管符合的員工（直屬主管空白 = 離職，排除）
+  employees = employees.filter(e => {
+    const sup = (gf(e,'直屬主管')||'').trim();
+    return sup === mgr || sup === 'KR-' + mgr;
+  });
+  const empNames = new Set(employees.map(e => (gf(e,'英文名字')||'').trim()));
+  exitList  = exitList.filter(r => empNames.has((gf(r,'英文名字')||'').trim()));
+  leaveList = leaveList.filter(r => empNames.has((gf(r,'英文名字')||'').trim()));
+}
+
+// ── 初始化 ──
+async function initDashboard() {
+  setSyncStatus('⟳ 連線中', '#EF9F27');
+  try {
+    await fetchAllTables();
+    applyRoleFilter();
+    renderAll();
+    setSyncStatus('⚡ 即時同步', '#5DCAA5');
+    document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
+  } catch(e) {
+    document.getElementById('error-box').textContent = '⚠️ 資料載入失敗：' + e.message + '（已載入示範資料）';
+    document.getElementById('error-box').style.display = 'block';
+    setSyncStatus('📋 示範資料', '#EF9F27');
+    loadDemoData();
+    applyRoleFilter();
+    renderAll();
+  }
+}
+
 // ── 啟動 ──
-initDashboard();
+(function() {
+  const saved = localStorage.getItem('bb_auth');
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      if (HR_USERS[u.pwd]) { applyAuth(HR_USERS[u.pwd]); return; }
+    } catch(e) {}
+  }
+  document.getElementById('auth-overlay').style.display = 'flex';
+})();
 </script>
 </body>
 </html>

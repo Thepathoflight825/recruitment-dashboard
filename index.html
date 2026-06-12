@@ -168,8 +168,36 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   select option { background: #1a1a2e; color: #fff; }
 </style>
+
+<style>
+#auth-overlay{position:fixed;inset:0;background:#0d1b2a;display:flex;align-items:center;justify-content:center;z-index:9999;}
+#auth-box{background:#fff;border-radius:16px;padding:40px 36px;width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4);}
+#auth-box h2{font-size:20px;font-weight:700;color:#0d1b2a;margin:0 0 6px;}
+#auth-box p{font-size:13px;color:#6b7c93;margin:0 0 24px;}
+#auth-input{width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #dde3ec;border-radius:8px;font-size:15px;font-family:inherit;outline:none;transition:border .2s;}
+#auth-input:focus{border-color:#E67E22;}
+#auth-btn{margin-top:12px;width:100%;padding:12px;background:#0d1b2a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+#auth-btn:hover{background:#1a2e44;}
+#auth-error{margin-top:10px;font-size:12px;color:#E24B4A;min-height:16px;}
+#auth-hint{margin-top:16px;font-size:11px;color:#aab4be;}
+#user-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#6c9bc8;background:rgba(255,255,255,.07);border:0.5px solid rgba(108,155,200,.3);border-radius:20px;padding:4px 12px;}
+#user-badge span{font-weight:600;color:#EF9F27;}
+#logout-btn{background:none;border:none;cursor:pointer;font-size:11px;color:#aab4be;padding:0;font-family:inherit;text-decoration:underline;}
+#logout-btn:hover{color:#E24B4A;}
+</style>
 </head>
 <body>
+<!-- ── Auth overlay ── -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>🎯 招募管理儀表板</h2>
+    <p>勝海科技・招募管理系統<br>請輸入您的專屬密碼</p>
+    <input id="auth-input" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="auth-btn" onclick="doLogin()">進入</button>
+    <div id="auth-error"></div>
+    <div id="auth-hint">忘記密碼請聯絡 Sherry</div>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-left">
@@ -204,6 +232,7 @@
     <button onclick="goToAttendance()" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:0.5px solid rgba(245,166,35,.4);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#F5A623;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.14)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.color='#F5A623'">
       <span>🕐</span> 考勤 <span style="font-size:10px">→</span>
     </button>
+    <div id="user-badge" style="display:none"><span id="user-name-label"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -383,6 +412,7 @@ async function initDashboard() {
   hideError();
   try {
     await fetchAllTables();
+    applyRoleFilter();
     renderAll();
     setSyncStatus('⚡ 即時同步', '#5DCAA5');
     document.getElementById('last-updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW');
@@ -390,6 +420,7 @@ async function initDashboard() {
     showError('資料載入失敗：' + e.message);
     setSyncStatus('✗ 載入失敗', '#E24B4A');
     loadDemoData();
+    applyRoleFilter();
   }
 }
 
@@ -1147,8 +1178,68 @@ function fmtDate(d) {
   return s;
 }
 
+// ── Auth ──
+const RECRUIT_USERS = {
+  'SJAU2B5P': { role:'hr',      name:'Sherry' },
+  'QHHW8S7L': { role:'hr',      name:'Tori' },
+  'TYJ57JE7': { role:'hr',      name:'Kassy' },
+  '8J69TVSU': { role:'hr',      name:'Max' },
+  'WL14ZP92': { role:'manager', managerId:'KR-Tamia',   name:'Tamia' },
+  'I1GPZ04B': { role:'manager', managerId:'KR-Dennis',  name:'Dennis' },
+  '85TGOFU3': { role:'manager', managerId:'KR-Slip',    name:'Slip' },
+  '0UT3RJTM': { role:'manager', managerId:'KR-Satoshi', name:'Satoshi' },
+  'TJZ0U2YF': { role:'manager', managerId:'KR-Roy',     name:'Roy' },
+  'S07XBOPU': { role:'manager', managerId:'KR-Dana',    name:'Dana' },
+};
+
+let currentUser = null;
+
+function doLogin() {
+  const pwd = document.getElementById('auth-input').value.trim();
+  const user = RECRUIT_USERS[pwd];
+  if (!user) {
+    document.getElementById('auth-error').textContent = '密碼錯誤，請重新輸入';
+    document.getElementById('auth-input').value = '';
+    return;
+  }
+  localStorage.setItem('bb_auth', JSON.stringify({ pwd, ...user }));
+  applyAuth(RECRUIT_USERS[pwd]);
+}
+
+function applyAuth(user) {
+  currentUser = user;
+  document.getElementById('auth-overlay').style.display = 'none';
+  const badge = document.getElementById('user-badge');
+  badge.style.display = 'inline-flex';
+  document.getElementById('user-name-label').textContent = user.name;
+  initDashboard();
+}
+
+function doLogout() {
+  localStorage.removeItem('bb_auth');
+  location.reload();
+}
+
+function applyRoleFilter() {
+  if (!currentUser || currentUser.role === 'hr') return;
+  const mgr = currentUser.managerId; // 已含 KR- 前綴
+  allCandidates = allCandidates.filter(c => {
+    const cm = (gf(c,'面談主管_初試')||'').trim();
+    return cm === mgr;
+  });
+}
+
 // 啟動
-initDashboard();
+(function() {
+  const saved = localStorage.getItem('bb_auth');
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      if (RECRUIT_USERS[u.pwd]) { applyAuth(RECRUIT_USERS[u.pwd]); return; }
+    } catch(e) {}
+  }
+  document.getElementById('auth-overlay').style.display = 'flex';
+})();
 </script>
 </body>
 </html>
