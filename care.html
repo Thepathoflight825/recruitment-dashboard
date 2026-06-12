@@ -41,7 +41,11 @@
   .tab { padding: 12px 18px 10px; font-size: 13px; color: #8899aa; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; font-weight: 500; }
   .tab.active { color: #fff; border-bottom-color: var(--teal-mid); }
   .tab:hover:not(.active) { color: #ccc; }
-  .header-right { display: flex; align-items: center; gap: 10px; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: nowrap; }
+  .nav-bridge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.06); border: 0.5px solid rgba(255,255,255,.18); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 11px; color: #aac4e0; font-family: 'Noto Sans TC',sans-serif; transition: all .2s; white-space: nowrap; flex-shrink: 0; }
+  .nav-bridge:hover { background: rgba(255,255,255,.14); color: #fff; }
+  .nav-bridge .nb-icon { font-size: 13px; }
+  .nav-bridge .nb-arrow { font-size: 10px; margin-left: 2px; }
   .sync-badge { font-size: 11px; color: var(--teal-mid); background: rgba(29,158,117,.12); border: 0.5px solid var(--teal-mid); border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
   .refresh-btn { background: rgba(255,255,255,.08); border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; color: #fff; font-size: 12px; padding: 5px 12px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
   .refresh-btn:hover { background: rgba(255,255,255,.15); }
@@ -276,12 +280,9 @@
     <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
   </div>
   <div class="header-right">
-    <button class="nav-bridge" onclick="goTo('hr')">👥 人力資源 ←</button>
-    <button class="nav-bridge" onclick="goTo('recruit')" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)">🎯 招募管理 ←</button>
-    <button class="nav-bridge" onclick="goTo('attendance')" title="前往考勤儀表板" style="color:#F5A623;border-color:rgba(245,166,35,.4)">
-      <span class="nb-icon">🕐</span> 考勤
-      <span class="nb-arrow">→</span>
-    </button>
+    <button class="nav-bridge" onclick="goTo('hr')"><span class="nb-icon">👥</span> 人力資源 <span class="nb-arrow">←</span></button>
+    <button class="nav-bridge" onclick="goTo('recruit')" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)"><span class="nb-icon">🎯</span> 招募管理 <span class="nb-arrow">←</span></button>
+    <button class="nav-bridge" onclick="goTo('attendance')" style="color:#F5A623;border-color:rgba(245,166,35,.4)"><span class="nb-icon">🕐</span> 考勤 <span class="nb-arrow">→</span></button>
     <div id="user-badge" style="display:none"><span id="user-name-label"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
