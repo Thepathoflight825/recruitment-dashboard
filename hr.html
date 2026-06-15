@@ -736,17 +736,17 @@ function renderCharts() {
   const deptMap = {};
   actives.forEach(e=>{ const d=gf(e,'單位')||'其他'; deptMap[d]=(deptMap[d]||0)+1; });
   const deptSorted = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
-  mkChart('chart-dept', { type:'bar', data:{ labels:deptSorted.map(d=>d[0]), datasets:[{data:deptSorted.map(d=>d[1]), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+  mkChart('chart-dept', { type:'bar', data:{ labels:deptSorted.map(d=>d[0]), datasets:[{data:deptSorted.map(d=>d[1]), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, layout:{padding:{right:32}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
 
   // 年資結構
   const tenureOrder = ['0-1年','1-3年','3-5年','5年以上'];
   const tenureMap = {}; actives.forEach(e=>{ const t=gf(e,'年資區間')||'—'; tenureMap[t]=(tenureMap[t]||0)+1; });
-  mkChart('chart-tenure', { type:'bar', data:{ labels:tenureOrder, datasets:[{data:tenureOrder.map(t=>tenureMap[t]||0), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+  mkChart('chart-tenure', { type:'bar', data:{ labels:tenureOrder, datasets:[{data:tenureOrder.map(t=>tenureMap[t]||0), backgroundColor:'#EF9F27', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, layout:{padding:{right:32}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
 
   // 年齡分布
   const ageOrder = ['25歲以下','26-35歲','36-45歲','46歲以上'];
   const ageMap = {}; actives.forEach(e=>{ const a=gf(e,'年齡區間')||'—'; ageMap[a]=(ageMap[a]||0)+1; });
-  mkChart('chart-age', { type:'bar', data:{ labels:ageOrder.filter(a=>ageMap[a]>0), datasets:[{data:ageOrder.filter(a=>ageMap[a]>0).map(a=>ageMap[a]||0), backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
+  mkChart('chart-age', { type:'bar', data:{ labels:ageOrder.filter(a=>ageMap[a]>0), datasets:[{data:ageOrder.filter(a=>ageMap[a]>0).map(a=>ageMap[a]||0), backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, layout:{padding:{right:32}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:true}});
 
   // 在職狀態 donut（外部標籤）
   const statusMap = {}; employees.forEach(e=>{ const s=gf(e,'在職狀態')||'未知'; statusMap[s]=(statusMap[s]||0)+1; });
@@ -818,12 +818,12 @@ function renderLeave() {
   // 假別總量（長條標值）
   const typeTotal = {}; fll.forEach(l=>{ const t=gf(l,'假別')||'其他'; typeTotal[t]=(typeTotal[t]||0)+n(gf(l,'天數')); });
   const sortedTypes = Object.entries(typeTotal).sort((a,b)=>b[1]-a[1]);
-  mkChart('chart-leave-type',{type:'bar',data:{labels:sortedTypes.map(t=>t[0]),datasets:[{data:sortedTypes.map(t=>parseFloat(t[1].toFixed(2))),backgroundColor:sortedTypes.map(([t])=>LEAVE_COLORS[t]||'#aaa'),borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+  mkChart('chart-leave-type',{type:'bar',data:{labels:sortedTypes.map(t=>t[0]),datasets:[{data:sortedTypes.map(t=>parseFloat(t[1].toFixed(2))),backgroundColor:sortedTypes.map(([t])=>LEAVE_COLORS[t]||'#aaa'),borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},layout:{padding:{right:32}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
 
   // 各單位請假天數（長條標值）
   const deptMap = {}; fll.forEach(l=>{ const d=gf(l,'部門')||'其他'; deptMap[d]=(deptMap[d]||0)+n(gf(l,'天數')); });
   const sortedDept = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
-  mkChart('chart-leave-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>parseFloat(d[1].toFixed(2))),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+  mkChart('chart-leave-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>parseFloat(d[1].toFixed(2))),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},layout:{padding:{right:32}},scales:{x:{beginAtZero:true},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
 
   // 個人請假排行
   const personMap = {}; fll.forEach(l=>{ const p=gf(l,'英文名字')||'未知'; if(!personMap[p]) personMap[p]={total:0,types:{}}; personMap[p].total+=n(gf(l,'天數')); const t=gf(l,'假別')||'其他'; personMap[p].types[t]=(personMap[p].types[t]||0)+n(gf(l,'天數')); });
