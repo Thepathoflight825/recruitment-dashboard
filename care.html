@@ -273,7 +273,7 @@
     <div class="tab" onclick="switchTab('promises')">承諾追蹤</div>
     <div class="tab" onclick="switchTab('perf')">績效面談</div>
     <div class="tab" onclick="switchTab('events')">事件管理</div>
-    <div class="tab" onclick="switchTab('report')">本月報告</div>
+    <div class="tab" onclick="switchTab('report')">分析報告</div>
   </div>
   <div class="header-right">
     <button class="nav-bridge" onclick="goTo('hr')"><span class="nb-icon">👥</span> 人力資源 <span class="nb-arrow">←</span></button>
@@ -435,8 +435,20 @@
     </div>
   </div>
 
-  <!-- ══ 本月報告 ══ -->
+  <!-- ══ 分析報告 ══ -->
   <div class="tab-content" id="tab-report">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 16px;background:#f8f9fa;border-radius:8px;border:0.5px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-sub);white-space:nowrap">📅 報告時間範圍</span>
+      <select id="report-period-select" onchange="renderReport()" style="font-size:12px;padding:5px 10px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff;cursor:pointer">
+        <option value="current">當月</option>
+        <option value="prev" selected>上個月</option>
+        <option value="3m">近三個月</option>
+        <option value="6m">近半年</option>
+        <option value="1y">整年度</option>
+        <option value="all">全部</option>
+      </select>
+      <span style="font-size:11px;color:var(--text-sub)">（獨立於上方時間範圍，僅影響本報告內容）</span>
+    </div>
     <div id="report-summary-wrap"></div>
     <div class="report-section-title">🚨 風險預告</div>
     <div id="report-risks"></div>
@@ -494,6 +506,7 @@ const LINKS = {
 
 let employees = [], careRecords = [], perfRecords = [], promises = [], events = [];
 let selectedPeriod = 'prev';
+let reportSelectedPeriod = 'prev'; // 分析報告獨立時間範圍
 let riskChart = null, deptChart = null;
 
 function goTo(key) {
@@ -1227,12 +1240,19 @@ function renderReport() {
     renderReportManager(); return;
   }
 
+  // 讀取報告獨立時間範圍
+  const sel = document.getElementById('report-period-select');
+  if (sel) reportSelectedPeriod = sel.value;
+  const _prev = selectedPeriod;
+  selectedPeriod = reportSelectedPeriod;
   const m = computeMetrics();
+  selectedPeriod = _prev; // 還原
+
   const risks = computeRisks(m);
   const strategies = computeStrategies(m, risks);
   const highCount = risks.filter(r => r.level === 'high').length;
   const now = new Date();
-  const periodLabel = document.getElementById('period-select').selectedOptions[0].text;
+  const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[reportSelectedPeriod]||'本期';
   const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
   const statusText  = highCount > 0 ? '⚠ 高風險' : risks.length > 0 ? '注意' : '✓ 健康';
 

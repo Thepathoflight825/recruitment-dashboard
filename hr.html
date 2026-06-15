@@ -248,7 +248,7 @@
     <div class="tab active" onclick="switchTab('overview')">總覽</div>
     <div class="tab" onclick="switchTab('attrition')">離職分析</div>
     <div class="tab" onclick="switchTab('leave')">差勤記錄</div>
-    <div class="tab" onclick="switchTab('report')">📋 本月報告</div>
+    <div class="tab" onclick="switchTab('report')">📊 分析報告</div>
   </div>
   <div class="header-right">
     <button class="nav-bridge" onclick="goTo('recruit')" title="前往招募管理儀表板">
@@ -350,8 +350,20 @@
     <div class="panel" style="margin-top:14px"><div class="panel-title">👤 個人請假排行</div><div id="leave-person-wrap"></div></div>
   </div>
 
-  <!-- ── 本月報告 ── -->
+  <!-- ── 分析報告 ── -->
   <div class="tab-content" id="tab-report">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 16px;background:#f8f9fa;border-radius:8px;border:0.5px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-sub);white-space:nowrap">📅 報告時間範圍</span>
+      <select id="report-period-select" onchange="renderReportHR()" style="font-size:12px;padding:5px 10px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff;cursor:pointer">
+        <option value="current">當月</option>
+        <option value="prev" selected>上個月</option>
+        <option value="3m">近三個月</option>
+        <option value="6m">近半年</option>
+        <option value="1y">整年度</option>
+        <option value="all">全部</option>
+      </select>
+      <span style="font-size:11px;color:var(--text-sub)">（獨立於上方時間範圍，僅影響本報告內容）</span>
+    </div>
     <div id="report-summary-wrap"></div>
     <div class="report-section-title">🚨 風險預告</div>
     <div id="report-risks"></div>
@@ -522,6 +534,7 @@ function loadDemoData() {
 }
 
 let selectedPeriod = 'prev';
+let reportSelectedPeriod = 'prev'; // 分析報告獨立時間範圍
 
 function getPeriodRange(period) {
   const now = new Date();
@@ -866,21 +879,24 @@ function computeHRMetrics() {
 function computeHRRisks(m) {
   const risks = [];
 
-  if (m.cumRate > 50) risks.push({level:'high', icon:'🚨', title:'累計離職率嚴重超標', metric:`累計離職率 ${m.cumRate}%（2025 起）`, desc:`過去 17 個月已有超過半數歷史員工離職，顯示組織留任能力面臨嚴峻挑戰，建議啟動全面的留才專案及薪資結構檢討。`, tag:'留才風險'});
-  else if (m.cumRate > 30) risks.push({level:'medium', icon:'📉', title:'累計離職率偏高', metric:`累計離職率 ${m.cumRate}%`, desc:`歷史離職率持續攀升，須監控是否出現加速趨勢，並針對高離職率部門進行深度訪談。`, tag:'留才風險'});
+  // ── 當期指標風險（依報告時間範圍計算）──
 
-  if (m.monthlyRate > 10) risks.push({level:'high', icon:'🔥', title:'當月離職率過高', metric:`月離職率 ${m.monthlyRate}%（${m.exitCnt} 人）`, desc:`當月離職人數偏高，若持續超過 10% 將嚴重影響服務能量與交接品質，建議本週緊急召開部門主管會議評估原因。`, tag:'緊急風險'});
-  else if (m.monthlyRate > 5) risks.push({level:'medium', icon:'⚠️', title:'當月離職率偏高', metric:`月離職率 ${m.monthlyRate}%`, desc:`當月離職比例高於健康水準（< 5%），需追蹤是否為連續趨勢。`, tag:'留才風險'});
+  if (m.monthlyRate > 10) risks.push({level:'high', icon:'🔥', title:'當期離職率過高', metric:`離職率 ${m.monthlyRate}%（${m.exitCnt} 人）`, desc:`當期離職人數偏高，若持續超過 10% 將嚴重影響服務能量與交接品質，建議本週緊急召開部門主管會議評估原因。`, tag:'緊急風險'});
+  else if (m.monthlyRate > 5 && m.exitCnt >= 2) risks.push({level:'medium', icon:'⚠️', title:'當期離職率偏高', metric:`離職率 ${m.monthlyRate}%（${m.exitCnt} 人）`, desc:`當期離職比例高於健康水準（< 5%），需追蹤是否為連續趨勢。`, tag:'留才風險'});
 
-  if (m.netChange < 0 && m.newCnt < m.exitCnt) risks.push({level:'high', icon:'📊', title:'淨人力持續負成長', metric:`本月淨變化 ${m.netChange}，新進 ${m.newCnt} < 離職 ${m.exitCnt}`, desc:`補充人力速度跟不上流失速度，若招募管線未能及時填補，將造成業務超載與品質下滑。`, tag:'人力缺口'});
+  if (m.netChange < 0 && m.newCnt < m.exitCnt) risks.push({level:'high', icon:'📊', title:'淨人力持續負成長', metric:`淨變化 ${m.netChange}，新進 ${m.newCnt} < 離職 ${m.exitCnt}`, desc:`補充人力速度跟不上流失速度，若招募管線未能及時填補，將造成業務超載與品質下滑。`, tag:'人力缺口'});
 
   if (m.juniorPct > 30) risks.push({level:'medium', icon:'🌱', title:'新進員工比例偏高', metric:`年資 0-1 年佔在職 ${m.juniorPct}%`, desc:`大量新進員工需要較多培訓資源與輔導，短期內可能影響整體生產力，建議啟動配對導師制。`, tag:'人才發展'});
 
-  if (m.maxDeptExit > 5) risks.push({level:'medium', icon:'🏢', title:`${m.maxDeptName} 離職集中`, metric:`${m.maxDeptName} 離職 ${m.maxDeptExit} 人（歷史最高單位）`, desc:`單一部門離職人數過於集中，需了解該部門是否存在管理問題、薪資落差或工作負荷問題。`, tag:'部門風險'});
+  if (m.maxDeptExit >= 3) risks.push({level:'medium', icon:'🏢', title:`${m.maxDeptName} 離職集中`, metric:`${m.maxDeptName} 本期離職 ${m.maxDeptExit} 人`, desc:`單一部門離職人數過於集中，需了解該部門是否存在管理問題、薪資落差或工作負荷問題。`, tag:'部門風險'});
 
-  if (m.voluntaryPct > 75) risks.push({level:'low', icon:'💼', title:'自願離職比例偏高', metric:`自願離職佔 ${m.voluntaryPct}%`, desc:`高自願離職率通常反映對組織的主動脫離意願，建議透過離職訪談深入了解核心動機，並定期進行在職員工滿意度調查。`, tag:'員工關係'});
+  // 自願離職比例：需至少 3 人才觸發
+  if (m.exitCnt >= 3 && m.voluntaryPct > 75) risks.push({level:'low', icon:'💼', title:'自願離職比例偏高', metric:`自願離職佔 ${m.voluntaryPct}%（${m.exitCnt} 人中）`, desc:`高自願離職率通常反映對組織的主動脫離意願，建議透過離職訪談深入了解核心動機，並定期進行在職員工滿意度調查。`, tag:'員工關係'});
 
-  return risks.sort((a,b)=>({'high':0,'medium':1,'low':2}[a.level]-{'high':0,'medium':1,'low':2}[b.level]));
+  // ── 歷史累計資訊（僅呈現，不觸發當期風險）──
+  if (m.cumRate > 0) risks.push({level:'info', icon:'📈', title:'歷史累計離職率參考', metric:`累計離職率 ${m.cumRate}%（2025 起歷史總覽）`, desc:`此為 2025 年起全歷史累計數字，供長期趨勢參考，不代表本期當前狀況。`, tag:'歷史參考'});
+
+  return risks.sort((a,b)=>({'high':0,'medium':1,'low':2,'info':3}[a.level]-{'high':0,'medium':1,'low':2,'info':3}[b.level]));
 }
 
 function computeHRStrategies(m, risks) {
@@ -925,14 +941,23 @@ function renderReportHR() {
     renderReportManagerHR(); return;
   }
 
+  // 讀取報告獨立時間範圍
+  const sel = document.getElementById('report-period-select');
+  if (sel) reportSelectedPeriod = sel.value;
+
+  // 暫時切換 selectedPeriod 供 computeHRMetrics 使用
+  const _prev = selectedPeriod;
+  selectedPeriod = reportSelectedPeriod;
   const m = computeHRMetrics();
+  selectedPeriod = _prev; // 還原，不影響其他頁籤
+
   const risks = computeHRRisks(m);
   const strategies = computeHRStrategies(m, risks);
   const highCount = risks.filter(r=>r.level==='high').length;
   const now = new Date();
   const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
   const statusText  = highCount > 0 ? '⚠ 高風險' : risks.length > 0 ? '注意' : '✓ 健康';
-  const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[selectedPeriod]||'';
+  const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[reportSelectedPeriod]||'';
   const exitLabel   = m.isMultiMonth ? '期間合計離職' : '本月離職';
   const newLabel    = m.isMultiMonth ? '期間合計新進' : '本月新進';
   const kpiExitLbl  = m.isMultiMonth ? '期間離職' : '本月離職';
