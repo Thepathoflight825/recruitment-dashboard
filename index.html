@@ -302,8 +302,8 @@
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 16px;background:#f8f9fa;border-radius:8px;border:0.5px solid var(--border)">
       <span style="font-size:12px;color:var(--text-sub);white-space:nowrap">📅 報告時間範圍</span>
       <select id="report-period-select" onchange="renderReport()" style="font-size:12px;padding:5px 10px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff;cursor:pointer">
-        <option value="current">當月</option>
-        <option value="prev" selected>上個月</option>
+        <option value="current" selected>當月</option>
+        <option value="prev">上個月</option>
         <option value="3m">近三個月</option>
         <option value="6m">近半年</option>
         <option value="1y">整年度</option>
@@ -407,7 +407,7 @@ const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','�
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
 let selectedPeriod = 'prev';   // current | prev | 3m | 6m | 1y | all
-let reportSelectedPeriod = 'prev'; // 分析報告獨立時間範圍
+let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let selectedPosition = '全部職缺'; // 從招募名單動態產生
 let currentFilter = '全部';
 let funnelChart = null, sourceChart = null;
@@ -872,14 +872,7 @@ function computeStrategies(m, risks) {
       steps:['建立被動候選人名單','社群關係經營','定期重啟接觸'] });
   }
 
-  // 常態性策略（固定呈現）
-  strategies.push({ icon:'📊', title:'每月招募健診 — 數據驅動決策',
-    tag:'長期 · 月報機制',
-    body:`<li>以本儀表板數據為基礎，每月營運會議前 <strong>3 個工作日</strong> 完成招募月報</li>
-          <li>報告應包含：漏斗轉換率、流失原因排行、候選人評分趨勢、下月預計開缺數</li>
-          <li>若連續兩個月流失率 > 30%，應提案啟動 <strong>薪資結構或雇主品牌專案</strong></li>`,
-    steps:['月報標準化','會議前3天完成','連2月超標啟動專案'] });
-
+  // 常態性策略（有活躍候選人時才顯示）
   if (m.avgPhoneScore >= 3.5 && m.total >= 10) {
     strategies.push({ icon:'🌟', title:'強化雇主品牌 — 維持高品質候選人來源',
       tag:'長期 · 品牌投資',
