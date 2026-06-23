@@ -676,13 +676,7 @@ function computeMetrics() {
   const deptCount = {};
   fr.forEach(r => {
     const larkId = gf(r,'關懷員工');
-    // 先嘗試用 Lark 帳號 ID 比對，再嘗試用員工姓名或英文名比對
-    const emp = employees.find(e =>
-      gf(e,'Lark 帳號 ID') === larkId ||
-      gf(e,'Lark 帳號 ID') === larkId?.trim() ||
-      (gf(e,'員工姓名')||'').trim() === (larkId||'').trim() ||
-      (gf(e,'英文名')||'').trim() === (larkId||'').trim()
-    );
+    const emp = empFind(larkId);
     const dept = emp ? (gf(emp,'部門') || '未知') : '未知';
     deptCount[dept] = (deptCount[dept] || 0) + 1;
   });
