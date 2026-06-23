@@ -364,6 +364,8 @@
           </select>
           <select id="rec-type-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部類型</option>
+            <option value="1on1 關懷">1on1 關懷</option>
+            <option value="HR 關懷">HR 關懷</option>
           </select>
           <select id="rec-risk-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部風險</option>
@@ -387,8 +389,9 @@
         <select id="promise-filter" onchange="renderPromises()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
           <option value="">全部狀態</option>
           <option value="overdue">已逾期</option>
-          <option value="pending">待完成</option>
-          <option value="fulfilled">已兌現</option>
+          <option value="pending">待處理</option>
+          <option value="fulfilled">已完成</option>
+          <option value="cancelled">取消</option>
         </select>
       </div>
       <div id="promises-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
@@ -437,12 +440,10 @@
           </select>
           <select id="newbie-filter-type" onchange="renderEvents()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部類型</option>
-            <option value="入職關懷">入職關懷</option>
-            <option value="W1">W1 關懷</option>
-            <option value="W2">W2 關懷</option>
-            <option value="W3">W3 關懷</option>
-            <option value="W4">W4 關懷</option>
-            <option value="1on1">1on1 關懷</option>
+            <option value="入職30天">入職30天</option>
+            <option value="入職60天">入職60天</option>
+            <option value="入職90天">入職90天</option>
+            <option value="HR關懷">HR關懷</option>
           </select>
           <button onclick="document.getElementById('newbie-filter-emp').value='';document.getElementById('newbie-filter-type').value='';renderEvents();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
         </div>
@@ -687,7 +688,7 @@ function computeMetrics() {
   const lowRisk    = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('低')).length;
   const pendingPromises = promises.filter(p => {
     const s = gf(p,'兌現狀態') || '';
-    return s.includes('待') || s.includes('逾期');
+    return s === '待處理' || s.includes('逾期');
   }).length;
   const openEvents = newbieRecords.length;
 
@@ -995,14 +996,14 @@ function renderOverview() {
 
   // promise reminders
   const upcoming = promises
-    .filter(p => { const s = gf(p,'兌現狀態') || ''; return !s.includes('已兌現') && !s.includes('已完成'); })
+    .filter(p => { const s = gf(p,'兌現狀態') || ''; return s === '待處理' || s.includes('逾期'); })
     .sort((a,b) => {
       const da = gf(a,'預計完成日期') || '9999', db = gf(b,'預計完成日期') || '9999';
       return da.localeCompare(db);
     }).slice(0, 5);
   document.getElementById('promise-reminders').innerHTML = upcoming.length
     ? upcoming.map(p => {
-        const s = gf(p,'兌現狀態') || '待完成';
+        const s = gf(p,'兌現狀態') || '待處理';
         const isOverdue = isOverduePromise(p);
         const cls = isOverdue ? 'overdue' : 'pending';
         const name = empName(gf(p,'關懷員工'));
@@ -1189,15 +1190,17 @@ function renderPromises() {
   const filter = document.getElementById('promise-filter').value;
   let ps = [...promises];
   if (filter === 'overdue')   ps = ps.filter(p => gf(p,'兌現狀態')?.includes('逾期') || n(gf(p,'逾期天數')) > 0);
-  if (filter === 'pending')   ps = ps.filter(p => { const s = gf(p,'兌現狀態')||''; return s.includes('待') && !s.includes('逾期'); });
-  if (filter === 'fulfilled') ps = ps.filter(p => gf(p,'兌現狀態')?.includes('兌現') || gf(p,'兌現狀態')?.includes('完成'));
+  if (filter === 'pending')   ps = ps.filter(p => { const s = gf(p,'兌現狀態')||''; return s === '待處理'; });
+  if (filter === 'fulfilled') ps = ps.filter(p => gf(p,'兌現狀態') === '已完成');
+  if (filter === 'cancelled') ps = ps.filter(p => gf(p,'兌現狀態') === '取消');
 
   document.getElementById('promises-list').innerHTML = ps.length
     ? ps.map(p => {
-        const s = gf(p,'兌現狀態') || '待完成';
+        const s = gf(p,'兌現狀態') || '待處理';
         const isOverdue = isOverduePromise(p);
-        const isFulfilled = s.includes('兌現') || s.includes('完成');
-        const cls = isFulfilled ? 'fulfilled' : isOverdue ? 'overdue' : 'pending';
+        const isCancelled = s === '取消';
+        const isFulfilled = s === '已完成';
+        const cls = isFulfilled ? 'fulfilled' : isOverdue ? 'overdue' : isCancelled ? 'cancelled' : 'pending';
         const name = empName(gf(p,'關懷員工'));
         return `<div class="promise-row ${cls}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -1207,7 +1210,7 @@ function renderPromises() {
               ${gf(p,'處理說明') ? `<div class="promise-meta" style="margin-top:4px">📝 ${gf(p,'處理說明').slice(0,80)}…</div>` : ''}
             </div>
             <div style="flex-shrink:0">
-              <span class="badge ${isFulfilled?'badge-teal':isOverdue?'badge-red':'badge-amber'}">${s||'待完成'}</span>
+              <span class="badge ${isFulfilled?'badge-teal':isCancelled?'badge-gray':isOverdue?'badge-red':'badge-amber'}">${s}</span>
               ${n(gf(p,'逾期天數'))>0?`<div style="font-size:10px;color:#E24B4A;margin-top:3px;text-align:right">逾 ${n(gf(p,'逾期天數'))} 天</div>`:''}
             </div>
           </div>
