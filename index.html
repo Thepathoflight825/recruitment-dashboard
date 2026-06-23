@@ -406,7 +406,7 @@ const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'ba
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
-let selectedPeriod = 'current';   // current | prev | 3m | 6m | 1y | all
+let selectedPeriod = 'prev';   // current | prev | 3m | 6m | 1y | all
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let selectedPosition = '全部職缺'; // 從招募名單動態產生
 let currentFilter = '全部';
@@ -470,7 +470,16 @@ function loadDemoData() {
     { 應徵者:'許晉瑜', 電訪日期:'2026/05/22', 總體評分:3.67, 是否建議主管面試:'是', 期望薪資:80000, 對公司理解度_1_5分_:3, 對職務的瞭解:4, 應徵動機清晰度:4, 經驗匹配度:4, 表達能力:4 },
   ];
   statsRecords = [
+    { 統計日期:'2026/05/31', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:27, AI評分:0, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
     { 統計日期:'2026/05/31', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:27, AI評分:2, HR推薦:0, 主管篩選通過:3, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/05/31', 應徵職務:'AI工程師/架構師', 主動應徵_履歷總數:20, AI評分:1, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/04', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:3, AI評分:0, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/03', 應徵職務:'AI工程師/架構師', 主動應徵_履歷總數:5, AI評分:2, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/04', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:2, AI評分:0, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/15', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:0, AI評分:0, HR推薦:8, 主管篩選通過:0, 主要來源:'HR搜尋' },
+    { 統計日期:'2026/06/15', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:3, AI評分:1, HR推薦:8, 主管篩選通過:0, 主要來源:'HR搜尋' },
+    { 統計日期:'2026/06/23', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:6, AI評分:0, HR推薦:0, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/23', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:8, AI評分:0, HR推薦:5, 主管篩選通過:0, 主要來源:'104主動應徵' },
   ];
   renderAll();
   setSyncStatus('📋 示範資料', '#EF9F27');
@@ -597,7 +606,7 @@ function renderFullTable() {
 function filterBy(s) { currentFilter = s; renderFullTable(); }
 
 function buildTable(list, compact) {
-  if (!list.length) return '<div class="loading">暫無資料</div>';
+  if (!list.length) return `<div class="loading">${compact ? '暫無資料' : '當月尚無收件紀錄'}</div>`;
   return `<table class="data-table"><thead><tr>
     <th>應徵者</th><th>應徵職務</th>${compact?'':'<th>履歷來源</th>'}
     <th>當前關卡</th><th>關卡進度</th><th>收件日期</th>${compact?'':'<th>HR</th>'}<th></th>
@@ -1095,7 +1104,10 @@ function renderReportManagerRecruit() {
 }
 
 function renderKPI() {
-  const total = allCandidates.length;
+  // 收件數優先用當月 statsRecords 加總（主動應徵 + HR推薦）
+  const fs = filterByPeriod(statsRecords, '統計日期');
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const total = statsTotal || allCandidates.length;
   // 電訪完成：有進入電訪關卡或之後的人數
   const pCount = allCandidates.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   // 初試達成：招募名單中當前關卡為初試/複試/錄取/到職（代表真正完成初試）
@@ -1202,10 +1214,20 @@ function renderCharts() {
     }
   });
 
+  // 履歷來源分佈：優先用 statsRecords（各統計記錄按主要來源加總收件數），fallback 用招募名單
   const srcCounts = {};
-  fc2.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
+  const fs2 = filterByPeriod(statsRecords, '統計日期');
+  if (fs2.length > 0) {
+    fs2.forEach(r => {
+      const src = gf(r,'主要來源') || '未知';
+      const n = (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0);
+      srcCounts[src] = (srcCounts[src]||0) + n;
+    });
+  } else {
+    fc2.forEach(c => { const s = gf(c,'履歷來源')||'未知'; srcCounts[s]=(srcCounts[s]||0)+1; });
+  }
   const srcColors = ['#3B8BD4','#1D9E75','#EF9F27','#E24B4A','#534AB7','#D85A30'];
-  const srcEntries = Object.entries(srcCounts);
+  const srcEntries = Object.entries(srcCounts).filter(([,v])=>v>0);
   const srcColorArr = srcEntries.map((_,i)=>srcColors[i%srcColors.length]);
   const srcTotal = srcEntries.reduce((a,[,v])=>a+v,0);
   if (sourceChart) sourceChart.destroy();
