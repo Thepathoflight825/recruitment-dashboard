@@ -584,14 +584,23 @@ function avatarColor(name) {
   let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffffff;
   return colors[Math.abs(h) % colors.length];
 }
+function empFind(larkId) {
+  if (!larkId) return null;
+  const id = String(larkId).trim();
+  return employees.find(e =>
+    gf(e,'Lark 帳號 ID') === id ||
+    (gf(e,'員工姓名')||'').trim() === id ||
+    (gf(e,'英文名')||'').trim() === id
+  );
+}
 function empName(larkId) {
   // 優先顯示英文名
-  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  const emp = empFind(larkId);
   return emp ? ((gf(emp,'英文名')||'').trim() || (gf(emp,'員工姓名')||'').trim() || larkId) : (larkId || '—');
 }
 function empChineseName(larkId) {
   // 取中文姓名，用於輔助小字顯示
-  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  const emp = empFind(larkId);
   return emp ? (gf(emp,'員工姓名')||'').trim() : '';
 }
 
@@ -660,7 +669,13 @@ function computeMetrics() {
   const deptCount = {};
   fr.forEach(r => {
     const larkId = gf(r,'關懷員工');
-    const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId);
+    // 先嘗試用 Lark 帳號 ID 比對，再嘗試用員工姓名或英文名比對
+    const emp = employees.find(e =>
+      gf(e,'Lark 帳號 ID') === larkId ||
+      gf(e,'Lark 帳號 ID') === larkId?.trim() ||
+      (gf(e,'員工姓名')||'').trim() === (larkId||'').trim() ||
+      (gf(e,'英文名')||'').trim() === (larkId||'').trim()
+    );
     const dept = emp ? (gf(emp,'部門') || '未知') : '未知';
     deptCount[dept] = (deptCount[dept] || 0) + 1;
   });
@@ -1563,7 +1578,7 @@ function togglePerfDetail(id) {
 }
 
 function empCnName(larkId) {
-  const emp = employees.find(e => gf(e,'Lark 帳號 ID') === larkId || gf(e,'Lark 帳號 ID') === larkId?.trim());
+  const emp = empFind(larkId);
   return emp ? (gf(emp,'員工姓名')||'').trim() : '';
 }
 
@@ -1698,11 +1713,21 @@ function applyRoleFilter() {
     const sup = (gf(e,'直屬主管')||'').trim();
     return sup === mgr || sup === currentUser.managerId;
   });
-  const empIds = new Set(employees.map(e => (gf(e,'Lark 帳號 ID')||'').trim()));
-  careRecords = careRecords.filter(r => empIds.has((gf(r,'關懷員工')||'').trim()));
-  perfRecords = perfRecords.filter(r => empIds.has((gf(r,'面談員工')||gf(r,'關懷員工')||'').trim()));
-  promises    = promises.filter(p => empIds.has((gf(p,'關懷員工')||'').trim()));
-  newbieRecords = newbieRecords.filter(ev => empIds.has((gf(ev,'關懷員工')||'').trim()));
+  // 建立多格式 ID set（Lark 帳號 ID、員工姓名、英文名）以應對不同欄位回傳格式
+  const empIdSet = new Set();
+  employees.forEach(e => {
+    const id = (gf(e,'Lark 帳號 ID')||'').trim();
+    const cn = (gf(e,'員工姓名')||'').trim();
+    const en = (gf(e,'英文名')||'').trim();
+    if (id) empIdSet.add(id);
+    if (cn) empIdSet.add(cn);
+    if (en) empIdSet.add(en);
+  });
+  const matchEmp = val => empIdSet.has((val||'').trim());
+  careRecords   = careRecords.filter(r => matchEmp(gf(r,'關懷員工')));
+  perfRecords   = perfRecords.filter(r => matchEmp(gf(r,'面談員工') || gf(r,'關懷員工')));
+  promises      = promises.filter(p => matchEmp(gf(p,'關懷員工')));
+  newbieRecords = newbieRecords.filter(ev => matchEmp(gf(ev,'關懷員工')));
 }
 
 // ── Overdue fix: 前端自行計算逾期 ──
