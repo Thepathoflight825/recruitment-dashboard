@@ -217,7 +217,7 @@
   </div>
   <div class="header-tabs">
     <div class="tab active" onclick="switchTab('overview')">總覽</div>
-    <div class="tab" onclick="switchTab('candidates')">應徵者名單</div>
+    <div class="tab" onclick="switchTab('candidates')">面談名單</div>
     <div class="tab" onclick="switchTab('funnel')">漏斗分析</div>
     <div class="tab" onclick="switchTab('kpi')">本月 KPI</div>
     <div class="tab" onclick="switchTab('report')">📊 分析報告</div>
@@ -594,19 +594,20 @@ function renderRecentTable() {
 }
 
 function renderFullTable() {
-  const stages = ['全部', ...new Set(allCandidates.map(c=>gf(c,'當前關卡')).filter(Boolean))];
+  const filtered = getFilteredCandidates();
+  const stages = ['全部', ...new Set(filtered.map(c=>gf(c,'當前關卡')).filter(Boolean))];
   document.getElementById('filter-bar').innerHTML = stages.map(s => `
     <button onclick="filterBy('${s}')" style="padding:3px 11px;border-radius:20px;font-size:11px;cursor:pointer;
       border:0.5px solid #D3D1C7;background:${s===currentFilter?'var(--navy)':'#F1EFE8'};
       color:${s===currentFilter?'#fff':'#5F5E5A'};font-family:'Noto Sans TC',sans-serif">${s}</button>`).join('');
-  const list = currentFilter === '全部' ? allCandidates : allCandidates.filter(c => gf(c,'當前關卡') === currentFilter);
+  const list = currentFilter === '全部' ? filtered : filtered.filter(c => gf(c,'當前關卡') === currentFilter);
   document.getElementById('full-wrap').innerHTML = buildTable(list, false);
 }
 
 function filterBy(s) { currentFilter = s; renderFullTable(); }
 
 function buildTable(list, compact) {
-  if (!list.length) return `<div class="loading">${compact ? '暫無資料' : '當月尚無收件紀錄'}</div>`;
+  if (!list.length) return `<div class="loading">${compact ? '暫無資料' : '當月尚無面談紀錄'}</div>`;
   return `<table class="data-table"><thead><tr>
     <th>應徵者</th><th>應徵職務</th>${compact?'':'<th>履歷來源</th>'}
     <th>當前關卡</th><th>關卡進度</th><th>收件日期</th>${compact?'':'<th>HR</th>'}<th></th>
