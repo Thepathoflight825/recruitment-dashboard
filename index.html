@@ -406,7 +406,7 @@ const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'ba
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
 
 let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
-let selectedPeriod = 'prev';   // current | prev | 3m | 6m | 1y | all
+let selectedPeriod = 'current';   // current | prev | 3m | 6m | 1y | all
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let selectedPosition = '全部職缺'; // 從招募名單動態產生
 let currentFilter = '全部';
@@ -570,7 +570,7 @@ function renderStats() {
   const phoneCount = fc.filter(c => ['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
   const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
   document.getElementById('s-total').textContent = statsTotal || total;
   document.getElementById('s-total-sub').textContent = statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`;
   document.getElementById('s-phone').textContent = phoneCount;
@@ -626,7 +626,7 @@ function renderFunnelBars() {
   // 從篩選後的資料取得各層數字
   const fs = getFilteredStats();
   const fc = getFilteredCandidates();
-  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
+  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
   const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
@@ -713,7 +713,7 @@ function computeMetrics() {
   const fs = getFilteredStats();
   const fp = getFilteredPhone();
 
-  const statsTotal   = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0),0);
+  const statsTotal   = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主動應徵_履歷總數'))||0)+(parseFloat(gf(r,'HR推薦'))||0),0);
   const statsAI      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0),0);
   const statsHR      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'HR推薦'))||0),0);
   const statsMgr     = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主管篩選通過'))||0),0);
@@ -1130,8 +1130,12 @@ function renderKPI() {
 }
 
 function renderJobProgress() {
+  const fc = getFilteredCandidates();  // 跟隨時間範圍
+  const fs = getFilteredStats();
   const jobs = {};
-  allCandidates.forEach(c => {
+
+  // 先從招募名單建立職缺清單
+  fc.forEach(c => {
     const pos = gf(c,'應徵職務'), dept = gf(c,'應徵單位');
     if (!pos) return;
     const key = `${pos}|${dept}`;
@@ -1139,6 +1143,18 @@ function renderJobProgress() {
     jobs[key].count++;
     const s = gf(c,'當前關卡'); if (s) jobs[key].stages[s] = (jobs[key].stages[s]||0)+1;
   });
+
+  // 若招募名單當期無資料，改從 statsRecords 建立職缺列表
+  if (!Object.keys(jobs).length) {
+    fs.forEach(r => {
+      const pos = (gf(r,'應徵職務')||'').trim();
+      if (!pos) return;
+      const key = `${pos}|`;
+      if (!jobs[key]) jobs[key] = { pos, dept:'', count:0, stages:{} };
+      const n = (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0);
+      jobs[key].count += n;
+    });
+  }
   const el = document.getElementById('job-progress');
   if (!Object.keys(jobs).length) { el.innerHTML = '<div style="color:var(--text-sub);font-size:12px">暫無資料</div>'; return; }
   el.innerHTML = Object.values(jobs).map(j=>`<div style="border-left:3px solid var(--blue);padding:9px 12px;margin-bottom:10px;background:var(--blue-light);border-radius:0 7px 7px 0">
@@ -1171,12 +1187,11 @@ function renderCharts() {
   const fs = getFilteredStats();
 
   // 上游三層從「履歷收件統計」取數（欄位名為「AI評分」）
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||parseFloat(gf(r,'收件總數'))||0), 0);
   const statsHR    = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||0), 0);
   const statsAI    = fs.reduce((a,r) => a + (parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0), 0);
   const statsMgr   = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
   const statsSent  = statsAI + statsHR; // 送審人選 = AI評分 + HR推薦
-
+  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
   // 下游從招募名單取當前關卡（AI評分已併入送審，不獨立顯示）
   const stageCountsLower = ['電訪','初試','複試','錄取','到職'].map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
 
