@@ -429,8 +429,27 @@
   <!-- ══ 新人關懷 ══ -->
   <div class="tab-content" id="tab-events">
     <div class="panel">
-      <div class="panel-title">🌱 新人關懷紀錄</div>
-      <div id="newbie-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>🌱 新人關懷紀錄</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="newbie-filter-emp" onchange="renderEvents()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部員工</option>
+          </select>
+          <select id="newbie-filter-type" onchange="renderEvents()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部類型</option>
+            <option value="入職關懷">入職關懷</option>
+            <option value="W1">W1 關懷</option>
+            <option value="W2">W2 關懷</option>
+            <option value="W3">W3 關懷</option>
+            <option value="W4">W4 關懷</option>
+            <option value="1on1">1on1 關懷</option>
+          </select>
+          <button onclick="document.getElementById('newbie-filter-emp').value='';document.getElementById('newbie-filter-type').value='';renderEvents();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
+        </div>
+      </div>
+      <div id="newbie-stats" style="display:flex;gap:12px;margin:14px 0 10px;flex-wrap:wrap"></div>
+      <div id="newbie-count" style="font-size:12px;color:var(--text-sub);margin-bottom:10px"></div>
+      <div id="newbie-list"></div>
     </div>
   </div>
 
@@ -1199,65 +1218,118 @@ function renderPromises() {
 
 // ── Render events ──
 function renderEvents() {
-  const el = document.getElementById('newbie-list');
-  if (!el) return;
+  const empF  = document.getElementById('newbie-filter-emp')?.value  || '';
+  const typeF = document.getElementById('newbie-filter-type')?.value || '';
 
-  if (!newbieRecords.length) {
-    el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">目前尚無新人關懷紀錄</div>';
+  // 填充員工篩選（第一次呼叫時）
+  const empSel = document.getElementById('newbie-filter-emp');
+  if (empSel && empSel.options.length <= 1) {
+    const names = [...new Set(newbieRecords.map(r => {
+      const larkId = gf(r,'關懷員工');
+      return empName(larkId) || larkId || '';
+    }).filter(Boolean))].sort();
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; empSel.appendChild(o); });
+  }
+
+  let recs = [...newbieRecords];
+  if (empF)  recs = recs.filter(r => (empName(gf(r,'關懷員工')) || gf(r,'關懷員工') || '') === empF);
+  if (typeF) recs = recs.filter(r => (gf(r,'面談類型')||'').includes(typeF));
+
+  // 計算平均分
+  const scoreFields = ['工作適應(1-5分)','團隊融入(1-5分)','資源支援(1-5分)','身心狀態(1-5分)','未來期望(1-5分)'];
+  function avgScore(rec) {
+    const vals = scoreFields.map(f => parseFloat(gf(rec,f))).filter(v => !isNaN(v));
+    return vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : null;
+  }
+
+  const total   = recs.length;
+  const high    = recs.filter(r => { const v = avgScore(r); return v !== null && v >= 4; }).length;
+  const mid     = recs.filter(r => { const v = avgScore(r); return v !== null && v >= 3 && v < 4; }).length;
+  const low     = recs.filter(r => { const v = avgScore(r); return v !== null && v < 3; }).length;
+
+  const statsEl = document.getElementById('newbie-stats');
+  if (statsEl) statsEl.innerHTML = [
+    ['本期總筆數', total, '#1a73e8'],
+    ['平均分 ≥4', high, '#1D9E75'],
+    ['平均分 3-4', mid, '#EF9F27'],
+    ['平均分 <3',  low, '#E24B4A'],
+  ].map(([label, val, color]) => `
+    <div style="background:#f8f9fa;border-radius:8px;padding:10px 16px;min-width:80px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${label}</div>
+    </div>`).join('');
+
+  const countEl = document.getElementById('newbie-count');
+  if (countEl) countEl.textContent = `共 ${recs.length} 筆`;
+
+  const listEl = document.getElementById('newbie-list');
+  if (!listEl) return;
+
+  if (!recs.length) {
+    listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-sub);font-size:13px">
+      🌱 尚無新人關懷紀錄${empF||typeF ? '（符合篩選條件）' : ''}</div>`;
     return;
   }
 
-  const scoreFields = ['工作適應(1-5分)','團隊融入(1-5分)','資源支援(1-5分)','身心狀態(1-5分)','未來期望(1-5分)'];
+  // 依面談日期排序（新→舊）
+  recs.sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
+
   const scoreLabels = ['工作適應','團隊融入','資源支援','身心狀態','未來期望'];
 
-  el.innerHTML = newbieRecords.map(rec => {
-    const name  = empName(gf(rec,'關懷員工'));
-    const date  = fmtDate(gf(rec,'面談日期'));
-    const type  = gf(rec,'面談類型') || '—';
-    const method= gf(rec,'面談方式') || '—';
-    const mgr   = (gf(rec,'主管')||'—').replace('KR-','');
-    const hr    = (gf(rec,'HR參與者')||'—').replace('KR-','');
+  listEl.innerHTML = recs.map(rec => {
+    const empId   = gf(rec,'關懷員工') || '';
+    const name    = empName(empId) || empId;
+    const cnName  = empCnName(empId);
+    const date    = fmtDate(gf(rec,'面談日期'));
+    const type    = gf(rec,'面談類型') || '—';
+    const method  = gf(rec,'面談方式') || '—';
+    const mgr     = (gf(rec,'主管')||'—').replace('KR-','').replace(/^ /,'');
+    const hr      = (gf(rec,'HR參與者')||'').replace('KR-','').replace(/^ /,'');
     const summary = gf(rec,'訪談重點摘要') || '';
     const feedback= gf(rec,'觀察與回饋') || '';
+    const avg     = avgScore(rec);
+    const avgColor = avg === null ? 'var(--text-sub)' : avg >= 4 ? '#1D9E75' : avg >= 3 ? '#EF9F27' : '#E24B4A';
+    const detailId = `newbie-detail-${(gf(rec,'紀錄ID')||Math.random()).toString().replace(/[^a-zA-Z0-9-]/g,'')}`;
 
-    const scores = scoreFields.map((f,i) => {
-      const v = parseFloat(gf(rec,f));
-      if (isNaN(v)) return null;
-      const color = v >= 4 ? '#1D9E75' : v >= 3 ? '#EF9F27' : '#E24B4A';
-      return `<div style="display:flex;align-items:center;gap:6px;font-size:12px">
+    const scoreRows = scoreFields.map((f, i) => {
+      const v = parseFloat(gf(rec, f));
+      if (isNaN(v)) return '';
+      const c = v >= 4 ? '#1D9E75' : v >= 3 ? '#EF9F27' : '#E24B4A';
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:5px">
         <span style="color:var(--text-sub);min-width:52px">${scoreLabels[i]}</span>
         <div style="flex:1;height:6px;background:#eee;border-radius:3px">
-          <div style="width:${v/5*100}%;height:100%;background:${color};border-radius:3px"></div>
+          <div style="width:${v/5*100}%;height:100%;background:${c};border-radius:3px"></div>
         </div>
-        <span style="color:${color};font-weight:600;min-width:20px">${v}</span>
+        <span style="color:${c};font-weight:600;min-width:16px">${v}</span>
       </div>`;
-    }).filter(Boolean);
+    }).join('');
 
-    const avgScore = (() => {
-      const vals = scoreFields.map(f=>parseFloat(gf(rec,f))).filter(v=>!isNaN(v));
-      if (!vals.length) return null;
-      return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
-    })();
-
-    const avgColor = avgScore ? (avgScore>=4?'#1D9E75':avgScore>=3?'#EF9F27':'#E24B4A') : 'var(--text-sub)';
-
-    return `<div style="border:0.5px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;background:#fff">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-        <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text)">${name||gf(rec,'紀錄ID')||'—'}</div>
-          <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${type}　${method}　${date}</div>
-          <div style="font-size:12px;color:var(--text-sub)">主管：${mgr}　HR：${hr}</div>
+    return `
+      <div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:#fff" onclick="toggleNewbieDetail('${detailId}')">
+          <div style="width:34px;height:34px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#1D9E75;flex-shrink:0">${(name[0]||'?').toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${name}${cnName&&cnName!==name?` <span style="font-weight:400;color:var(--text-sub);font-size:11px">${cnName}</span>`:''}
+              ${avg !== null ? `<span style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:${avgColor}18;color:${avgColor}">avg ${avg.toFixed(1)}</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:3px">
+              ${type} ｜ ${date} ｜ ${method} ｜ 主管：${mgr}${hr?` ｜ HR：${hr}`:''}
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-sub)">▾</div>
         </div>
-        ${avgScore ? `<div style="text-align:center;padding:6px 14px;background:${avgColor}18;border-radius:8px">
-          <div style="font-size:20px;font-weight:700;color:${avgColor}">${avgScore}</div>
-          <div style="font-size:10px;color:var(--text-sub)">平均分</div>
-        </div>` : ''}
-      </div>
-      ${scores.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">${scores.join('')}</div>` : ''}
-      ${summary ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">📝 ${summary}</div>` : ''}
-      ${feedback ? `<div style="font-size:12px;color:var(--text-sub)">💬 ${feedback}</div>` : ''}
-    </div>`;
+        <div id="${detailId}" style="display:none;padding:12px 16px;background:#fafbfc;border-top:0.5px solid var(--border);font-size:12px">
+          ${scoreRows ? `<div style="margin-bottom:12px">${scoreRows}</div>` : ''}
+          ${summary  ? `<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">📝 訪談重點摘要</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${summary}</div></div>` : ''}
+          ${feedback ? `<div><div style="color:var(--text-sub);margin-bottom:3px">💬 觀察與回饋</div><div style="background:#E8F5E9;border-radius:6px;padding:8px 10px">${feedback}</div></div>` : ''}
+        </div>
+      </div>`;
   }).join('');
+}
+
+function toggleNewbieDetail(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 // ── Render report ──
