@@ -586,12 +586,19 @@ function avatarColor(name) {
 }
 function empFind(larkId) {
   if (!larkId) return null;
-  const id = String(larkId).trim();
-  return employees.find(e =>
-    gf(e,'Lark 帳號 ID') === id ||
-    (gf(e,'員工姓名')||'').trim() === id ||
-    (gf(e,'英文名')||'').trim() === id
-  );
+  const id    = String(larkId).trim();
+  const idNorm = id.replace(/\s+/g, '').toLowerCase(); // 去除所有空白、轉小寫
+  return employees.find(e => {
+    const larkAccId = (gf(e,'Lark 帳號 ID')||'').trim();
+    const cnName    = (gf(e,'員工姓名')||'').trim();
+    const enName    = (gf(e,'英文名')||'').trim();
+    return larkAccId === id ||
+      cnName === id ||
+      enName === id ||
+      larkAccId.replace(/\s+/g,'').toLowerCase() === idNorm ||
+      cnName.replace(/\s+/g,'').toLowerCase() === idNorm ||
+      enName.replace(/\s+/g,'').toLowerCase() === idNorm;
+  });
 }
 function empName(larkId) {
   // 優先顯示英文名
