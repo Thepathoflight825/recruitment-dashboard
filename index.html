@@ -1105,29 +1105,38 @@ function renderReportManagerRecruit() {
 }
 
 function renderKPI() {
-  // 收件數優先用當月 statsRecords 加總（主動應徵 + HR推薦）
+  const fc = getFilteredCandidates();
   const fs = filterByPeriod(statsRecords, '統計日期');
+  const fp = filterByPeriod(phoneRecords, '電訪日期');
+
   const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
-  const total = statsTotal || allCandidates.length;
-  // 電訪完成：有進入電訪關卡或之後的人數
-  const pCount = allCandidates.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
-  // 初試達成：招募名單中當前關卡為初試/複試/錄取/到職（代表真正完成初試）
-  const iCount = allCandidates.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
-  // 或從面談紀錄算有效筆數（有應徵者名稱）
+  const total = statsTotal || fc.length;
+
+  const pCount = fc.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const iCount = fc.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const interviewDone = interviewRecords.filter(r => gf(r,'應徵者')).length;
-  const iReal = interviewDone || iCount; // 優先用面談紀錄
-  const dec = allCandidates.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  const iReal = interviewDone || iCount;
+  const dec = fc.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+
+  const phoneScores = fp.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
+  const avgPhoneScore = phoneScores.length ? (phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2) : null;
+
   const kpis = [
-    { name:'每月履歷收件數',  target:'≥ 10 份', val:total, unit:'份', ok:total>=10 },
-    { name:'電訪完成率',      target:'100%',    val:total?Math.round(pCount/total*100):0, unit:'%', ok:pCount===total },
-    { name:'初試達成率',      target:'≥ 60%',   val:pCount?Math.round(iReal/pCount*100):0, unit:'%', ok:pCount?iReal/pCount>=0.6:false },
-    { name:'應徵者流失率',    target:'≤ 30%',   val:total?Math.round(dec/total*100):0, unit:'%', ok:total?dec/total<=0.3:true },
-    { name:'電訪平均評分',    target:'≥ 3.5 / 5', val:avgScore(), unit:'/5', ok:parseFloat(avgScore())>=3.5 },
+    { name:'每月履歷收件數', target:'≥ 10 份',   val:total,                                       unit:'份', ok:total>=10,                         noData:false },
+    { name:'電訪完成率',     target:'100%',       val:total?Math.round(pCount/total*100):0,        unit:'%',  ok:pCount===total&&total>0,            noData:total===0 },
+    { name:'初試達成率',     target:'≥ 60%',      val:pCount?Math.round(iReal/pCount*100):0,       unit:'%',  ok:pCount?iReal/pCount>=0.6:false,     noData:pCount===0 },
+    { name:'應徵者流失率',   target:'≤ 30%',      val:fc.length?Math.round(dec/fc.length*100):0,   unit:'%',  ok:fc.length?dec/fc.length<=0.3:true,  noData:fc.length===0 },
+    { name:'電訪平均評分',   target:'≥ 3.5 / 5', val:avgPhoneScore ?? 0,                          unit:'/5', ok:avgPhoneScore!==null&&parseFloat(avgPhoneScore)>=3.5, noData:avgPhoneScore===null },
   ];
-  document.getElementById('kpi-list').innerHTML = kpis.map(k=>`<div class="kpi-row">
-    <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
-    <div class="kpi-value" style="color:${k.ok?'var(--teal)':'var(--red)'}">${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span></div>
-    <div style="font-size:16px">${k.ok?'✅':'❌'}</div></div>`).join('');
+
+  document.getElementById('kpi-list').innerHTML = kpis.map(k => {
+    const icon  = k.noData ? '⚠️' : k.ok ? '✅' : '❌';
+    const color = k.noData ? '#EF9F27' : k.ok ? 'var(--teal)' : 'var(--red)';
+    return `<div class="kpi-row">
+      <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
+      <div class="kpi-value" style="color:${color}">${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span></div>
+      <div style="font-size:16px">${icon}</div></div>`;
+  }).join('');
 }
 
 function renderJobProgress() {
