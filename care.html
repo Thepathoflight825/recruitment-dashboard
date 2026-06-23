@@ -272,7 +272,7 @@
     <div class="tab" onclick="switchTab('records')">關懷紀錄</div>
     <div class="tab" onclick="switchTab('promises')">承諾追蹤</div>
     <div class="tab" onclick="switchTab('perf')">績效面談</div>
-    <div class="tab" onclick="switchTab('events')">事件管理</div>
+    <div class="tab" onclick="switchTab('events')">新人關懷</div>
     <div class="tab" onclick="switchTab('report')">分析報告</div>
   </div>
   <div class="header-right">
@@ -296,7 +296,7 @@
       <div class="stat-card blue">  <div class="stat-label">本期關懷次數</div><div class="stat-value" id="s-care">—</div><div class="stat-sub" id="s-care-sub">1on1 紀錄</div><div class="stat-icon">💬</div></div>
       <div class="stat-card amber"> <div class="stat-label">待兌現承諾</div><div class="stat-value" id="s-promise">—</div><div class="stat-sub" id="s-promise-sub">主管承諾追蹤</div><div class="stat-icon">📋</div></div>
       <div class="stat-card red">   <div class="stat-label">高風險員工</div><div class="stat-value" id="s-highrisk">—</div><div class="stat-sub" id="s-risk-sub">需優先關注</div><div class="stat-icon">⚠</div></div>
-      <div class="stat-card purple"><div class="stat-label">待處理事件</div><div class="stat-value" id="s-event">—</div><div class="stat-sub" id="s-event-sub">事件管理</div><div class="stat-icon">🚨</div></div>
+      <div class="stat-card purple"><div class="stat-label">新人關懷</div><div class="stat-value" id="s-event">—</div><div class="stat-sub" id="s-event-sub">本月紀錄數</div><div class="stat-icon">🌱</div></div>
     </div>
     <div class="panel-grid-2">
       <div class="panel">
@@ -426,12 +426,11 @@
     </div>
   </div>
 
-  <!-- ══ 事件管理 ══ -->
+  <!-- ══ 新人關懷 ══ -->
   <div class="tab-content" id="tab-events">
-    <div id="event-alert" style="margin-bottom:12px"></div>
     <div class="panel">
-      <div class="panel-title">🚨 事件紀錄</div>
-      <div id="events-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+      <div class="panel-title">🌱 新人關懷紀錄</div>
+      <div id="newbie-list"><div class="loading"><div class="spinner"></div>載入中...</div></div>
     </div>
   </div>
 
@@ -495,7 +494,7 @@ const TABLE_IDS = {
   關懷紀錄: 'tblsPbqM9zqQ2UZo',
   績效面談: 'tblLVAg8ddngVF0v',
   承諾追蹤: 'tbliiEFQvWd1IvcU',
-  事件確認: 'tblr4p6LrWYFL0HG',
+  新人關懷: 'tblY8UxWJzXXy4e1',
 };
 const LINKS = {
   hr:         'https://thepathoflight825.github.io/recruitment-dashboard/hr.html',
@@ -504,7 +503,7 @@ const LINKS = {
 };
 // ══════════════════════════════════════
 
-let employees = [], careRecords = [], perfRecords = [], promises = [], events = [];
+let employees = [], careRecords = [], perfRecords = [], promises = [], newbieRecords = [];
 let selectedPeriod = 'prev';
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let riskChart = null, deptChart = null;
@@ -611,12 +610,12 @@ async function fetchTable(tableId) {
 }
 
 async function fetchAllTables() {
-  [employees, careRecords, perfRecords, promises, events] = await Promise.all([
+  [employees, careRecords, perfRecords, promises, newbieRecords] = await Promise.all([
     fetchTable(TABLE_IDS.員工主檔),
     fetchTable(TABLE_IDS.關懷紀錄),
     fetchTable(TABLE_IDS.績效面談),
     fetchTable(TABLE_IDS.承諾追蹤),
-    fetchTable(TABLE_IDS.事件確認),
+    fetchTable(TABLE_IDS.新人關懷),
   ]);
 }
 
@@ -641,9 +640,7 @@ function loadDemoData() {
     { '承諾 ID': 'ACT-003', '關懷員工': 'KR-Sherry', '承諾人（主管）': 'KR-Tori', '承諾內容': '舉辦跨公司 AI 使用研討會，分享 SOP', '預計完成日期': '2026/06/05', '兌現狀態': '待完成', '逾期天數': '' },
     { '承諾 ID': 'ACT-004', '關懷員工': 'KR-Roy', '承諾人（主管）': 'KR-Max', '承諾內容': '安排職涯發展對談，了解留任意願', '預計完成日期': '2026/05/15', '兌現狀態': '已逾期', '逾期天數': 21 },
   ];
-  events = [
-    { '事件 ID': 'EVT-001', '關懷員工': 'KR-Roy', '觸發主管': 'KR-Max', '觸發時間': '2026/05/08', '事件類型': '留任風險', '緊急程度': '高', '事件描述': '連續兩次 1on1 表達對職涯方向的不確定', '處理狀態': '處理中' },
-  ];
+  newbieRecords = [];
 }
 
 // ── Compute metrics ──
@@ -657,10 +654,7 @@ function computeMetrics() {
     const s = gf(p,'兌現狀態') || '';
     return s.includes('待') || s.includes('逾期');
   }).length;
-  const openEvents = events.filter(e => {
-    const s = gf(e,'處理狀態') || '';
-    return !s.includes('結案') && !s.includes('完成');
-  }).length;
+  const openEvents = newbieRecords.length;
 
   // 部門關懷次數
   const deptCount = {};
@@ -718,20 +712,7 @@ function computeRisks(m) {
     });
   }
 
-  // ② 待處理事件
-  if (m.openEvents > 0) {
-    risks.push({
-      level: 'high', icon: '🚨', title: '事件紀錄尚未結案',
-      tag: '事件管理 · 立即追蹤',
-      metric: `${m.openEvents} 件事件處理中`,
-      desc: `HR 收到事件通知後應於 <strong>24 小時內</strong>聯繫主管，啟動協同處理流程。<br>
-             ▶ 確認每件事件的處理負責人與目前進度<br>
-             ▶ 涉及人際衝突或主管本身為問題來源時，由 HR 直接介入<br>
-             ▶ 處理完成後，請更新「處理狀態」為結案`,
-    });
-  }
-
-  // ③ 主管承諾逾期超過 3 天
+  // ② 主管承諾逾期超過 3 天
   const overduePromises = promises.filter(p => {
     const days = parseFloat(gf(p,'逾期天數')) || 0;
     const status = gf(p,'兌現狀態') || '';
@@ -840,7 +821,7 @@ function computeStrategies(m, risks) {
   const strats = [];
   const hasHighRisk = m.highRisk > 0;
   const hasOverdue = promises.some(p => (parseFloat(gf(p,'逾期天數'))||0) > 3 || gf(p,'兌現狀態')?.includes('逾期'));
-  const hasOpenEvent = m.openEvents > 0;
+  const hasOpenEvent = false; // 已改為新人關懷（非風險指標）
 
   // 緊急：高風險 / 事件處理
   if (hasHighRisk || hasOpenEvent) {
@@ -1202,35 +1183,65 @@ function renderPromises() {
 
 // ── Render events ──
 function renderEvents() {
-  const el = document.getElementById('events-list');
-  const alertEl = document.getElementById('event-alert');
-  const openEvts = events.filter(e => { const s = gf(e,'處理狀態')||''; return !s.includes('結案')&&!s.includes('完成'); });
+  const el = document.getElementById('newbie-list');
+  if (!el) return;
 
-  if (openEvts.length > 0) {
-    alertEl.innerHTML = `<div class="alert-banner critical"><div class="alert-banner-icon">🚨</div><div class="alert-banner-body"><div class="alert-banner-title">待處理事件（${openEvts.length} 件）— 需立即跟進</div><div class="alert-banner-desc">${openEvts.map(e=>`<strong>${empName(gf(e,'關懷員工'))}</strong>：${gf(e,'事件類型')||'未分類'}`).join('　｜　')}</div></div></div>`;
+  if (!newbieRecords.length) {
+    el.innerHTML = '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">目前尚無新人關懷紀錄</div>';
+    return;
   }
 
-  el.innerHTML = events.length
-    ? events.map(ev => {
-        const urg = gf(ev,'緊急程度') || '';
-        const status = gf(ev,'處理狀態') || '待處理';
-        const isClosed = status.includes('結案') || status.includes('完成');
-        return `<div class="event-card" onclick="openEventDetail(${JSON.stringify(ev).replace(/"/g,'&quot;')})">
-          <div class="event-level">
-            <div class="event-level-icon">${urg.includes('高')?'🔴':urg.includes('中')?'🟡':'🟢'}</div>
-            <div class="event-level-tag" style="color:${urg.includes('高')?'#E24B4A':urg.includes('中')?'#EF9F27':'#1D9E75'}">${urg||'一般'}</div>
-          </div>
-          <div class="event-body">
-            <div class="event-title">${gf(ev,'事件類型')||'事件'} — ${empName(gf(ev,'關懷員工'))}</div>
-            <div class="event-meta">
-              觸發時間：${fmtDate(gf(ev,'觸發時間'))}　觸發主管：${(gf(ev,'觸發主管')||'—').replace('KR-','').replace(/^ /,'')}
-              ${gf(ev,'事件描述') ? `<br>描述：${gf(ev,'事件描述').slice(0,60)}…` : ''}
-            </div>
-          </div>
-          <div style="flex-shrink:0"><span class="badge ${isClosed?'badge-gray':urg.includes('高')?'badge-red':'badge-amber'}">${status}</span></div>
-        </div>`;
-      }).join('')
-    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">🎉 目前無待處理事件</div>';
+  const scoreFields = ['工作適應(1-5分)','團隊融入(1-5分)','資源支援(1-5分)','身心狀態(1-5分)','未來期望(1-5分)'];
+  const scoreLabels = ['工作適應','團隊融入','資源支援','身心狀態','未來期望'];
+
+  el.innerHTML = newbieRecords.map(rec => {
+    const name  = empName(gf(rec,'關懷員工'));
+    const date  = fmtDate(gf(rec,'面談日期'));
+    const type  = gf(rec,'面談類型') || '—';
+    const method= gf(rec,'面談方式') || '—';
+    const mgr   = (gf(rec,'主管')||'—').replace('KR-','');
+    const hr    = (gf(rec,'HR參與者')||'—').replace('KR-','');
+    const summary = gf(rec,'訪談重點摘要') || '';
+    const feedback= gf(rec,'觀察與回饋') || '';
+
+    const scores = scoreFields.map((f,i) => {
+      const v = parseFloat(gf(rec,f));
+      if (isNaN(v)) return null;
+      const color = v >= 4 ? '#1D9E75' : v >= 3 ? '#EF9F27' : '#E24B4A';
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <span style="color:var(--text-sub);min-width:52px">${scoreLabels[i]}</span>
+        <div style="flex:1;height:6px;background:#eee;border-radius:3px">
+          <div style="width:${v/5*100}%;height:100%;background:${color};border-radius:3px"></div>
+        </div>
+        <span style="color:${color};font-weight:600;min-width:20px">${v}</span>
+      </div>`;
+    }).filter(Boolean);
+
+    const avgScore = (() => {
+      const vals = scoreFields.map(f=>parseFloat(gf(rec,f))).filter(v=>!isNaN(v));
+      if (!vals.length) return null;
+      return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+    })();
+
+    const avgColor = avgScore ? (avgScore>=4?'#1D9E75':avgScore>=3?'#EF9F27':'#E24B4A') : 'var(--text-sub)';
+
+    return `<div style="border:0.5px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)">${name||gf(rec,'紀錄ID')||'—'}</div>
+          <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${type}　${method}　${date}</div>
+          <div style="font-size:12px;color:var(--text-sub)">主管：${mgr}　HR：${hr}</div>
+        </div>
+        ${avgScore ? `<div style="text-align:center;padding:6px 14px;background:${avgColor}18;border-radius:8px">
+          <div style="font-size:20px;font-weight:700;color:${avgColor}">${avgScore}</div>
+          <div style="font-size:10px;color:var(--text-sub)">平均分</div>
+        </div>` : ''}
+      </div>
+      ${scores.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">${scores.join('')}</div>` : ''}
+      ${summary ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">📝 ${summary}</div>` : ''}
+      ${feedback ? `<div style="font-size:12px;color:var(--text-sub)">💬 ${feedback}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ── Render report ──
@@ -1266,7 +1277,7 @@ function renderReport() {
         高風險員工 <strong style="color:${m.highRisk>0?'#F08080':'#5DCAA5'}">${m.highRisk}</strong> 人、
         中風險 <strong style="color:${m.midRisk>0?'#EF9F27':'#5DCAA5'}">${m.midRisk}</strong> 人，
         待兌現主管承諾 <strong style="color:${m.pendingPromises>3?'#F08080':'#fff'}">${m.pendingPromises}</strong> 項，
-        待處理事件 <strong style="color:${m.openEvents>0?'#F08080':'#fff'}">${m.openEvents}</strong> 件。
+        新人關懷紀錄 <strong style="color:#5DCAA5">${m.openEvents}</strong> 筆。
         共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。
       </div>
       <div class="rs-kpi-row">
@@ -1691,7 +1702,7 @@ function applyRoleFilter() {
   careRecords = careRecords.filter(r => empIds.has((gf(r,'關懷員工')||'').trim()));
   perfRecords = perfRecords.filter(r => empIds.has((gf(r,'面談員工')||gf(r,'關懷員工')||'').trim()));
   promises    = promises.filter(p => empIds.has((gf(p,'關懷員工')||'').trim()));
-  events      = events.filter(ev => empIds.has((gf(ev,'關懷員工')||'').trim()));
+  newbieRecords = newbieRecords.filter(ev => empIds.has((gf(ev,'關懷員工')||'').trim()));
 }
 
 // ── Overdue fix: 前端自行計算逾期 ──
