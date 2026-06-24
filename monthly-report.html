@@ -493,7 +493,8 @@ function computeRecruitMetrics() {
   const lossRate = fc.length ? Math.round(dec / fc.length * 100) : null;
   const phoneScores = fp.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
   const avgScore = phoneScores.length ? parseFloat((phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2)) : null;
-  const positions = [...new Set(allCandidates.map(c=>gf(c,'應徵職務')).filter(Boolean))];
+  // 開放職缺數：從當月履歷收件統計的「應徵職務」欄位去重，反映本月實際有收件的職缺
+  const positions = [...new Set(fs.map(r=>gf(r,'應徵職務')).filter(Boolean))];
   return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc };
 }
 
