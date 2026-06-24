@@ -1112,7 +1112,11 @@ function renderKPI() {
   const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
   const total = statsTotal || fc.length;
 
-  const pCount = fc.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  // 電訪完成率：分母 = 當月面談名單（招募名單）收件人數 fc.length
+  //             分子 = 當月電訪紀錄（依電訪日期篩選）筆數 fp.length
+  const phoneCompletedCount = fp.length;  // 當月有電訪紀錄的人數
+  const phoneDenominator    = fc.length;  // 當月面談名單收件人數
+
   const iCount = fc.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const interviewDone = interviewRecords.filter(r => gf(r,'應徵者')).length;
   const iReal = interviewDone || iCount;
@@ -1122,19 +1126,22 @@ function renderKPI() {
   const avgPhoneScore = phoneScores.length ? (phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2) : null;
 
   const kpis = [
-    { name:'每月履歷收件數', target:'≥ 10 份',   val:total,                                       unit:'份', ok:total>=10,                         noData:false },
-    { name:'電訪完成率',     target:'100%',       val:total?Math.round(pCount/total*100):0,        unit:'%',  ok:pCount===total&&total>0,            noData:total===0 },
-    { name:'初試達成率',     target:'≥ 60%',      val:pCount?Math.round(iReal/pCount*100):0,       unit:'%',  ok:pCount?iReal/pCount>=0.6:false,     noData:pCount===0 },
-    { name:'應徵者流失率',   target:'≤ 30%',      val:fc.length?Math.round(dec/fc.length*100):0,   unit:'%',  ok:fc.length?dec/fc.length<=0.3:true,  noData:fc.length===0 },
-    { name:'電訪平均評分',   target:'≥ 3.5 / 5', val:avgPhoneScore ?? 0,                          unit:'/5', ok:avgPhoneScore!==null&&parseFloat(avgPhoneScore)>=3.5, noData:avgPhoneScore===null },
+    { name:'每月履歷收件數', target:'≥ 10 份',   val:total,                                                                   unit:'份', ok:total>=10,                                                   noData:total===0 },
+    { name:'電訪完成率',     target:'100%',       val:phoneDenominator?Math.round(phoneCompletedCount/phoneDenominator*100):0, unit:'%',  ok:phoneCompletedCount===phoneDenominator&&phoneDenominator>0, noData:phoneDenominator===0 },
+    { name:'初試達成率',     target:'≥ 60%',      val:phoneCompletedCount?Math.round(iReal/phoneCompletedCount*100):0,         unit:'%',  ok:phoneCompletedCount?iReal/phoneCompletedCount>=0.6:false,    noData:phoneCompletedCount===0 },
+    { name:'應徵者流失率',   target:'≤ 30%',      val:fc.length?Math.round(dec/fc.length*100):0,                               unit:'%',  ok:fc.length?dec/fc.length<=0.3:true,                          noData:fc.length===0 },
+    { name:'電訪平均評分',   target:'≥ 3.5 / 5', val:avgPhoneScore ?? 0,                                                      unit:'/5', ok:avgPhoneScore!==null&&parseFloat(avgPhoneScore)>=3.5,        noData:avgPhoneScore===null },
   ];
 
   document.getElementById('kpi-list').innerHTML = kpis.map(k => {
-    const icon  = k.noData ? '⚠️' : k.ok ? '✅' : '❌';
+    const icon  = k.noData ? '🔺' : k.ok ? '✅' : '❌';
     const color = k.noData ? '#EF9F27' : k.ok ? 'var(--teal)' : 'var(--red)';
+    const displayVal = k.noData
+      ? `<span style="font-size:12px;color:#EF9F27;font-weight:600">暫無紀錄可計算</span>`
+      : `${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span>`;
     return `<div class="kpi-row">
       <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
-      <div class="kpi-value" style="color:${color}">${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span></div>
+      <div class="kpi-value" style="color:${color}">${displayVal}</div>
       <div style="font-size:16px">${icon}</div></div>`;
   }).join('');
 }
