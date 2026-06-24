@@ -614,7 +614,7 @@ function renderStats() {
   const leave    = employees.filter(e=>gf(e,'在職狀態')==='留職停薪').length;
   const total    = employees.length;
   const fs       = getFilteredSummaries();
-  const latest   = fs[fs.length - 1] || summaries[summaries.length - 1] || {};
+  const latest   = fs[fs.length - 1] || {};
   const exitCnt  = n(gf(latest,'當月離職人數'));
   const newCnt   = n(gf(latest,'當月新進人數'));
   const netChg   = n(gf(latest,'淨人力變化'));
