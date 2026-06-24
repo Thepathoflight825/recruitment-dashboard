@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>月度人力資源報告 · 班班日常</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1a1a2e;
+    --blue: #185FA5;   --blue-light: #E6F1FB;
+    --teal: #1D9E75;   --teal-light: #E1F5EE;
+    --amber: #EF9F27;  --amber-light: #FAEEDA;
+    --red: #E24B4A;    --red-light: #FCEBEB;
+    --purple: #6B4FA0; --purple-light: #EFE9FA;
+    --gray: #F7F6F2;   --border: #E8E6DF;
+    --text: #1a1a2e;   --text-sub: #888780;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', sans-serif; background: #F2F1EC; color: var(--text); min-height: 100vh; }
+
+  /* ── Auth ── */
+  #auth-overlay { position:fixed; inset:0; background:#0d1b2a; display:flex; align-items:center; justify-content:center; z-index:9999; }
+  #auth-box { background:#fff; border-radius:16px; padding:40px 36px; width:340px; text-align:center; box-shadow:0 8px 40px rgba(0,0,0,.4); }
+  #auth-box h2 { font-size:20px; font-weight:700; color:#0d1b2a; margin:0 0 6px; }
+  #auth-box p  { font-size:13px; color:#6b7c93; margin:0 0 24px; line-height:1.6; }
+  #auth-input { width:100%; padding:11px 14px; border:1.5px solid #dde3ec; border-radius:8px; font-size:15px; font-family:inherit; outline:none; transition:border .2s; }
+  #auth-input:focus { border-color:#185FA5; }
+  #auth-btn { margin-top:12px; width:100%; padding:12px; background:#0d1b2a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+  #auth-btn:hover { background:#1a2e44; }
+  #auth-error { margin-top:10px; font-size:12px; color:#E24B4A; min-height:16px; }
+  #no-access { display:none; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:12px; }
+  #no-access h2 { font-size:18px; font-weight:700; color:#fff; }
+  #no-access p  { font-size:13px; color:#8899aa; }
+  #no-access button { margin-top:8px; padding:10px 24px; background:#185FA5; color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit; }
+
+  /* ── Header ── */
+  .header { background: var(--navy); padding: 0 32px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+  .header-left { display:flex; flex-direction:column; }
+  .header-title { font-size:16px; font-weight:700; color:#fff; }
+  .header-sub   { font-size:11px; color:#6c9bc8; margin-top:2px; }
+  .header-right { display:flex; align-items:center; gap:10px; }
+  .month-badge  { font-size:12px; color:#EF9F27; background:rgba(239,159,39,.15); border:0.5px solid rgba(239,159,39,.4); border-radius:20px; padding:4px 14px; font-weight:600; }
+  .nav-back     { font-size:11px; color:#aac4e0; background:rgba(255,255,255,.06); border:0.5px solid rgba(255,255,255,.18); border-radius:8px; padding:5px 12px; cursor:pointer; font-family:inherit; transition:all .2s; }
+  .nav-back:hover { background:rgba(255,255,255,.14); color:#fff; }
+  #user-badge { font-size:11px; color:#6c9bc8; display:flex; align-items:center; gap:6px; }
+  #user-badge span { font-weight:600; color:#EF9F27; }
+  #logout-btn { background:none; border:none; cursor:pointer; font-size:11px; color:#aab4be; font-family:inherit; text-decoration:underline; }
+  #logout-btn:hover { color:#E24B4A; }
+
+  /* ── Main ── */
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px 24px 60px; }
+
+  /* ── Generate bar ── */
+  .gen-bar { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:16px 20px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .gen-bar-left { display:flex; flex-direction:column; gap:4px; }
+  .gen-bar-title { font-size:13px; font-weight:700; color:var(--navy); }
+  .gen-bar-desc  { font-size:11px; color:var(--text-sub); }
+  .gen-btn { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:8px; transition:background .2s; flex-shrink:0; }
+  .gen-btn:hover { background:#2a2a4a; }
+  .gen-btn:disabled { background:#aaa; cursor:not-allowed; }
+  .gen-btn .spinner-sm { width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; display:none; }
+  .gen-btn.loading .spinner-sm { display:inline-block; }
+  .gen-btn.loading .btn-text { display:none; }
+  .period-select { padding:6px 12px; border:0.5px solid var(--border); border-radius:6px; font-size:12px; font-family:inherit; background:#fff; cursor:pointer; }
+
+  /* ── Section headers ── */
+  .section-title { font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:.07em; margin:24px 0 10px; padding-bottom:6px; border-bottom:0.5px solid var(--border); }
+
+  /* ── KPI cards strip ── */
+  .kpi-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:6px; }
+  .kpi-card { background:#fff; border-radius:10px; border:0.5px solid var(--border); padding:14px 16px; position:relative; overflow:hidden; }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .kpi-card.hr::before     { background:#3B8BD4; }
+  .kpi-card.recruit::before{ background:#1D9E75; }
+  .kpi-card.care::before   { background:#6B4FA0; }
+  .kpi-card-label { font-size:10px; color:var(--text-sub); margin-bottom:4px; }
+  .kpi-card-val   { font-size:26px; font-weight:700; line-height:1; }
+  .kpi-card-sub   { font-size:10px; color:#b4b2a9; margin-top:4px; }
+  .kpi-card-tag   { position:absolute; top:10px; right:12px; font-size:10px; padding:2px 7px; border-radius:20px; font-weight:600; }
+  .tag-ok     { background:var(--teal-light);   color:var(--teal); }
+  .tag-warn   { background:var(--amber-light);  color:#854F0B; }
+  .tag-danger { background:var(--red-light);    color:#A32D2D; }
+  .tag-info   { background:var(--blue-light);   color:var(--blue); }
+
+  /* ── Block panels ── */
+  .block-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px; }
+  .block-panel { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:16px 18px; }
+  .block-panel-title { font-size:12px; font-weight:700; color:var(--navy); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .metric-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:0.5px solid #F1EFE8; font-size:12px; }
+  .metric-row:last-child { border-bottom:none; }
+  .metric-label { color:var(--text-sub); }
+  .metric-val   { font-weight:700; color:var(--navy); }
+  .metric-val.red    { color:var(--red); }
+  .metric-val.teal   { color:var(--teal); }
+  .metric-val.amber  { color:var(--amber); }
+
+  /* ── Risk list ── */
+  .risk-list { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .risk-item { border-radius:10px; padding:12px 16px; display:flex; align-items:flex-start; gap:12px; border-left:4px solid; }
+  .risk-item.high   { background:#FFF2F2; border-color:#E24B4A; }
+  .risk-item.medium { background:#FFFBF0; border-color:#EF9F27; }
+  .risk-item.low    { background:#F0F6FF; border-color:#3B8BD4; }
+  .risk-icon  { font-size:16px; flex-shrink:0; margin-top:1px; }
+  .risk-body  { flex:1; }
+  .risk-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+  .risk-level-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; white-space:nowrap; }
+  .risk-item.high   .risk-level-badge { background:#E24B4A; color:#fff; }
+  .risk-item.medium .risk-level-badge { background:#EF9F27; color:#fff; }
+  .risk-item.low    .risk-level-badge { background:#3B8BD4; color:#fff; }
+  .risk-source-badge { font-size:10px; padding:2px 7px; border-radius:20px; background:#F1EFE8; color:#5F5E5A; }
+  .risk-title  { font-size:13px; font-weight:700; color:var(--navy); }
+  .risk-metric { font-size:11px; color:var(--text-sub); margin-bottom:4px; }
+  .risk-desc   { font-size:12px; color:#444; line-height:1.6; }
+
+  /* ── AI 敘述區 ── */
+  .ai-panel { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:22px 24px; margin-bottom:14px; }
+  .ai-panel-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .ai-panel-title  { font-size:14px; font-weight:700; color:var(--navy); }
+  .ai-badge { font-size:10px; background:var(--purple-light); color:var(--purple); padding:2px 8px; border-radius:20px; font-weight:600; }
+  .ai-loading { display:flex; align-items:center; gap:10px; color:var(--text-sub); font-size:13px; padding:20px 0; }
+  .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+  .ai-content { font-size:13px; color:#333; line-height:1.9; white-space:pre-wrap; }
+  .ai-placeholder { color:var(--text-sub); font-size:13px; padding:20px 0; font-style:italic; }
+
+  /* ── 可執行方案 ── */
+  .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+  .action-card { background:#fff; border-radius:10px; border:0.5px solid var(--border); padding:16px 18px; }
+  .action-header { display:flex; align-items:flex-start; gap:10px; margin-bottom:8px; }
+  .action-icon  { font-size:20px; flex-shrink:0; }
+  .action-meta  { flex:1; }
+  .action-title { font-size:13px; font-weight:700; color:var(--navy); }
+  .action-tag   { font-size:10px; color:var(--text-sub); margin-top:2px; }
+  .action-body  { font-size:12px; color:#444; line-height:1.7; padding-left:30px; }
+  .action-body li { margin-bottom:4px; }
+  .action-steps { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; padding-left:30px; }
+  .action-step  { background:var(--gray); border-radius:6px; padding:3px 9px; font-size:11px; color:#555; border:0.5px solid var(--border); }
+
+  /* ── Empty / error states ── */
+  .empty-state { text-align:center; padding:24px; color:var(--text-sub); font-size:13px; }
+  .loading-state { display:flex; align-items:center; justify-content:center; height:120px; gap:8px; color:var(--text-sub); font-size:13px; }
+
+  /* ── Print ── */
+  .print-bar { display:flex; gap:8px; justify-content:flex-end; margin-bottom:16px; }
+  .print-btn { background:#fff; border:0.5px solid var(--border); border-radius:8px; padding:8px 16px; font-size:12px; cursor:pointer; font-family:inherit; color:var(--navy); transition:background .2s; }
+  .print-btn:hover { background:var(--gray); }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes spin   { to { transform:rotate(360deg); } }
+
+  @media print {
+    .header, .gen-bar, .print-bar, #auth-overlay { display:none !important; }
+    .main { padding:0; }
+    body { background:#fff; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Auth overlay ── -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>📊 月度人力資源報告</h2>
+    <p>勝海科技・班班日常<br>此頁面為 HR 專用，請輸入您的密碼</p>
+    <input id="auth-input" type="password" placeholder="密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="auth-btn" onclick="doLogin()">進入</button>
+    <div id="auth-error"></div>
+  </div>
+  <!-- 無權限提示（覆蓋在同一 overlay 層） -->
+  <div id="no-access">
+    <h2>🔒 無存取權限</h2>
+    <p>此頁面僅限 HR 管理員使用</p>
+    <button onclick="location.href='index.html'">返回招募儀表板</button>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">📊 月度人力資源報告</div>
+    <div class="header-sub">勝海科技 · 班班日常</div>
+  </div>
+  <div class="header-right">
+    <span class="month-badge" id="month-badge">— 年 — 月</span>
+    <button class="nav-back" onclick="location.href='index.html'">← 招募儀表板</button>
+    <div id="user-badge"><span id="user-name"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
+  </div>
+</div>
+
+<div class="main" id="main-content" style="display:none">
+
+  <!-- 操作列 -->
+  <div class="gen-bar">
+    <div class="gen-bar-left">
+      <div class="gen-bar-title">🤖 AI 月報生成</div>
+      <div class="gen-bar-desc">點擊後系統將彙整三大區塊數據，由 Claude AI 生成月度敘述報告，請於確認內容後使用</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <select id="period-select" class="period-select" onchange="onPeriodChange(this.value)">
+        <option value="current" selected>當月</option>
+        <option value="prev">上個月</option>
+        <option value="3m">近三個月</option>
+      </select>
+      <button class="gen-btn" id="gen-btn" onclick="generateReport()">
+        <div class="spinner-sm"></div>
+        <span class="btn-text">✨ 生成 AI 報告</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 列印 -->
+  <div class="print-bar">
+    <button class="print-btn" onclick="window.print()">🖨 列印報告</button>
+    <button class="print-btn" onclick="copyReportText()">📋 複製文字</button>
+  </div>
+
+  <!-- ── 三大區塊核心指標 ── -->
+  <div class="section-title">📌 本月核心指標總覽</div>
+  <div class="kpi-strip" id="kpi-strip">
+    <div class="loading-state"><div class="spinner"></div>載入中...</div>
+  </div>
+
+  <!-- ── 三欄詳細指標 ── -->
+  <div class="block-grid" id="block-grid">
+    <div class="loading-state"><div class="spinner"></div>載入中...</div>
+  </div>
+
+  <!-- ── 風險預告 ── -->
+  <div class="section-title">🚨 風險預告</div>
+  <div class="risk-list" id="risk-list">
+    <div class="loading-state"><div class="spinner"></div>載入中...</div>
+  </div>
+
+  <!-- ── AI 敘述報告 ── -->
+  <div class="section-title">📝 月度分析敘述</div>
+  <div class="ai-panel">
+    <div class="ai-panel-header">
+      <div class="ai-panel-title">人力資源月度報告</div>
+      <span class="ai-badge">Claude AI 生成</span>
+      <span style="font-size:11px;color:var(--text-sub);margin-left:auto">生成後請 HR 審閱確認再使用</span>
+    </div>
+    <div id="ai-output">
+      <div class="ai-placeholder">點擊上方「✨ 生成 AI 報告」按鈕，系統將根據當月數據生成完整月度分析敘述。</div>
+    </div>
+  </div>
+
+  <!-- ── 可執行方案 ── -->
+  <div class="section-title">💡 可執行方案</div>
+  <div class="action-grid" id="action-grid">
+    <div class="loading-state"><div class="spinner"></div>載入中...</div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ══════════════════════════════════════
+//  設定
+// ══════════════════════════════════════
+const WORKER_URL   = 'https://lark-recruitment-api.sherrya82255.workers.dev';
+const BASE_TOKEN   = 'E3X4blbxWa4DaLsSxsClZ3KbgYb';
+
+// 招募 Base 表格
+const RECRUIT_TABLES = {
+  招募名單:     'tbl9yLmC7gMtdN6A',
+  電訪紀錄:     'tblkTPzuymEcZoyx',
+  面談紀錄:     'tblaQzLBQlItTtiB',
+  履歷收件統計: 'tblHKMr3Xlf3g6KS',
+};
+// 人力資源 Base 表格（同 Base）
+const HR_TABLES = {
+  員工基本資料: 'tblSWTahiwhpq0uR',
+  人力彙總:     'tblpLG2AS9l1dwVY',
+  離職記錄:     'tbl6K6YTOpt2MvfF',
+  差勤記錄:     'tblTvIFm0EptwCtR',
+};
+// 關懷 Base 表格
+const CARE_BASE_TOKEN = 'E3X4blbxWa4DaLsSxsClZ3KbgYb'; // 同 base
+const CARE_TABLES = {
+  員工主檔: 'tblyywSnGtr4m1PO',
+  關懷紀錄: 'tblsPbqM9zqQ2UZo',
+  績效面談: 'tblLVAg8ddngVF0v',
+  承諾追蹤: 'tbliiEFQvWd1IvcU',
+  新人關懷: 'tblY8UxWJzXXy4e1',
+};
+
+// ── 層級 A：僅 Sherry 可進入 ──
+const ALLOWED_PWD  = 'SJAU2B5P';
+const ALLOWED_NAME = 'Sherry';
+
+let selectedPeriod = 'current';
+
+// 全域資料
+let allCandidates = [], phoneRecords = [], interviewRecords = [], statsRecords = [];
+let employees = [], summaries = [], exitList = [], leaveList = [];
+let careEmployees = [], careRecords = [], promises = [], newbieRecords = [];
+let dataLoaded = false;
+
+// ══════════════════════════════════════
+//  Auth — 層級 A + 讀取 localStorage
+// ══════════════════════════════════════
+function doLogin() {
+  const pwd = document.getElementById('auth-input').value.trim();
+  if (pwd === ALLOWED_PWD) {
+    localStorage.setItem('bb_auth', JSON.stringify({ pwd, role:'hr', name: ALLOWED_NAME }));
+    grantAccess();
+  } else {
+    // 其他所有密碼（含其他 HR、所有主管）→ 無權限
+    document.getElementById('auth-error').textContent = '此頁面僅限 HR 管理員（Sherry）使用';
+  }
+}
+
+function grantAccess() {
+  document.getElementById('auth-overlay').style.display = 'none';
+  document.getElementById('user-name').textContent = ALLOWED_NAME;
+  document.getElementById('main-content').style.display = 'block';
+  updateMonthBadge();
+  initData();
+}
+
+function doLogout() {
+  localStorage.removeItem('bb_auth');
+  location.reload();
+}
+
+// 啟動：讀取 localStorage
+(function() {
+  const saved = localStorage.getItem('bb_auth');
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      if (u.pwd === ALLOWED_PWD) { grantAccess(); return; }
+      // 其他人有 bb_auth 但非 Sherry → 顯示無權限提示
+      showNoAccess();
+      return;
+    } catch(e) {}
+  }
+  // 未登入 → 顯示登入框
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('auth-box').style.display = 'block';
+  document.getElementById('no-access').style.display = 'none';
+})();
+
+function showNoAccess() {
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('auth-box').style.display = 'none';
+  document.getElementById('no-access').style.display = 'flex';
+}
+
+// ══════════════════════════════════════
+//  Helper
+// ══════════════════════════════════════
+function gf(obj, key) {
+  if (!obj || !obj[key]) return null;
+  const v = obj[key];
+  if (Array.isArray(v)) return v.map(i => typeof i === 'object' ? (i.text || i.name || '') : i).join(', ');
+  if (typeof v === 'object' && v.text) return v.text;
+  return v;
+}
+function n(v) { return parseFloat(v) || 0; }
+function parseDateVal(v) {
+  if (!v) return null;
+  if (!isNaN(v)) return new Date(Number(v));
+  return new Date(String(v).replace(/\//g, '-').split(' ')[0]);
+}
+function getPeriodRange(period) {
+  const now = new Date(); const y = now.getFullYear(), m = now.getMonth();
+  switch(period) {
+    case 'current': return { start: new Date(y, m, 1),   end: new Date(y, m+1, 0) };
+    case 'prev':    return { start: new Date(y, m-1, 1), end: new Date(y, m, 0) };
+    case '3m':      return { start: new Date(y, m-2, 1), end: new Date(y, m+1, 0) };
+    default:        return null;
+  }
+}
+function filterByPeriod(records, dateField, period) {
+  const p = period || selectedPeriod;
+  const range = getPeriodRange(p);
+  if (!range) return records;
+  return records.filter(r => {
+    const d = parseDateVal(gf(r, dateField));
+    return d && d >= range.start && d <= range.end;
+  });
+}
+function periodLabel(p) {
+  const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1;
+  if (p === 'current') return `${y} 年 ${m} 月`;
+  if (p === 'prev') {
+    const pm = m === 1 ? 12 : m - 1; const py = m === 1 ? y - 1 : y;
+    return `${py} 年 ${pm} 月`;
+  }
+  return `近三個月`;
+}
+function updateMonthBadge() {
+  document.getElementById('month-badge').textContent = periodLabel(selectedPeriod);
+}
+
+// ══════════════════════════════════════
+//  資料載入
+// ══════════════════════════════════════
+async function fetchTable(tableId, token) {
+  const tk = token || BASE_TOKEN;
+  let records = [], pageToken = null;
+  do {
+    const path = `/open-apis/bitable/v1/apps/${tk}/tables/${tableId}/records?page_size=100${pageToken ? '&page_token=' + pageToken : ''}`;
+    const res  = await fetch(WORKER_URL + path);
+    const data = await res.json();
+    if (data.code !== 0) throw new Error('讀取失敗：' + data.msg);
+    records = records.concat(data.data?.items || []);
+    pageToken = data.data?.page_token || null;
+  } while (pageToken);
+  return records.map(r => r.fields);
+}
+
+async function initData() {
+  try {
+    // 並行載入所有表格
+    const [
+      cand, phone, interview, stats,
+      emp, summ, exit_, leave,
+      careEmp, care, perf, prom, newbie
+    ] = await Promise.all([
+      fetchTable(RECRUIT_TABLES.招募名單),
+      fetchTable(RECRUIT_TABLES.電訪紀錄).catch(() => []),
+      fetchTable(RECRUIT_TABLES.面談紀錄).catch(() => []),
+      fetchTable(RECRUIT_TABLES.履歷收件統計).catch(() => []),
+      fetchTable(HR_TABLES.員工基本資料),
+      fetchTable(HR_TABLES.人力彙總),
+      fetchTable(HR_TABLES.離職記錄).catch(() => []),
+      fetchTable(HR_TABLES.差勤記錄).catch(() => []),
+      fetchTable(CARE_TABLES.員工主檔),
+      fetchTable(CARE_TABLES.關懷紀錄).catch(() => []),
+      fetchTable(CARE_TABLES.績效面談).catch(() => []),
+      fetchTable(CARE_TABLES.承諾追蹤).catch(() => []),
+      fetchTable(CARE_TABLES.新人關懷).catch(() => []),
+    ]);
+    allCandidates = cand; phoneRecords = phone; interviewRecords = interview; statsRecords = stats;
+    employees = emp; summaries = summ; exitList = exit_; leaveList = leave;
+    careEmployees = careEmp; careRecords = care; promises = prom; newbieRecords = newbie;
+    dataLoaded = true;
+  } catch(e) {
+    console.warn('資料載入失敗，使用示範資料', e);
+    loadDemoData();
+  }
+  renderAll();
+}
+
+function loadDemoData() {
+  dataLoaded = true;
+  allCandidates = [
+    { 應徵者:'刁彥瑜', 應徵職務:'AI前端工程師', 當前關卡:'電訪', 關卡進度:'應徵者婉拒', 收件日期:'2026/06/05' },
+    { 應徵者:'許晉瑜', 應徵職務:'AI前端工程師', 當前關卡:'初試', 關卡進度:'進行中',     收件日期:'2026/06/10' },
+    { 應徵者:'嚴庭亞', 應徵職務:'AI前端工程師', 當前關卡:'AI評分', 關卡進度:'應徵者婉拒', 收件日期:'2026/06/12' },
+  ];
+  phoneRecords = [
+    { 應徵者:'刁彥瑜', 電訪日期:'2026/06/06', 總體評分: 3.5 },
+    { 應徵者:'許晉瑜', 電訪日期:'2026/06/11', 總體評分: 4.0 },
+  ];
+  statsRecords = [
+    { 統計日期:'2026/06/10', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:24, HR推薦:8, AI評分:3, 主管篩選通過:0 },
+    { 統計日期:'2026/06/10', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:17, HR推薦:2, AI評分:1, 主管篩選通過:0 },
+    { 統計日期:'2026/06/10', 應徵職務:'AI工程師/架構師', 主動應徵_履歷總數:5, HR推薦:0, AI評分:2, 主管篩選通過:0 },
+  ];
+  summaries = [
+    { 月份:'2026/06', 當月在職總人數:29, 當月離職人數:1, 當月新進人數:0, '累計離職人數（2025起）':38, '累計離職率（歷史總覽）':54.3, 淨人力變化:-1 },
+  ];
+  exitList = [
+    { 英文名字:'ExX', 單位:'技術中心', 離職類型:'自願離職', 離職原因:'生涯規劃', 離職月份:'2026/06', 年資區間:'1-3年' },
+  ];
+  employees = [
+    { 英文名字:'Victor', 在職狀態:'在職中', 單位:'技術中心', 年資區間:'5年以上' },
+    { 英文名字:'Mina',   在職狀態:'在職中', 單位:'管理中心', 年資區間:'1-3年' },
+    { 英文名字:'Felix',  在職狀態:'在職中', 單位:'技術中心', 年資區間:'1-3年' },
+    { 英文名字:'Roy',    在職狀態:'在職中', 單位:'技術中心', 年資區間:'5年以上' },
+  ];
+  careEmployees = [
+    { 英文名:'Roy',   '員工姓名':'林上景', 'Lark 帳號 ID':'KR-Roy',  '部門':'技術中心', '當前風險等級':'高', '在職狀態':'在職', '到職日期':'2021/03/01' },
+    { 英文名:'Felix', '員工姓名':'林柏安', 'Lark 帳號 ID':'KR-Felix','部門':'技術中心', '當前風險等級':'中', '在職狀態':'在職', '到職日期':'2023/06/01' },
+    { 英文名:'Mina',  '員工姓名':'蔡美娜', 'Lark 帳號 ID':'KR-Mina', '部門':'管理中心', '當前風險等級':'低', '在職狀態':'在職', '到職日期':'2024/01/15' },
+  ];
+  careRecords = [
+    { '紀錄 ID':'CARE-001', '關懷員工':'KR-Mina', '面談日期':'2026/06/05', '面談類型':'1on1 關懷', '留任風險等級':'低', '流程狀態':'已完成' },
+  ];
+  promises = [
+    { '承諾 ID':'ACT-004', '關懷員工':'KR-Roy', '承諾人（主管）':'KR-Max', '承諾內容':'安排職涯發展對談', '預計完成日期':'2026/05/15', '兌現狀態':'已逾期', '逾期天數':21 },
+  ];
+  newbieRecords = [];
+}
+
+// ══════════════════════════════════════
+//  指標計算
+// ══════════════════════════════════════
+
+// ── 招募指標 ──
+function computeRecruitMetrics() {
+  const fc = filterByPeriod(allCandidates, '收件日期');
+  const fs = filterByPeriod(statsRecords, '統計日期');
+  const fp = filterByPeriod(phoneRecords, '電訪日期');
+  const fi = filterByPeriod(interviewRecords, '面試日期');
+
+  const statsTotal = fs.reduce((a,r) => a + n(gf(r,'主動應徵_履歷總數')) + n(gf(r,'HR推薦')), 0);
+  const total = statsTotal || fc.length;
+  const phoneCompleted = fp.filter(r => gf(r,'應徵者')).length;
+  const phoneDenom = fc.length;
+  const phoneRate = phoneDenom ? Math.round(phoneCompleted / phoneDenom * 100) : null;
+  const iReal = fi.filter(r => gf(r,'應徵者')).length;
+  const interviewRate = phoneCompleted ? Math.round(iReal / phoneCompleted * 100) : null;
+  const dec = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  const lossRate = fc.length ? Math.round(dec / fc.length * 100) : null;
+  const phoneScores = fp.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
+  const avgScore = phoneScores.length ? parseFloat((phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2)) : null;
+  const positions = [...new Set(allCandidates.map(c=>gf(c,'應徵職務')).filter(Boolean))];
+  return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc };
+}
+
+// ── 人力資源指標 ──
+function computeHRMetrics() {
+  const fs = filterByPeriod(summaries, '月份');
+  const fel = filterByPeriod(exitList, '離職月份');
+  const actives = employees.filter(e => gf(e,'在職狀態') === '在職中');
+  const latest = fs[fs.length - 1] || {};
+  const exitCnt = n(gf(latest,'當月離職人數'));
+  const newCnt  = n(gf(latest,'當月新進人數'));
+  const activeCnt = n(gf(latest,'當月在職總人數')) || actives.length;
+  const cumRate = n(gf(latest,'累計離職率（歷史總覽）'));
+  const monthlyRate = activeCnt ? parseFloat((exitCnt / activeCnt * 100).toFixed(1)) : 0;
+  const netChange = n(gf(latest,'淨人力變化'));
+  const juniorPct = actives.length ? Math.round(actives.filter(e=>gf(e,'年資區間')==='0-1年').length / actives.length * 100) : 0;
+  const voluntaryPct = fel.length ? Math.round(fel.filter(e=>gf(e,'離職類型')==='自願離職').length / fel.length * 100) : 0;
+  const exitByDept = {}; fel.forEach(e=>{ const d=gf(e,'單位')||'其他'; exitByDept[d]=(exitByDept[d]||0)+1; });
+  const maxDeptEntry = Object.entries(exitByDept).sort((a,b)=>b[1]-a[1])[0];
+  return { exitCnt, newCnt, activeCnt, cumRate, monthlyRate, netChange, juniorPct, voluntaryPct, maxDeptEntry, actives };
+}
+
+// ── 關懷指標 ──
+function computeCareMetrics() {
+  const fr = filterByPeriod(careRecords, '面談日期');
+  const activeEmps = careEmployees.filter(e => !gf(e,'在職狀態')?.includes('離職'));
+  const highRisk = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('高')).length;
+  const midRisk  = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('中')).length;
+  const overdueP = promises.filter(p => {
+    const s = gf(p,'兌現狀態') || '';
+    return s.includes('逾期') || (parseFloat(gf(p,'逾期天數'))||0) > 3;
+  }).length;
+  const coveredIds = [...new Set(fr.map(r => gf(r,'關懷員工')).filter(Boolean))];
+  const coverageRate = activeEmps.length ? Math.round(coveredIds.length / activeEmps.length * 100) : 0;
+  const pendingP = promises.filter(p => { const s=gf(p,'兌現狀態')||''; return s==='待處理'||s.includes('逾期'); }).length;
+  return { activeEmps, highRisk, midRisk, fr, coverageRate, overdueP, pendingP, coveredIds };
+}
+
+// ══════════════════════════════════════
+//  風險整合計算
+// ══════════════════════════════════════
+function computeAllRisks(rm, hm, cm) {
+  const risks = [];
+
+  // ── 人力資源風險 ──
+  if (hm.monthlyRate > 10)
+    risks.push({ level:'high', icon:'🔥', source:'人力資源', title:'本月離職率過高', metric:`離職率 ${hm.monthlyRate}%（${hm.exitCnt} 人）`, desc:`當月離職人數偏高，若持續超過 10% 將嚴重影響服務能量與交接品質，建議本週緊急召開部門主管會議評估原因。` });
+  else if (hm.monthlyRate > 5 && hm.exitCnt >= 2)
+    risks.push({ level:'medium', icon:'⚠️', source:'人力資源', title:'本月離職率偏高', metric:`離職率 ${hm.monthlyRate}%（${hm.exitCnt} 人）`, desc:`當月離職比例高於健康水準（< 5%），需追蹤是否為連續趨勢。` });
+
+  if (hm.netChange < 0 && hm.newCnt < hm.exitCnt)
+    risks.push({ level:'high', icon:'📉', source:'人力資源', title:'淨人力持續負成長', metric:`淨變化 ${hm.netChange}，新進 ${hm.newCnt} < 離職 ${hm.exitCnt}`, desc:`補充人力速度跟不上流失速度，若招募管線未能及時填補，將造成業務超載與品質下滑。` });
+
+  if (hm.juniorPct > 30)
+    risks.push({ level:'medium', icon:'🌱', source:'人力資源', title:'新進員工比例偏高', metric:`年資 0-1 年佔在職 ${hm.juniorPct}%`, desc:`大量新進員工需要較多培訓資源，短期內可能影響整體生產力，建議啟動配對導師制。` });
+
+  // ── 招募風險 ──
+  if (rm.total < 10)
+    risks.push({ level:'high', icon:'📥', source:'招募管理', title:'履歷收件量嚴重不足', metric:`本月收件 ${rm.total} 份，目標 ≥ 10 份`, desc:`收件量不足將導致後續各關卡候選人稀缺，建議立即擴大招募渠道。` });
+  else if (rm.total < 20)
+    risks.push({ level:'medium', icon:'📊', source:'招募管理', title:'履歷收件量偏低', metric:`本月收件 ${rm.total} 份`, desc:`收件量雖達最低門檻，但相對於職缺需求仍屬偏低，建議調整刊登策略。` });
+
+  if (rm.lossRate !== null && rm.lossRate > 30)
+    risks.push({ level:'high', icon:'🚪', source:'招募管理', title:'應徵者流失率超標', metric:`流失率 ${rm.lossRate}%，目標 ≤ 30%`, desc:`${rm.dec} 位候選人主動婉拒，建議縮短決策週期並了解薪資期望落差。` });
+
+  if (rm.phoneRate !== null && rm.phoneRate < 60)
+    risks.push({ level:'medium', icon:'📞', source:'招募管理', title:'電訪完成率偏低', metric:`電訪完成率 ${rm.phoneRate}%，目標 ≥ 60%`, desc:`電訪接通率未達標，可能為聯絡時段不佳或求職者意願低落，建議調整電訪時段與話術。` });
+
+  // ── 員工關懷風險 ──
+  if (cm.highRisk > 0) {
+    const names = careEmployees.filter(e=>gf(e,'當前風險等級')?.includes('高')).map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、');
+    risks.push({ level:'high', icon:'🔴', source:'員工關懷', title:'高留任風險員工需立即關懷', metric:`共 ${cm.highRisk} 位：${names || '詳見關懷系統'}`, desc:`高風險員工若未及時關懷介入，離職機率顯著提升，請主管本週內安排 1on1，HR 同步追蹤。` });
+  }
+
+  if (cm.overdueP > 0)
+    risks.push({ level:'high', icon:'📋', source:'員工關懷', title:'主管承諾逾期未兌現', metric:`${cm.overdueP} 項承諾已逾期超過 3 天`, desc:`逾期承諾會直接影響員工對主管的信任感，請 HR 本週內逐一追蹤並協助推進。` });
+
+  if (cm.midRisk >= 2)
+    risks.push({ level:'medium', icon:'🟡', source:'員工關懷', title:'中風險員工持續追蹤中', metric:`共 ${cm.midRisk} 位中風險員工`, desc:`中風險員工若連續兩次評估未改善，建議主管縮短關懷頻率為每月一次，持續追蹤。` });
+
+  return risks.sort((a,b) => ({'high':0,'medium':1,'low':2}[a.level] - {'high':0,'medium':1,'low':2}[b.level]));
+}
+
+// ══════════════════════════════════════
+//  渲染
+// ══════════════════════════════════════
+function renderAll() {
+  if (!dataLoaded) return;
+  updateMonthBadge();
+  const rm = computeRecruitMetrics();
+  const hm = computeHRMetrics();
+  const cm = computeCareMetrics();
+  const risks = computeAllRisks(rm, hm, cm);
+  renderKPIStrip(rm, hm, cm);
+  renderBlockGrid(rm, hm, cm);
+  renderRiskList(risks);
+  renderActions(risks, rm, hm, cm);
+}
+
+function tagClass(ok, warn) {
+  if (ok === null) return 'tag-info';
+  return ok ? 'tag-ok' : (warn ? 'tag-warn' : 'tag-danger');
+}
+function tagText(ok, val, unit) {
+  if (ok === null) return '待確認';
+  return ok ? '達標' : '未達標';
+}
+
+function renderKPIStrip(rm, hm, cm) {
+  const cards = [
+    {
+      cls:'hr', label:'本月在職人數', val: hm.activeCnt, unit:'人',
+      sub: `離職 ${hm.exitCnt} 人・淨變化 ${hm.netChange >= 0 ? '+':''}${hm.netChange}`,
+      tagCls: hm.exitCnt <= 1 ? 'tag-ok' : hm.monthlyRate > 10 ? 'tag-danger' : 'tag-warn',
+      tagTxt: hm.exitCnt === 0 ? '無異動' : `離職 ${hm.exitCnt} 人`
+    },
+    {
+      cls:'recruit', label:'本月履歷收件', val: rm.total, unit:'份',
+      sub: `電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}`,
+      tagCls: rm.total >= 10 ? 'tag-ok' : 'tag-danger',
+      tagTxt: rm.total >= 10 ? '達標' : '不足'
+    },
+    {
+      cls:'care', label:'高留任風險員工', val: cm.highRisk, unit:'人',
+      sub: `中風險 ${cm.midRisk} 人・關懷覆蓋率 ${cm.coverageRate}%`,
+      tagCls: cm.highRisk === 0 ? 'tag-ok' : 'tag-danger',
+      tagTxt: cm.highRisk === 0 ? '良好' : '需立即處理'
+    },
+  ];
+  document.getElementById('kpi-strip').innerHTML = cards.map(c => `
+    <div class="kpi-card ${c.cls}" style="animation:fadeUp .4s ease both">
+      <div class="kpi-card-label">${c.label}</div>
+      <div class="kpi-card-val" style="color:var(--navy)">${c.val}<span style="font-size:14px;font-weight:400;color:var(--text-sub);margin-left:2px">${c.unit}</span></div>
+      <div class="kpi-card-sub">${c.sub}</div>
+      <span class="kpi-card-tag ${c.tagCls}">${c.tagTxt}</span>
+    </div>`).join('');
+}
+
+function renderBlockGrid(rm, hm, cm) {
+  const hrRows = [
+    { label:'本月在職人數',    val: hm.activeCnt + ' 人', cls: '' },
+    { label:'本月離職人數',    val: hm.exitCnt + ' 人',  cls: hm.exitCnt >= 3 ? 'red' : hm.exitCnt >= 1 ? 'amber' : 'teal' },
+    { label:'本月新進人數',    val: hm.newCnt + ' 人',   cls: 'teal' },
+    { label:'當月離職率',      val: hm.monthlyRate + '%', cls: hm.monthlyRate > 10 ? 'red' : hm.monthlyRate > 5 ? 'amber' : 'teal' },
+    { label:'新進員工佔比',    val: hm.juniorPct + '%',   cls: hm.juniorPct > 30 ? 'amber' : '' },
+    { label:'自願離職佔比',    val: hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '—', cls: '' },
+  ];
+  const recruitRows = [
+    { label:'收件總數',        val: rm.total + ' 份',     cls: rm.total >= 10 ? 'teal' : 'red' },
+    { label:'電訪完成率',      val: rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無', cls: rm.phoneRate !== null ? (rm.phoneRate >= 60 ? 'teal' : 'amber') : '' },
+    { label:'初試達成率',      val: rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無', cls: rm.interviewRate !== null ? (rm.interviewRate >= 60 ? 'teal' : 'amber') : '' },
+    { label:'應徵者流失率',    val: rm.lossRate !== null ? rm.lossRate + '%' : '暫無', cls: rm.lossRate !== null ? (rm.lossRate <= 30 ? 'teal' : 'red') : '' },
+    { label:'電訪平均評分',    val: rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無', cls: rm.avgScore !== null ? (rm.avgScore >= 3.5 ? 'teal' : 'amber') : '' },
+    { label:'開放職缺數',      val: rm.positions.length + ' 個', cls: '' },
+  ];
+  const careRows = [
+    { label:'在職員工總數',    val: cm.activeEmps.length + ' 人', cls: '' },
+    { label:'高留任風險',      val: cm.highRisk + ' 人', cls: cm.highRisk > 0 ? 'red' : 'teal' },
+    { label:'中留任風險',      val: cm.midRisk + ' 人',  cls: cm.midRisk >= 2 ? 'amber' : '' },
+    { label:'本月關懷次數',    val: cm.fr.length + ' 次', cls: cm.fr.length > 0 ? 'teal' : 'amber' },
+    { label:'關懷覆蓋率',      val: cm.coverageRate + '%', cls: cm.coverageRate >= 80 ? 'teal' : cm.coverageRate >= 50 ? 'amber' : 'red' },
+    { label:'逾期承諾',        val: cm.overdueP + ' 項', cls: cm.overdueP > 0 ? 'red' : 'teal' },
+  ];
+
+  function buildBlock(icon, title, color, rows) {
+    return `<div class="block-panel" style="animation:fadeUp .5s ease both">
+      <div class="block-panel-title"><span style="color:${color}">${icon}</span> ${title}</div>
+      ${rows.map(r => `<div class="metric-row">
+        <span class="metric-label">${r.label}</span>
+        <span class="metric-val ${r.cls}">${r.val}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  document.getElementById('block-grid').innerHTML =
+    buildBlock('👥', '人力資源', '#3B8BD4', hrRows) +
+    buildBlock('📋', '招募管理', '#1D9E75', recruitRows) +
+    buildBlock('💚', '員工關懷', '#6B4FA0', careRows);
+}
+
+function renderRiskList(risks) {
+  if (!risks.length) {
+    document.getElementById('risk-list').innerHTML = `
+      <div style="background:var(--teal-light);border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✅</span>
+        <div>
+          <div style="font-weight:700;font-size:13px;color:var(--teal)">本月各項指標均在健康範圍</div>
+          <div style="font-size:12px;color:#5F5E5A;margin-top:3px">請維持現有人力管理節奏，持續追蹤關鍵指標。</div>
+        </div>
+      </div>`;
+    return;
+  }
+  document.getElementById('risk-list').innerHTML = risks.map(r => `
+    <div class="risk-item ${r.level}" style="animation:fadeUp .4s ease both">
+      <div class="risk-icon">${r.icon}</div>
+      <div class="risk-body">
+        <div class="risk-header">
+          <span class="risk-level-badge">${r.level === 'high' ? '高風險' : r.level === 'medium' ? '中風險' : '低風險'}</span>
+          <span class="risk-source-badge">${r.source}</span>
+          <span class="risk-title">${r.title}</span>
+        </div>
+        <div class="risk-metric">${r.metric}</div>
+        <div class="risk-desc">${r.desc}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderActions(risks, rm, hm, cm) {
+  const actions = [];
+  const tags = risks.map(r => r.source + ':' + r.title);
+
+  if (hm.exitCnt > 0 || (rm.lossRate !== null && rm.lossRate > 20))
+    actions.push({ icon:'🤝', title:'縮短決策週期・降低人才流失', tag:'短期・本週優先',
+      body:`<li>電訪評分 ≥ 4 分的候選人，建議 <strong>3 個工作日內</strong> 完成主管面試安排</li>
+            <li>離職員工進行<strong>離職訪談</strong>，記錄原因並每月彙整一次呈報管理層</li>
+            <li>若多人因薪資婉拒，啟動 <strong>薪資結構檢討</strong>，對比市場行情</li>`,
+      steps:['確認主管面試檔期','完成離職訪談記錄','啟動薪資校準評估'] });
+
+  if (cm.highRisk > 0 || cm.overdueP > 0)
+    actions.push({ icon:'💬', title:'高風險員工關懷介入', tag:'緊急・立即執行',
+      body:`<li>高風險員工請主管 <strong>本週內</strong> 安排 1on1，並將面談記錄同步至關懷系統</li>
+            <li>逾期承諾請 HR 逐一確認完成狀況，未完成者更新預計完成日期</li>
+            <li>HR 獨立約談高風險員工，了解主管無法得知的深層狀況</li>`,
+      steps:['主管本週安排 1on1','更新逾期承諾','HR 獨立約談'] });
+
+  if (rm.total < 20)
+    actions.push({ icon:'📢', title:'擴大招募渠道・提升收件量', tag:'短期・立即執行',
+      body:`<li>同步開啟 <strong>LinkedIn、CakeResume、Yourator</strong> 刊登，避免依賴單一平台</li>
+            <li>請部門主管協助 <strong>內部轉介</strong>，推薦潛力人才</li>
+            <li>評估是否調整 JD 措辭，降低不必要的硬性條件以擴大應徵母數</li>`,
+      steps:['多平台同步刊登','啟動員工轉介','審視並優化 JD'] });
+
+  if (hm.netChange < 0)
+    actions.push({ icon:'⚡', title:'加速招募填補人力缺口', tag:'中期・本月追蹤',
+      body:`<li>確認各職缺的優先填補順序，集中資源在最急迫的職位</li>
+            <li>縮短面試流程，電訪後 <strong>48 小時內</strong> 完成邀約，7 天內確定主管面試日</li>
+            <li>建立備援候選人名單，避免最終錄取者拒絕後管道斷流</li>`,
+      steps:['職缺優先排序','48h 內完成邀約','建立候選人備援池'] });
+
+  if (hm.juniorPct > 25)
+    actions.push({ icon:'🌱', title:'新進員工培育計畫', tag:'中期・本季執行',
+      body:`<li>啟動配對導師制，每位新進員工指定 1 位資深同仁擔任 Buddy</li>
+            <li>HR 安排入職 30/60/90 天節點關懷，了解適應狀況</li>
+            <li>主管納入新人里程碑追蹤，確保培育進度符合預期</li>`,
+      steps:['建立 Buddy 制度','入職三節點關懷','主管里程碑追蹤'] });
+
+  if (!actions.length)
+    actions.push({ icon:'✅', title:'維持現有管理節奏', tag:'持續執行',
+      body:`<li>本月各項指標均在健康範圍，建議持續維持現有招募、關懷與人力管理頻率</li>
+            <li>每月定期檢視儀表板數據，提前發現潛在風險</li>
+            <li>持續蒐集員工意見，作為下季人力策略的參考依據</li>`,
+      steps:['定期儀表板檢視','蒐集員工意見','下季策略規劃'] });
+
+  document.getElementById('action-grid').innerHTML = actions.map(a => `
+    <div class="action-card" style="animation:fadeUp .5s ease both">
+      <div class="action-header">
+        <div class="action-icon">${a.icon}</div>
+        <div class="action-meta">
+          <div class="action-title">${a.title}</div>
+          <div class="action-tag">${a.tag}</div>
+        </div>
+      </div>
+      <ul class="action-body">${a.body}</ul>
+      <div class="action-steps">${a.steps.map(s=>`<span class="action-step">${s}</span>`).join('')}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+//  AI 報告生成
+// ══════════════════════════════════════
+async function generateReport() {
+  const btn = document.getElementById('gen-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  document.getElementById('ai-output').innerHTML = `
+    <div class="ai-loading"><div class="spinner"></div>正在彙整數據並生成月度報告，約需 15-30 秒...</div>`;
+
+  const rm = computeRecruitMetrics();
+  const hm = computeHRMetrics();
+  const cm = computeCareMetrics();
+  const risks = computeAllRisks(rm, hm, cm);
+  const period = periodLabel(selectedPeriod);
+
+  const prompt = `你是勝海科技的 HR 顧問，請根據以下 ${period} 的人力資源數據，撰寫一份給管理層的月度人力資源報告。
+
+【人力資源】
+- 本月在職人數：${hm.activeCnt} 人
+- 本月離職人數：${hm.exitCnt} 人（離職率 ${hm.monthlyRate}%）
+- 本月新進人數：${hm.newCnt} 人（淨人力變化：${hm.netChange >= 0 ? '+':''}${hm.netChange}）
+- 年資 0-1 年員工佔比：${hm.juniorPct}%
+- 自願離職佔本月離職：${hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '無離職'}
+
+【招募管理】
+- 本月收件總數：${rm.total} 份（目標 ≥ 10 份）
+- 電訪完成率：${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無資料'}（目標 ≥ 60%）
+- 初試達成率：${rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無資料'}（目標 ≥ 60%）
+- 應徵者流失率：${rm.lossRate !== null ? rm.lossRate + '%' : '暫無資料'}（目標 ≤ 30%）
+- 電訪平均評分：${rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無資料'}（目標 ≥ 3.5）
+- 開放職缺：${rm.positions.join('、') || '無'}
+
+【員工關懷】
+- 在職員工：${cm.activeEmps.length} 人
+- 高留任風險員工：${cm.highRisk} 人
+- 中留任風險員工：${cm.midRisk} 人
+- 本月關懷次數：${cm.fr.length} 次
+- 關懷覆蓋率：${cm.coverageRate}%
+- 逾期未兌現承諾：${cm.overdueP} 項
+
+【本月主要風險】
+${risks.length > 0 ? risks.map(r => `- [${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}風險][${r.source}] ${r.title}：${r.metric}`).join('\n') : '- 本月無顯著風險'}
+
+請撰寫一份結構清晰的月度報告，格式如下：
+1. 本月整體人力狀況摘要（3-4句，點出關鍵數字與整體趨勢）
+2. 三大區塊重點說明（人力資源、招募管理、員工關懷各 2-3 句，有問題直接點出痛點）
+3. 本月最需關注的 1-2 個核心議題（說明為什麼重要、影響範圍）
+4. 下月行動建議（具體可執行，3-5 條）
+
+語氣：專業、直接，適合在管理層會議上報告，繁體中文，不要加 markdown 符號。`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b => b.text || '').join('') || '';
+    if (!text) throw new Error('AI 回應為空');
+    document.getElementById('ai-output').innerHTML = `<div class="ai-content">${escHtml(text)}</div>`;
+  } catch(e) {
+    document.getElementById('ai-output').innerHTML = `
+      <div style="background:var(--red-light);border-radius:8px;padding:14px;font-size:12px;color:#A32D2D">
+        ⚠️ AI 生成失敗：${escHtml(e.message)}<br>
+        <span style="color:var(--text-sub);margin-top:4px;display:block">請確認網路連線後重試，或手動整理上方數據撰寫報告。</span>
+      </div>`;
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════
+//  工具函數
+// ══════════════════════════════════════
+function onPeriodChange(val) {
+  selectedPeriod = val;
+  renderAll();
+}
+
+function copyReportText() {
+  const aiText = document.getElementById('ai-output')?.textContent?.trim() || '';
+  const rm = computeRecruitMetrics();
+  const hm = computeHRMetrics();
+  const cm = computeCareMetrics();
+  const period = periodLabel(selectedPeriod);
+  const text = `【${period} 月度人力資源報告】\n\n` +
+    `■ 人力資源\n在職 ${hm.activeCnt} 人・離職 ${hm.exitCnt} 人・新進 ${hm.newCnt} 人・離職率 ${hm.monthlyRate}%\n\n` +
+    `■ 招募管理\n收件 ${rm.total} 份・電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}・流失率 ${rm.lossRate !== null ? rm.lossRate + '%' : '暫無'}\n\n` +
+    `■ 員工關懷\n高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・覆蓋率 ${cm.coverageRate}%・逾期承諾 ${cm.overdueP} 項\n\n` +
+    (aiText && !aiText.includes('點擊上方') ? `■ AI 月報分析\n${aiText}` : '');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.print-btn:last-child');
+    const orig = btn.textContent;
+    btn.textContent = '✅ 已複製';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+</script>
+</body>
+</html>
