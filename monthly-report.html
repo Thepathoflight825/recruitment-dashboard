@@ -192,8 +192,8 @@
   <!-- 操作列 -->
   <div class="gen-bar">
     <div class="gen-bar-left">
-      <div class="gen-bar-title">🤖 AI 月報生成</div>
-      <div class="gen-bar-desc">點擊後系統將彙整三大區塊數據，由 Claude AI 生成月度敘述報告，請於確認內容後使用</div>
+      <div class="gen-bar-title">📋 複製數據給 AI</div>
+      <div class="gen-bar-desc">點擊後複製當月數據摘要，貼入「班班日常月報產生器」Claude Project 即可生成月度敘述報告</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <select id="period-select" class="period-select" onchange="onPeriodChange(this.value)">
@@ -201,9 +201,8 @@
         <option value="prev">上個月</option>
         <option value="3m">近三個月</option>
       </select>
-      <button class="gen-btn" id="gen-btn" onclick="generateReport()">
-        <div class="spinner-sm"></div>
-        <span class="btn-text">✨ 生成 AI 報告</span>
+      <button class="gen-btn" id="copy-ai-btn" onclick="copyDataForAI()">
+        <span class="btn-text">📋 複製數據給 AI</span>
       </button>
     </div>
   </div>
@@ -229,19 +228,6 @@
   <div class="section-title">🚨 風險預告</div>
   <div class="risk-list" id="risk-list">
     <div class="loading-state"><div class="spinner"></div>載入中...</div>
-  </div>
-
-  <!-- ── AI 敘述報告 ── -->
-  <div class="section-title">📝 月度分析敘述</div>
-  <div class="ai-panel">
-    <div class="ai-panel-header">
-      <div class="ai-panel-title">人力資源月度報告</div>
-      <span class="ai-badge">Claude AI 生成</span>
-      <span style="font-size:11px;color:var(--text-sub);margin-left:auto">生成後請 HR 審閱確認再使用</span>
-    </div>
-    <div id="ai-output">
-      <div class="ai-placeholder">點擊上方「✨ 生成 AI 報告」按鈕，系統將根據當月數據生成完整月度分析敘述。</div>
-    </div>
   </div>
 
   <!-- ── 可執行方案 ── -->
@@ -776,91 +762,6 @@ function renderActions(risks, rm, hm, cm) {
 }
 
 // ══════════════════════════════════════
-//  AI 報告生成
-// ══════════════════════════════════════
-async function generateReport() {
-  const btn = document.getElementById('gen-btn');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  document.getElementById('ai-output').innerHTML = `
-    <div class="ai-loading"><div class="spinner"></div>正在彙整數據並生成月度報告，約需 15-30 秒...</div>`;
-
-  const rm = computeRecruitMetrics();
-  const hm = computeHRMetrics();
-  const cm = computeCareMetrics();
-  const risks = computeAllRisks(rm, hm, cm);
-  const period = periodLabel(selectedPeriod);
-
-  const prompt = `你是勝海科技的 HR 顧問，請根據以下 ${period} 的人力資源數據，撰寫一份給管理層的月度人力資源報告。
-
-【人力資源】
-- 本月在職人數：${hm.activeCnt} 人
-- 本月離職人數：${hm.exitCnt} 人（離職率 ${hm.monthlyRate}%）
-- 本月新進人數：${hm.newCnt} 人（淨人力變化：${hm.netChange >= 0 ? '+':''}${hm.netChange}）
-- 年資 0-1 年員工佔比：${hm.juniorPct}%
-- 自願離職佔本月離職：${hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '無離職'}
-
-【招募管理】
-- 本月收件總數：${rm.total} 份（目標 ≥ 10 份）
-- 電訪完成率：${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無資料'}（目標 ≥ 60%）
-- 初試達成率：${rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無資料'}（目標 ≥ 60%）
-- 應徵者流失率：${rm.lossRate !== null ? rm.lossRate + '%' : '暫無資料'}（目標 ≤ 30%）
-- 電訪平均評分：${rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無資料'}（目標 ≥ 3.5）
-- 開放職缺：${rm.positions.join('、') || '無'}
-
-【員工關懷】
-- 在職員工：${cm.activeEmps.length} 人
-- 高留任風險員工：${cm.highRisk} 人
-- 中留任風險員工：${cm.midRisk} 人
-- 本月關懷次數：${cm.fr.length} 次
-- 關懷覆蓋率：${cm.coverageRate}%
-- 逾期未兌現承諾：${cm.overdueP} 項
-
-【本月主要風險】
-${risks.length > 0 ? risks.map(r => `- [${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}風險][${r.source}] ${r.title}：${r.metric}`).join('\n') : '- 本月無顯著風險'}
-
-請撰寫一份結構清晰的月度報告，格式如下：
-1. 本月整體人力狀況摘要（3-4句，點出關鍵數字與整體趨勢）
-2. 三大區塊重點說明（人力資源、招募管理、員工關懷各 2-3 句，有問題直接點出痛點）
-3. 本月最需關注的 1-2 個核心議題（說明為什麼重要、影響範圍）
-4. 下月行動建議（具體可執行，3-5 條）
-
-語氣：專業、直接，適合在管理層會議上報告，繁體中文，不要加 markdown 符號。`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    const text = data.content?.map(b => b.text || '').join('') || '';
-    if (!text) throw new Error('AI 回應為空');
-    document.getElementById('ai-output').innerHTML = `<div class="ai-content">${escHtml(text)}</div>`;
-  } catch(e) {
-    document.getElementById('ai-output').innerHTML = `
-      <div style="background:var(--red-light);border-radius:8px;padding:14px;font-size:12px;color:#A32D2D">
-        ⚠️ AI 生成失敗：${escHtml(e.message)}<br>
-        <span style="color:var(--text-sub);margin-top:4px;display:block">請確認網路連線後重試，或手動整理上方數據撰寫報告。</span>
-      </div>`;
-  } finally {
-    btn.classList.remove('loading');
-    btn.disabled = false;
-  }
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ══════════════════════════════════════
 //  工具函數
 // ══════════════════════════════════════
 function onPeriodChange(val) {
@@ -868,17 +769,62 @@ function onPeriodChange(val) {
   renderAll();
 }
 
+// 複製格式化數據給 Claude Project 使用
+function copyDataForAI() {
+  const rm = computeRecruitMetrics();
+  const hm = computeHRMetrics();
+  const cm = computeCareMetrics();
+  const risks = computeAllRisks(rm, hm, cm);
+  const period = periodLabel(selectedPeriod);
+
+  const text =
+`【${period} 人力資源數據】
+
+■ 人力資源
+- 本月在職人數：${hm.activeCnt} 人
+- 本月離職人數：${hm.exitCnt} 人（離職率 ${hm.monthlyRate}%）
+- 本月新進人數：${hm.newCnt} 人（淨人力變化：${hm.netChange >= 0 ? '+' : ''}${hm.netChange}）
+- 年資 0-1 年員工佔比：${hm.juniorPct}%
+- 自願離職佔本月離職：${hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '無離職'}
+
+■ 招募管理
+- 本月收件總數：${rm.total} 份（目標 ≥ 10 份）
+- 電訪完成率：${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無資料'}（目標 ≥ 60%）
+- 初試達成率：${rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無資料'}（目標 ≥ 60%）
+- 應徵者流失率：${rm.lossRate !== null ? rm.lossRate + '%' : '暫無資料'}（目標 ≤ 30%）
+- 電訪平均評分：${rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無資料'}（目標 ≥ 3.5）
+- 開放職缺：${rm.positions.join('、') || '無'}
+
+■ 員工關懷
+- 在職員工：${cm.activeEmps.length} 人
+- 高留任風險員工：${cm.highRisk} 人
+- 中留任風險員工：${cm.midRisk} 人
+- 本月關懷次數：${cm.fr.length} 次
+- 關懷覆蓋率：${cm.coverageRate}%
+- 逾期未兌現承諾：${cm.overdueP} 項
+
+■ 本月主要風險
+${risks.length > 0 ? risks.map(r => `- [${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}風險][${r.source}] ${r.title}：${r.metric}`).join('\n') : '- 本月無顯著風險'}`;
+
+  const btn = document.getElementById('copy-ai-btn');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.querySelector('.btn-text').textContent = '✅ 已複製！貼入 Claude Project';
+    setTimeout(() => btn.querySelector('.btn-text').textContent = '📋 複製數據給 AI', 3000);
+  }).catch(() => {
+    btn.querySelector('.btn-text').textContent = '❌ 複製失敗，請重試';
+    setTimeout(() => btn.querySelector('.btn-text').textContent = '📋 複製數據給 AI', 2000);
+  });
+}
+
 function copyReportText() {
-  const aiText = document.getElementById('ai-output')?.textContent?.trim() || '';
   const rm = computeRecruitMetrics();
   const hm = computeHRMetrics();
   const cm = computeCareMetrics();
   const period = periodLabel(selectedPeriod);
-  const text = `【${period} 月度人力資源報告】\n\n` +
-    `■ 人力資源\n在職 ${hm.activeCnt} 人・離職 ${hm.exitCnt} 人・新進 ${hm.newCnt} 人・離職率 ${hm.monthlyRate}%\n\n` +
-    `■ 招募管理\n收件 ${rm.total} 份・電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}・流失率 ${rm.lossRate !== null ? rm.lossRate + '%' : '暫無'}\n\n` +
-    `■ 員工關懷\n高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・覆蓋率 ${cm.coverageRate}%・逾期承諾 ${cm.overdueP} 項\n\n` +
-    (aiText && !aiText.includes('點擊上方') ? `■ AI 月報分析\n${aiText}` : '');
+  const text = `【${period} 月度人力資源報告數據摘要】\n\n` +
+    `人力資源：在職 ${hm.activeCnt} 人・離職 ${hm.exitCnt} 人・新進 ${hm.newCnt} 人・離職率 ${hm.monthlyRate}%\n` +
+    `招募管理：收件 ${rm.total} 份・電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}・流失率 ${rm.lossRate !== null ? rm.lossRate + '%' : '暫無'}\n` +
+    `員工關懷：高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・覆蓋率 ${cm.coverageRate}%・逾期承諾 ${cm.overdueP} 項`;
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.querySelector('.print-btn:last-child');
     const orig = btn.textContent;
