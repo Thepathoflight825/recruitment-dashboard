@@ -264,6 +264,7 @@
       <span class="nb-arrow">→</span>
     </button>
     <div id="user-badge" style="display:none"><span id="user-name-label"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
+    <button id="monthly-report-btn" onclick="location.href='monthly-report.html'" style="display:none;align-items:center;gap:5px;background:rgba(239,159,39,.15);border:0.5px solid rgba(239,159,39,.5);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#EF9F27;font-family:'Noto Sans TC',sans-serif;transition:all .2s;white-space:nowrap;flex-shrink:0"><span>📊</span> 月報</button>
     <span class="sync-badge" id="sync-status">⟳ 載入中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
   </div>
@@ -1122,6 +1123,9 @@ function applyAuth(user) {
   const badge = document.getElementById('user-badge');
   badge.style.display = 'inline-flex';
   document.getElementById('user-name-label').textContent = user.name;
+  // 月報按鈕：僅 Sherry 可見
+  const reportBtn = document.getElementById('monthly-report-btn');
+  if (reportBtn) reportBtn.style.display = user.name === 'Sherry' ? 'inline-flex' : 'none';
   initDashboard();
 }
 

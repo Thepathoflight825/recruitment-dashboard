@@ -226,6 +226,7 @@
     <button class="nav-bridge" onclick="goToHR()"><span class="nb-icon">👥</span> 人力資源 <span class="nb-arrow">←</span></button>
     <button class="nav-bridge" onclick="goToCare()" style="color:#7DCFB6;border-color:rgba(29,158,117,.4)"><span class="nb-icon">💚</span> 關懷小幫手 <span class="nb-arrow">→</span></button>
     <button class="nav-bridge" onclick="goToAttendance()" style="color:#F5A623;border-color:rgba(245,166,35,.4)"><span class="nb-icon">🕐</span> 考勤 <span class="nb-arrow">→</span></button>
+    <button id="monthly-report-btn" onclick="location.href='monthly-report.html'" style="display:none;align-items:center;gap:5px;background:rgba(239,159,39,.15);border:0.5px solid rgba(239,159,39,.5);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;color:#EF9F27;font-family:'Noto Sans TC',sans-serif;transition:all .2s;white-space:nowrap;flex-shrink:0"><span>📊</span> 月報</button>
     <div id="user-badge" style="display:none"><span id="user-name-label"></span> <button id="logout-btn" onclick="doLogout()">登出</button></div>
     <span class="sync-badge" id="sync-status">⟳ 連線中</span>
     <button class="refresh-btn" onclick="initDashboard()">↻ 重整</button>
@@ -1370,6 +1371,9 @@ function applyAuth(user) {
   const badge = document.getElementById('user-badge');
   badge.style.display = 'inline-flex';
   document.getElementById('user-name-label').textContent = user.name;
+  // 月報按鈕：僅 Sherry 可見
+  const reportBtn = document.getElementById('monthly-report-btn');
+  if (reportBtn) reportBtn.style.display = user.name === 'Sherry' ? 'inline-flex' : 'none';
   // 主管角色隱藏「本月 KPI」頁籤
   if (user.role === 'manager') {
     document.querySelectorAll('.tab').forEach(t => {
