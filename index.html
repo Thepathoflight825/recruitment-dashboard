@@ -1117,9 +1117,13 @@ function renderKPI() {
   const phoneCompletedCount = fp.length;  // 當月有電訪紀錄的人數
   const phoneDenominator    = fc.length;  // 當月面談名單收件人數
 
-  const iCount = fc.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
-  const interviewDone = interviewRecords.filter(r => gf(r,'應徵者')).length;
-  const iReal = interviewDone || iCount;
+  // 初試達成率：分母 = 當月有電訪紀錄的人數（phoneCompletedCount）
+  //             分子 = 面談紀錄表中依「面試日期」篩出的當月筆數
+  //             說明：當前關卡顯示「初試」不代表已完成面談（如：初試＋應徵者婉拒，
+  //             代表在安排初試前就婉拒了，電訪紀錄有記錄但面談紀錄不會有），
+  //             因此必須以面談紀錄表的實際面試日期為準。
+  const fi = filterByPeriod(interviewRecords, '面試日期');
+  const iReal = fi.filter(r => gf(r,'應徵者')).length;
   const dec = fc.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
 
   const phoneScores = fp.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
@@ -1134,7 +1138,7 @@ function renderKPI() {
   ];
 
   document.getElementById('kpi-list').innerHTML = kpis.map(k => {
-    const icon  = k.noData ? '🔺' : k.ok ? '✅' : '❌';
+    const icon  = k.noData ? '⚠️' : k.ok ? '✅' : '❌';
     const color = k.noData ? '#EF9F27' : k.ok ? 'var(--teal)' : 'var(--red)';
     const displayVal = k.noData
       ? `<span style="font-size:12px;color:#EF9F27;font-weight:600">暫無紀錄可計算</span>`
