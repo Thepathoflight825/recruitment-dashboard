@@ -1131,7 +1131,7 @@ function renderKPI() {
 
   const kpis = [
     { name:'每月履歷收件數', target:'≥ 10 份',   val:total,                                                                   unit:'份', ok:total>=10,                                                   noData:total===0 },
-    { name:'電訪完成率',     target:'100%',       val:phoneDenominator?Math.round(phoneCompletedCount/phoneDenominator*100):0, unit:'%',  ok:phoneCompletedCount===phoneDenominator&&phoneDenominator>0, noData:phoneDenominator===0 },
+    { name:'電訪完成率',     target:'≥ 60%',      val:phoneDenominator?Math.round(phoneCompletedCount/phoneDenominator*100):0, unit:'%',  ok:phoneDenominator>0&&phoneCompletedCount/phoneDenominator>=0.6, noData:phoneDenominator===0 },
     { name:'初試達成率',     target:'≥ 60%',      val:phoneCompletedCount?Math.round(iReal/phoneCompletedCount*100):0,         unit:'%',  ok:phoneCompletedCount?iReal/phoneCompletedCount>=0.6:false,    noData:phoneCompletedCount===0 },
     { name:'應徵者流失率',   target:'≤ 30%',      val:fc.length?Math.round(dec/fc.length*100):0,                               unit:'%',  ok:fc.length?dec/fc.length<=0.3:true,                          noData:fc.length===0 },
     { name:'電訪平均評分',   target:'≥ 3.5 / 5', val:avgPhoneScore ?? 0,                                                      unit:'/5', ok:avgPhoneScore!==null&&parseFloat(avgPhoneScore)>=3.5,        noData:avgPhoneScore===null },
