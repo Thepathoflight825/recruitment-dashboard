@@ -258,8 +258,8 @@
   <div style="display:flex;align-items:center;gap:8px;padding:0 16px">
     <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
     <select id="period-select" class="period-select" onchange="onPeriodChange(this.value)">
-      <option value="current">當月</option>
-      <option value="prev" selected>上個月</option>
+      <option value="current" selected>當月</option>
+      <option value="prev">上個月</option>
       <option value="3m">近三個月</option>
       <option value="6m">近半年</option>
       <option value="1y">整年度</option>
@@ -525,7 +525,7 @@ const LINKS = {
 // ══════════════════════════════════════
 
 let employees = [], careRecords = [], perfRecords = [], promises = [], newbieRecords = [];
-let selectedPeriod = 'prev';
+let selectedPeriod = 'current';
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let riskChart = null, deptChart = null;
 

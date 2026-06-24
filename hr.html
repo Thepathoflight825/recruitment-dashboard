@@ -236,8 +236,8 @@
   <div style="display:flex;align-items:center;gap:8px;padding:0 12px">
     <span style="font-size:11px;color:#6c9bc8;white-space:nowrap">時間範圍</span>
     <select id="period-select" onchange="onPeriodChange(this.value)" style="background:#2a2a45;border:0.5px solid #3a3a5e;border-radius:6px;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer;font-family:'Noto Sans TC',sans-serif">
-      <option value="current">當月</option>
-      <option value="prev" selected>上個月</option>
+      <option value="current" selected>當月</option>
+      <option value="prev">上個月</option>
       <option value="3m">近三個月</option>
       <option value="6m">近半年</option>
       <option value="1y">整年度</option>
@@ -534,7 +534,7 @@ function loadDemoData() {
   document.getElementById('last-updated').textContent = '示範模式';
 }
 
-let selectedPeriod = 'prev';
+let selectedPeriod = 'current';
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 
 function getPeriodRange(period) {
