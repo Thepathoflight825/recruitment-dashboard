@@ -689,7 +689,7 @@ function computeMetrics() {
   const lowRisk    = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('低')).length;
   const pendingPromises = promises.filter(p => {
     const s = gf(p,'兌現狀態') || '';
-    return s === '待處理' || s.includes('逾期');
+    return s === '待處理' || s === '進行中' || s.includes('逾期');
   }).length;
   const openEvents = newbieRecords.length;
 
@@ -959,11 +959,26 @@ function renderOverview() {
   document.getElementById('s-highrisk').textContent = m.highRisk;
   document.getElementById('s-event').textContent    = m.openEvents;
 
-  // risk donut
+  // risk donut — 依關懷紀錄最新一筆「留任風險等級」計算各層人數
+  const latestRiskMap = {};
+  careRecords.forEach(r => {
+    const empId = gf(r, '關懷員工');
+    const dateStr = gf(r, '面談日期') || '';
+    const risk = gf(r, '留任風險等級') || '';
+    if (!empId || !risk) return;
+    if (!latestRiskMap[empId] || dateStr > (latestRiskMap[empId].date || '')) {
+      latestRiskMap[empId] = { date: dateStr, risk };
+    }
+  });
   const riskLevels = ['高', '中', '低', '未設定'];
   const riskCounts = riskLevels.map(lv => {
-    if (lv === '未設定') return m.activeEmps.filter(e => !gf(e,'當前風險等級')).length;
-    return m.activeEmps.filter(e => gf(e,'當前風險等級')?.includes(lv)).length;
+    return m.activeEmps.filter(e => {
+      const empId = gf(e, 'Lark 帳號 ID') || '';
+      const latest = latestRiskMap[empId];
+      const riskVal = latest ? latest.risk : '';
+      if (lv === '未設定') return !riskVal;
+      return riskVal.includes(lv);
+    }).length;
   });
   const riskColors = ['#E24B4A', '#EF9F27', '#1D9E75', '#ccc'];
   document.getElementById('risk-total').textContent = m.activeEmps.length;
@@ -982,22 +997,27 @@ function renderOverview() {
     options: { cutout: '65%', plugins: { legend: { display: false } }, responsive: false }
   });
 
-  // dept bar chart
+  // dept bar chart — 依部門名稱映射不同顏色
+  const DEPT_COLOR_PALETTE = ['#1D9E75','#185FA5','#EF9F27','#7B5EA7','#E24B4A','#D85A30','#5DCAA5','#378ADD','#F5A623','#9B7FCC'];
+  const deptColorMap = {};
+  const allDepts = [...new Set(employees.map(e => gf(e,'部門')).filter(Boolean))].sort();
+  allDepts.forEach((d, i) => { deptColorMap[d] = DEPT_COLOR_PALETTE[i % DEPT_COLOR_PALETTE.length]; });
   const deptCtx = document.getElementById('chart-dept').getContext('2d');
   if (deptChart) deptChart.destroy();
   const deptEntries = Object.entries(m.deptCount).sort((a,b) => b[1]-a[1]);
+  const deptBgColors = deptEntries.map(e => deptColorMap[e[0]] || '#1D9E75');
   deptChart = new Chart(deptCtx, {
     type: 'bar',
     data: {
       labels: deptEntries.map(e=>e[0]),
-      datasets: [{ data: deptEntries.map(e=>e[1]), backgroundColor: '#1D9E75', borderRadius: 5, borderSkipped: false }]
+      datasets: [{ data: deptEntries.map(e=>e[1]), backgroundColor: deptBgColors, borderRadius: 5, borderSkipped: false }]
     },
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }, x: { grid: { display: false } } }, responsive: true, maintainAspectRatio: true }
   });
 
   // promise reminders
   const upcoming = promises
-    .filter(p => { const s = gf(p,'兌現狀態') || ''; return s === '待處理' || s.includes('逾期'); })
+    .filter(p => { const s = gf(p,'兌現狀態') || ''; return s === '待處理' || s === '進行中' || s.includes('逾期'); })
     .sort((a,b) => {
       const da = gf(a,'預計完成日期') || '9999', db = gf(b,'預計完成日期') || '9999';
       return da.localeCompare(db);
