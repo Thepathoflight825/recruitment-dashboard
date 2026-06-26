@@ -960,9 +960,11 @@ function renderOverview() {
   document.getElementById('s-event').textContent    = m.openEvents;
 
   // risk donut — 依關懷紀錄最新一筆「留任風險等級」計算各層人數
+  // key 統一 normalize（去除所有空白、轉小寫），避免 'KR- Lawson' vs 'KR-Lawson' 對不到
+  const norm = s => (s || '').replace(/\s+/g, '').toLowerCase();
   const latestRiskMap = {};
   careRecords.forEach(r => {
-    const empId = gf(r, '關懷員工');
+    const empId = norm(gf(r, '關懷員工'));
     const dateStr = gf(r, '面談日期') || '';
     const risk = gf(r, '留任風險等級') || '';
     if (!empId || !risk) return;
@@ -973,7 +975,7 @@ function renderOverview() {
   const riskLevels = ['高', '中', '低', '未設定'];
   const riskCounts = riskLevels.map(lv => {
     return m.activeEmps.filter(e => {
-      const empId = gf(e, 'Lark 帳號 ID') || '';
+      const empId = norm(gf(e, 'Lark 帳號 ID'));
       const latest = latestRiskMap[empId];
       const riskVal = latest ? latest.risk : '';
       if (lv === '未設定') return !riskVal;
