@@ -642,7 +642,7 @@ function renderFunnelBars() {
   const fs = getFilteredStats();
   const fc = getFilteredCandidates();
   const statsTotal    = getStatsTotal(fs);
-  const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
+  const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
   // 從篩選後招募名單取得後四層（AI評分已被送審人選吸收）
