@@ -343,6 +343,19 @@ function gf(obj, key) {
   return v;
 }
 function n(v) { return parseFloat(v) || 0; }
+
+// 本月履歷總數計算規則：
+// - 主要來源＝HR搜尋：HR推薦是獨立新增的履歷來源，需加總（主動應徵_履歷總數＋HR推薦）
+// - 主要來源＝104主動應徵（或其他非HR搜尋來源）：HR推薦是從主動應徵_履歷總數篩選出來的子集，
+//   只能計入主動應徵_履歷總數，不可再加HR推薦，否則會重複計算
+function getStatsTotal(fs) {
+  return fs.reduce((a, r) => {
+    const active = n(gf(r,'主動應徵_履歷總數'));
+    const hr = n(gf(r,'HR推薦'));
+    const src = gf(r,'主要來源');
+    return a + (src === 'HR搜尋' ? active + hr : active);
+  }, 0);
+}
 function parseDateVal(v) {
   if (!v) return null;
   if (!isNaN(v)) return new Date(Number(v));
@@ -441,9 +454,9 @@ function loadDemoData() {
     { 應徵者:'許晉瑜', 電訪日期:'2026/06/11', 總體評分: 4.0 },
   ];
   statsRecords = [
-    { 統計日期:'2026/06/10', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:24, HR推薦:8, AI評分:3, 主管篩選通過:0 },
-    { 統計日期:'2026/06/10', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:17, HR推薦:2, AI評分:1, 主管篩選通過:0 },
-    { 統計日期:'2026/06/10', 應徵職務:'AI工程師/架構師', 主動應徵_履歷總數:5, HR推薦:0, AI評分:2, 主管篩選通過:0 },
+    { 統計日期:'2026/06/10', 應徵職務:'AI前端工程師', 主動應徵_履歷總數:24, HR推薦:8, AI評分:3, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/10', 應徵職務:'專案產品經理(PM)', 主動應徵_履歷總數:17, HR推薦:2, AI評分:1, 主管篩選通過:0, 主要來源:'104主動應徵' },
+    { 統計日期:'2026/06/10', 應徵職務:'AI工程師/架構師', 主動應徵_履歷總數:5, HR推薦:0, AI評分:2, 主管篩選通過:0, 主要來源:'104主動應徵' },
   ];
   summaries = [
     { 月份:'2026/06', 當月在職總人數:29, 當月離職人數:1, 當月新進人數:0, '累計離職人數（2025起）':38, '累計離職率（歷史總覽）':54.3, 淨人力變化:-1 },
@@ -482,7 +495,7 @@ function computeRecruitMetrics() {
   const fp = filterByPeriod(phoneRecords, '電訪日期');
   const fi = filterByPeriod(interviewRecords, '面試日期');
 
-  const statsTotal = fs.reduce((a,r) => a + n(gf(r,'主動應徵_履歷總數')) + n(gf(r,'HR推薦')), 0);
+  const statsTotal = getStatsTotal(fs);
   const total = statsTotal || fc.length;
   const phoneCompleted = fp.filter(r => gf(r,'應徵者')).length;
   const phoneDenom = fc.length;
