@@ -345,7 +345,7 @@ function gf(obj, key) {
 function n(v) { return parseFloat(v) || 0; }
 
 // 本月履歷總數計算規則：
-// - 主要來源＝HR搜尋：HR推薦是獨立新增的履歷來源，需加總（主動應徵_履歷總數＋HR推薦）
+// - 主要來源＝HR搜尋：該行人數＝HR推薦欄位本身，忽略主動應徵_履歷總數（該欄位在此來源下無意義）
 // - 主要來源＝104主動應徵（或其他非HR搜尋來源）：HR推薦是從主動應徵_履歷總數篩選出來的子集，
 //   只能計入主動應徵_履歷總數，不可再加HR推薦，否則會重複計算
 function getStatsTotal(fs) {
@@ -353,7 +353,7 @@ function getStatsTotal(fs) {
     const active = n(gf(r,'主動應徵_履歷總數'));
     const hr = n(gf(r,'HR推薦'));
     const src = gf(r,'主要來源');
-    return a + (src === 'HR搜尋' ? active + hr : active);
+    return a + (src === 'HR搜尋' ? hr : active);
   }, 0);
 }
 function parseDateVal(v) {
