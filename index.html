@@ -529,6 +529,19 @@ function getFilteredStats() {
   return list;
 }
 
+// 本月履歷總數計算規則：
+// - 主要來源＝HR搜尋：HR推薦是獨立新增的履歷來源，需加總（主動應徵_履歷總數＋HR推薦）
+// - 主要來源＝104主動應徵（或其他非HR搜尋來源）：HR推薦是從主動應徵_履歷總數篩選出來的子集，
+//   只能計入主動應徵_履歷總數，不可再加HR推薦，否則會重複計算
+function getStatsTotal(fs) {
+  return fs.reduce((a, r) => {
+    const active = parseFloat(gf(r,'主動應徵_履歷總數')) || 0;
+    const hr = parseFloat(gf(r,'HR推薦')) || 0;
+    const src = gf(r,'主要來源');
+    return a + (src === 'HR搜尋' ? active + hr : active);
+  }, 0);
+}
+
 function getFilteredPhone() {
   const filtered = getFilteredCandidates().map(c => gf(c,'應徵者')).filter(Boolean);
   return phoneRecords.filter(r => filtered.includes(gf(r,'應徵者')));
@@ -571,7 +584,7 @@ function renderStats() {
   const phoneCount = fc.filter(c => ['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
   const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
   const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const statsTotal = getStatsTotal(fs);
   document.getElementById('s-total').textContent = statsTotal || total;
   document.getElementById('s-total-sub').textContent = statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`;
   document.getElementById('s-phone').textContent = phoneCount;
@@ -628,7 +641,7 @@ function renderFunnelBars() {
   // 從篩選後的資料取得各層數字
   const fs = getFilteredStats();
   const fc = getFilteredCandidates();
-  const statsTotal    = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const statsTotal    = getStatsTotal(fs);
   const statsHR       = fs.reduce((a,r) => a + (parseFloat(gf(r,'HR推薦'))||parseFloat(gf(r,'HR初篩通過'))||0), 0);
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
@@ -715,7 +728,7 @@ function computeMetrics() {
   const fs = getFilteredStats();
   const fp = getFilteredPhone();
 
-  const statsTotal   = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主動應徵_履歷總數'))||0)+(parseFloat(gf(r,'HR推薦'))||0),0);
+  const statsTotal   = getStatsTotal(fs);
   const statsAI      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0),0);
   const statsHR      = fs.reduce((a,r)=>a+(parseFloat(gf(r,'HR推薦'))||0),0);
   const statsMgr     = fs.reduce((a,r)=>a+(parseFloat(gf(r,'主管篩選通過'))||0),0);
@@ -1110,7 +1123,7 @@ function renderKPI() {
   const fs = filterByPeriod(statsRecords, '統計日期');
   const fp = filterByPeriod(phoneRecords, '電訪日期');
 
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const statsTotal = getStatsTotal(fs);
   const total = statsTotal || fc.length;
 
   // 電訪完成率：分母 = 當月面談名單（招募名單）收件人數 fc.length
@@ -1173,7 +1186,9 @@ function renderJobProgress() {
       if (!pos) return;
       const key = `${pos}|`;
       if (!jobs[key]) jobs[key] = { pos, dept:'', count:0, stages:{} };
-      const n = (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0);
+      const n = gf(r,'主要來源') === 'HR搜尋'
+        ? (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0)
+        : (parseFloat(gf(r,'主動應徵_履歷總數'))||0);
       jobs[key].count += n;
     });
   }
@@ -1213,7 +1228,7 @@ function renderCharts() {
   const statsAI    = fs.reduce((a,r) => a + (parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0), 0);
   const statsMgr   = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
   const statsSent  = statsAI + statsHR; // 送審人選 = AI評分 + HR推薦
-  const statsTotal = fs.reduce((a,r) => a + (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0), 0);
+  const statsTotal = getStatsTotal(fs);
   // 下游從招募名單取當前關卡（AI評分已併入送審，不獨立顯示）
   const stageCountsLower = ['電訪','初試','複試','錄取','到職'].map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
 
@@ -1257,7 +1272,9 @@ function renderCharts() {
   if (fs2.length > 0) {
     fs2.forEach(r => {
       const src = gf(r,'主要來源') || '未知';
-      const n = (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0);
+      const n = src === 'HR搜尋'
+        ? (parseFloat(gf(r,'主動應徵_履歷總數'))||0) + (parseFloat(gf(r,'HR推薦'))||0)
+        : (parseFloat(gf(r,'主動應徵_履歷總數'))||0);
       srcCounts[src] = (srcCounts[src]||0) + n;
     });
   } else {
