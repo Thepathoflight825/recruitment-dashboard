@@ -403,6 +403,20 @@ function goToAttendance() {
 
 const STAGE_ORDER = ['電訪','AI評分','初試','複試','錄取','到職'];
 const STAGE_ORDER_FULL = ['收件總數','送審人選','主管篩選通過','電訪','AI評分','初試','複試','錄取','到職'];
+// 漏斗累計語意：計算「已到達該關卡（含更後面關卡）」的人數。
+// 與統計卡片「電訪完成」及 KPI 的計數邏輯一致（例：進入初試者必然算入電訪）。
+// AI評分 視為已進入電訪流程（與既有卡片邏輯相同）。
+const STAGE_CUMULATIVE = {
+  '電訪': ['電訪','AI評分','初試','複試','錄取','到職'],
+  '初試': ['初試','複試','錄取','到職'],
+  '複試': ['複試','錄取','到職'],
+  '錄取': ['錄取','到職'],
+  '到職': ['到職'],
+};
+function stageCumCount(list, stage) {
+  const set = STAGE_CUMULATIVE[stage] || [stage];
+  return list.filter(c => set.includes(gf(c,'當前關卡'))).length;
+}
 const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'badge-amber','AI評分通過':'badge-amber','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
 
@@ -646,8 +660,14 @@ function renderFunnelBars() {
   const statsMgr      = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
 
   // 從篩選後招募名單取得後四層（AI評分已被送審人選吸收）
-  const stageMap = { '電訪':0,'AI評分':0,'初試':0,'複試':0,'錄取':0,'到職':0 };
-  fc.forEach(c => { const s = gf(c,'當前關卡'); if (s && stageMap[s] !== undefined) stageMap[s]++; });
+  // 漏斗語意 = 累計到達人數：已推進到更後面關卡者，仍計入先前每一關（修正：原快照邏輯會使已進初試者的電訪計數歸零）
+  const stageMap = {
+    '電訪': stageCumCount(fc, '電訪'),
+    '初試': stageCumCount(fc, '初試'),
+    '複試': stageCumCount(fc, '複試'),
+    '錄取': stageCumCount(fc, '錄取'),
+    '到職': stageCumCount(fc, '到職'),
+  };
 
   // 履歷收件統計的欄位名為「AI評分」（非AI評分通過）
   const statsAI  = fs.reduce((a,r)=>a+(parseFloat(gf(r,'AI評分'))||parseFloat(gf(r,'AI評分通過'))||0),0);
@@ -1229,8 +1249,9 @@ function renderCharts() {
   const statsMgr   = fs.reduce((a,r) => a + (parseFloat(gf(r,'主管篩選通過'))||0), 0);
   const statsSent  = statsAI + statsHR; // 送審人選 = AI評分 + HR推薦
   const statsTotal = getStatsTotal(fs);
-  // 下游從招募名單取當前關卡（AI評分已併入送審，不獨立顯示）
-  const stageCountsLower = ['電訪','初試','複試','錄取','到職'].map(s => fc2.filter(c => gf(c,'當前關卡') === s).length);
+  // 下游從招募名單取累計到達人數（AI評分已併入送審，不獨立顯示）
+  // 與漏斗、統計卡片同一套累計語意：已推進到後面關卡者，仍計入先前每一關
+  const stageCountsLower = ['電訪','初試','複試','錄取','到職'].map(s => stageCumCount(fc2, s));
 
   // 合併成完整 8 段（無 AI評分 獨立欄）
   const labels = ['收件總數','送審人選','主管篩選\n通過','電訪','初試','複試','錄取','到職'];
