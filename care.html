@@ -215,9 +215,9 @@
   /* ── 績效面談圖表 ── */
   .perf-chart-card { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:18px; }
   .perf-chart-card h3 { font-size:13px; font-weight:700; margin:0 0 14px; display:flex; align-items:center; gap:6px; }
-  .perf-chart-box { position:relative; height:220px; }
+  .perf-chart-box { position:relative; height:260px; }
   .perf-donut-wrap { display:flex; align-items:center; gap:18px; }
-  .perf-donut { position:relative; width:150px; height:150px; flex-shrink:0; }
+  .perf-donut { position:relative; width:170px; height:170px; flex-shrink:0; }
   .perf-legend { flex:1; font-size:12px; min-width:0; }
   .perf-legend-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:0.5px dashed var(--border); }
   .perf-legend-row:last-child { border-bottom:0; }
@@ -436,7 +436,7 @@
         </div>
       </div>
       <div id="perf-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:14px 0 16px"></div>
-      <div id="perf-charts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px">
+      <div id="perf-charts" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px">
         <div class="perf-chart-card"><h3>🎯 整體績效評等分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="perf-rating-donut"></canvas></div><div id="perf-rating-legend" class="perf-legend"></div></div></div>
         <div class="perf-chart-card"><h3>👥 面談類型分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="perf-type-donut"></canvas></div><div id="perf-type-legend" class="perf-legend"></div></div></div>
         <div class="perf-chart-card"><h3>🧑‍💼 各評核人面談數</h3><div class="perf-chart-box"><canvas id="perf-reviewer-bar"></canvas></div></div>
@@ -1718,24 +1718,26 @@ function renderPerf() {
     return;
   }
 
-  // 依面談日期排序（新→舊）
-  ps.sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
+  // 依評核人分組（群組依筆數多→少，與長條圖一致；組內依面談日期新→舊）
+  const perfGroups = {};
+  ps.forEach(r => {
+    const rev = (gf(r,'評核人(執行面談者)')||'—').trim() || '—';
+    (perfGroups[rev] = perfGroups[rev] || []).push(r);
+  });
+  const perfGroupOrder = Object.keys(perfGroups).sort((a,b) => perfGroups[b].length - perfGroups[a].length || a.localeCompare(b));
 
-  listEl.innerHTML = ps.map(r => {
+  const perfRowHtml = (r) => {
     const empId    = gf(r,'面談員工') || '';
     const name     = empName(empId) || empId;
     const cnName   = empChineseName(empId);
     const period   = gf(r,'考核期間') || '—';
     const date     = fmtDate(gf(r,'面談日期'));
     const type     = gf(r,'面談類型') || '—';
-    const reviewer = gf(r,'評核人(執行面談者)') || '—';
     const rating   = gf(r,'整體績效評等') || '';
     const fact     = gf(r,'具體事蹟(工作內容)') || '';
     const summary  = gf(r,'面談摘要(面談內容)') || '';
     const note     = gf(r,'備註') || '';
-
     const detailId = `perf-detail-${gf(r,'績效紀錄 ID')||Math.random()}`.replace(/[^a-zA-Z0-9-]/g,'');
-
     return `
       <div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;background:#fff" onclick="togglePerfDetail('${detailId}')">
@@ -1746,7 +1748,7 @@ function renderPerf() {
               <span style="margin-left:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--gray);color:var(--text-sub);border:0.5px solid var(--border)">${type}</span>
             </div>
             <div style="font-size:11px;color:var(--text-sub);margin-top:3px">
-              ${period} ｜ ${date} ｜ 評核人：${reviewer}
+              ${period} ｜ ${date}
             </div>
           </div>
           <div style="font-size:11px;color:var(--text-sub)">▾</div>
@@ -1758,8 +1760,20 @@ function renderPerf() {
           ${!fact&&!summary&&!note?`<div style="color:var(--text-sub)">（無明細內容）</div>`:''}
         </div>
       </div>`;
+  };
+
+  listEl.innerHTML = perfGroupOrder.map(rev => {
+    const rs = perfGroups[rev].sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
+    return `
+      <div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(rev[0]||'?').toUpperCase()}</div>
+        <span style="font-size:13px;font-weight:700">評核人：${rev}</span>
+        <span style="font-size:11px;color:var(--text-sub);background:var(--gray);border:0.5px solid var(--border);border-radius:10px;padding:2px 9px">${rs.length} 筆</span>
+      </div>
+      ${rs.map(perfRowHtml).join('')}`;
   }).join('');
 }
+
 
 function togglePerfDetail(id) {
   const el = document.getElementById(id);
