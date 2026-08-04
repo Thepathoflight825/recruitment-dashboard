@@ -416,15 +416,13 @@
   <div class="tab-content" id="tab-perf">
     <div class="panel">
       <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>📊 績效面談 · 營運總覽</span>
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">📊 績效面談 · 營運總覽 <span id="perf-period-badge" style="font-size:12px;font-weight:700;color:#fff;background:var(--teal);border-radius:8px;padding:3px 12px;display:none"></span></span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="perf-filter-emp" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部員工</option>
           </select>
-          <select id="perf-filter-period" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
-            <option value="">全部考核期間</option>
-            <option value="H1">上半年 (H1)</option>
-            <option value="H2">下半年 (H2)</option>
+          <select id="perf-filter-review" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff;font-weight:600">
+            <!-- 依考核年度＋H1/H2 動態填入 -->
           </select>
           <select id="perf-filter-type" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部面談類型</option>
@@ -432,9 +430,10 @@
             <option value="執行長評主管">執行長評主管</option>
             <option value="執行長評成員">執行長評成員</option>
           </select>
-          <button onclick="document.getElementById('perf-filter-emp').value='';document.getElementById('perf-filter-period').value='';document.getElementById('perf-filter-type').value='';renderPerf();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
+          <button onclick="document.getElementById('perf-filter-emp').value='';document.getElementById('perf-filter-type').value='';renderPerf();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--teal);background:rgba(29,158,117,.1);border:0.5px solid var(--teal);border-radius:6px;padding:5px 12px;display:inline-block;margin:14px 0 0">🔒 本頁依「考核期間」統計，不受上方時間範圍（當月／上個月）影響</div>
       <div id="perf-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:14px 0 16px"></div>
       <div id="perf-charts" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px">
         <div class="perf-chart-card"><h3>🎯 整體績效評等分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="perf-rating-donut"></canvas></div><div id="perf-rating-legend" class="perf-legend"></div></div></div>
@@ -1581,11 +1580,20 @@ function perfRatingBadge(r) {
   return `<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;${st}">${r}</span>`;
 }
 
+// 期別判斷：以「考核年度」欄位為準；若該欄空白，退回用面談日期推導（H1→當年、H2→年-1）
+function perfHalf(period) { const p = String(period||''); return /H1/.test(p) ? 'H1' : (/H2/.test(p) ? 'H2' : ''); }
+function perfReviewYear(r) {
+  const y = (gf(r,'考核年度')||'').trim();
+  if (/^\d{4}$/.test(y)) return y;
+  const dy = parseInt(String(fmtDate(gf(r,'面談日期'))).slice(0,4));
+  if (!dy) return '';
+  return perfHalf(gf(r,'考核期間')) === 'H2' ? String(dy-1) : String(dy);
+}
+
 let perfRatingChart=null, perfTypeChart=null, perfReviewerChart=null, perfProgressChart=null;
 
 function renderPerf() {
   const empF    = document.getElementById('perf-filter-emp')?.value || '';
-  const periodF = document.getElementById('perf-filter-period')?.value || '';
   const typeF   = document.getElementById('perf-filter-type')?.value || '';
 
   // 填充員工篩選（第一次呼叫時）
@@ -1598,10 +1606,47 @@ function renderPerf() {
     names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; empSel.appendChild(o); });
   }
 
+  // 填充「考核年度＋H1/H2」期別選擇器（第一次呼叫時），預設落在最新一期
+  const revSel = document.getElementById('perf-filter-review');
+  if (revSel && !revSel.options.length) {
+    const yearHalves = {};   // 年度 -> Set(半年)
+    perfRecords.forEach(r => {
+      const y = perfReviewYear(r), h = perfHalf(gf(r,'考核期間'));
+      if (y && h) (yearHalves[y] = yearHalves[y] || new Set()).add(h);
+    });
+    const yearList = Object.keys(yearHalves).sort((a,b) => b.localeCompare(a));
+    yearList.forEach(y => {
+      const hs = yearHalves[y];
+      const oAll = document.createElement('option'); oAll.value = `${y}|ALL`; oAll.textContent = `${y} 全年度（H1+H2）`; revSel.appendChild(oAll);
+      if (hs.has('H1')) { const o = document.createElement('option'); o.value = `${y}|H1`; o.textContent = `${y} 上半年（H1）`; revSel.appendChild(o); }
+      if (hs.has('H2')) { const o = document.createElement('option'); o.value = `${y}|H2`; o.textContent = `${y} 下半年（H2）`; revSel.appendChild(o); }
+    });
+    if (yearList.length) { const y = yearList[0]; const hs = yearHalves[y]; revSel.value = `${y}|${hs.has('H2') ? 'H2' : 'H1'}`; }
+  }
+  const reviewF = revSel?.value || '';
+
+  // 更新頁首年度徽章
+  const badgeEl = document.getElementById('perf-period-badge');
+  if (badgeEl) {
+    if (reviewF) {
+      const [ry, rp] = reviewF.split('|');
+      badgeEl.textContent = rp === 'ALL' ? `${ry} 年度・全年度（H1+H2）`
+        : rp === 'H1' ? `${ry} 年度・上半年（H1）` : `${ry} 年度・下半年（H2）`;
+      badgeEl.style.display = '';
+    } else badgeEl.style.display = 'none';
+  }
+
   let ps = [...perfRecords];
-  if (empF)    ps = ps.filter(r => { const n = empName(gf(r,'面談員工')) || gf(r,'面談員工') || ''; return n === empF; });
-  if (periodF) ps = ps.filter(r => (gf(r,'考核期間')||'').includes(periodF));
-  if (typeF)   ps = ps.filter(r => (gf(r,'面談類型')||'') === typeF);
+  if (reviewF) {
+    const [ry, rp] = reviewF.split('|');
+    ps = ps.filter(r => {
+      if (perfReviewYear(r) !== ry) return false;
+      if (rp === 'ALL') return true;
+      return perfHalf(gf(r,'考核期間')) === rp;
+    });
+  }
+  if (empF)  ps = ps.filter(r => { const n = empName(gf(r,'面談員工')) || gf(r,'面談員工') || ''; return n === empF; });
+  if (typeF) ps = ps.filter(r => (gf(r,'面談類型')||'') === typeF);
 
   // ══ KPI ══
   const total = ps.length;
@@ -1714,7 +1759,7 @@ function renderPerf() {
 
   if (!ps.length) {
     listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-sub);font-size:13px">
-      📋 尚無績效面談紀錄${empF||periodF||typeF ? '（符合篩選條件）' : ''}</div>`;
+      📋 尚無績效面談紀錄${empF||typeF ? '（符合篩選條件）' : ''}</div>`;
     return;
   }
 
