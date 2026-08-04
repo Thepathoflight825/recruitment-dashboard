@@ -1606,22 +1606,36 @@ function renderPerf() {
     names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; empSel.appendChild(o); });
   }
 
-  // 填充「考核年度＋H1/H2」期別選擇器（第一次呼叫時），預設落在最新一期
+  // 「考核年度＋H1/H2」期別選擇器：資料驅動，偵測到期別有增減才重建（保留當前選擇）
   const revSel = document.getElementById('perf-filter-review');
-  if (revSel && !revSel.options.length) {
-    const yearHalves = {};   // 年度 -> Set(半年)
+  if (revSel) {
+    const yearHalves = {};   // 年度 -> Set(有資料的半年)
     perfRecords.forEach(r => {
       const y = perfReviewYear(r), h = perfHalf(gf(r,'考核期間'));
       if (y && h) (yearHalves[y] = yearHalves[y] || new Set()).add(h);
     });
     const yearList = Object.keys(yearHalves).sort((a,b) => b.localeCompare(a));
-    yearList.forEach(y => {
-      const hs = yearHalves[y];
-      const oAll = document.createElement('option'); oAll.value = `${y}|ALL`; oAll.textContent = `${y} 全年度（H1+H2）`; revSel.appendChild(oAll);
-      if (hs.has('H1')) { const o = document.createElement('option'); o.value = `${y}|H1`; o.textContent = `${y} 上半年（H1）`; revSel.appendChild(o); }
-      if (hs.has('H2')) { const o = document.createElement('option'); o.value = `${y}|H2`; o.textContent = `${y} 下半年（H2）`; revSel.appendChild(o); }
-    });
-    if (yearList.length) { const y = yearList[0]; const hs = yearHalves[y]; revSel.value = `${y}|${hs.has('H2') ? 'H2' : 'H1'}`; }
+    const wanted = [];
+    yearList.forEach(y => wanted.push(`${y}|ALL`, `${y}|H1`, `${y}|H2`));
+    // 簽章：年度 + 各半年是否有資料 → 新年度、或某半年補了資料，都會觸發重建
+    const sig = yearList.map(y => `${y}:${['H1','H2'].filter(h => yearHalves[y].has(h)).join('')}`).join(',');
+    if (revSel.dataset.sig !== sig) {
+      const prev = revSel.value;   // 保留使用者當前選擇
+      revSel.dataset.sig = sig;
+      revSel.innerHTML = '';
+      yearList.forEach(y => {
+        const hs = yearHalves[y];
+        const oAll = document.createElement('option'); oAll.value = `${y}|ALL`; oAll.textContent = `${y} 全年度（H1+H2）`; revSel.appendChild(oAll);
+        [['H1','上半年（H1）'],['H2','下半年（H2）']].forEach(([hf,label]) => {
+          const o = document.createElement('option'); o.value = `${y}|${hf}`;
+          o.textContent = `${y} ${label}${hs.has(hf) ? '' : '（尚無資料）'}`;
+          revSel.appendChild(o);
+        });
+      });
+      // 還原選擇；若原選項已不存在（例如首次載入），落到最新一期
+      if (prev && wanted.includes(prev)) revSel.value = prev;
+      else if (yearList.length) { const y = yearList[0]; revSel.value = `${y}|${yearHalves[y].has('H2') ? 'H2' : 'H1'}`; }
+    }
   }
   const reviewF = revSel?.value || '';
 
@@ -1672,7 +1686,7 @@ function renderPerf() {
   if (kpiEl) kpiEl.innerHTML = [
     ['面談總筆數', `${total}`, '本期已完成面談紀錄', '#1a73e8'],
     ['受評人數', `${rateeCount}<span style="font-size:13px;font-weight:600">人</span>`, `主管 ${mgrSet.size}・成員 ${memSet.size}`, '#1D9E75'],
-    ['評等達標率', `${passRate}<span style="font-size:13px;font-weight:600">%</span>`, `達標及以上 ÷ 全部評等（${passCnt}/${rated.length}）`, '#7B5EA7'],
+    ['評等達標率', rated.length ? `${passRate}<span style="font-size:13px;font-weight:600">%</span>` : '—', rated.length ? `達標及以上 ÷ 全部評等（${passCnt}/${rated.length}）` : '本期尚無評等資料', '#7B5EA7'],
     ['面談期間', dsorted.length ? `<span style="font-size:17px">${dMin}–${dMax}</span>` : '—', dsorted.length ? `最新面談：${dMax}` : '本期尚無紀錄', '#EF9F27'],
   ].map(([label, val, note, color]) => `
     <div style="background:#fff;border-radius:12px;border:0.5px solid var(--border);padding:16px 18px;position:relative;overflow:hidden">
