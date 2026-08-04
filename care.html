@@ -211,6 +211,18 @@
 
   /* ── Scrollable table wrap ── */
   .table-wrap { overflow-x: auto; }
+
+  /* ── 績效面談圖表 ── */
+  .perf-chart-card { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:18px; }
+  .perf-chart-card h3 { font-size:13px; font-weight:700; margin:0 0 14px; display:flex; align-items:center; gap:6px; }
+  .perf-chart-box { position:relative; height:220px; }
+  .perf-donut-wrap { display:flex; align-items:center; gap:18px; }
+  .perf-donut { position:relative; width:150px; height:150px; flex-shrink:0; }
+  .perf-legend { flex:1; font-size:12px; min-width:0; }
+  .perf-legend-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:0.5px dashed var(--border); }
+  .perf-legend-row:last-child { border-bottom:0; }
+  .perf-legend-l { display:flex; align-items:center; gap:8px; min-width:0; }
+  .perf-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 </style>
 
 <style>
@@ -404,7 +416,7 @@
   <div class="tab-content" id="tab-perf">
     <div class="panel">
       <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>📊 績效面談紀錄</span>
+        <span>📊 績效面談 · 營運總覽</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="perf-filter-emp" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部員工</option>
@@ -414,18 +426,23 @@
             <option value="H1">上半年 (H1)</option>
             <option value="H2">下半年 (H2)</option>
           </select>
-          <select id="perf-filter-status" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
-            <option value="">全部狀態</option>
-            <option value="已提交">已提交</option>
-            <option value="待完成">待完成</option>
-            <option value="同仁確認中">同仁確認中</option>
-            <option value="已完成">已完成</option>
+          <select id="perf-filter-type" onchange="renderPerf()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
+            <option value="">全部面談類型</option>
+            <option value="主管評成員">主管評成員</option>
+            <option value="執行長評主管">執行長評主管</option>
+            <option value="執行長評成員">執行長評成員</option>
           </select>
-          <button onclick="document.getElementById('perf-filter-emp').value='';document.getElementById('perf-filter-period').value='';document.getElementById('perf-filter-status').value='';renderPerf();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
+          <button onclick="document.getElementById('perf-filter-emp').value='';document.getElementById('perf-filter-period').value='';document.getElementById('perf-filter-type').value='';renderPerf();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
         </div>
       </div>
-      <div id="perf-stats" style="display:flex;gap:12px;margin:14px 0 10px;flex-wrap:wrap"></div>
-      <div id="perf-count" style="font-size:12px;color:var(--text-sub);margin-bottom:10px"></div>
+      <div id="perf-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:14px 0 16px"></div>
+      <div id="perf-charts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px">
+        <div class="perf-chart-card"><h3>🎯 整體績效評等分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="perf-rating-donut"></canvas></div><div id="perf-rating-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>👥 面談類型分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="perf-type-donut"></canvas></div><div id="perf-type-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>🧑‍💼 各評核人面談數</h3><div class="perf-chart-box"><canvas id="perf-reviewer-bar"></canvas></div></div>
+        <div class="perf-chart-card"><h3>📈 面談完成累積進度</h3><div class="perf-chart-box"><canvas id="perf-progress-line"></canvas></div></div>
+      </div>
+      <div id="perf-count" style="font-size:12px;color:var(--text-sub);margin:4px 0 10px;font-weight:700"></div>
       <div id="perf-list"></div>
     </div>
   </div>
@@ -1564,10 +1581,12 @@ function perfRatingBadge(r) {
   return `<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;${st}">${r}</span>`;
 }
 
+let perfRatingChart=null, perfTypeChart=null, perfReviewerChart=null, perfProgressChart=null;
+
 function renderPerf() {
   const empF    = document.getElementById('perf-filter-emp')?.value || '';
   const periodF = document.getElementById('perf-filter-period')?.value || '';
-  const statusF = document.getElementById('perf-filter-status')?.value || '';
+  const typeF   = document.getElementById('perf-filter-type')?.value || '';
 
   // 填充員工篩選（第一次呼叫時）
   const empSel = document.getElementById('perf-filter-emp');
@@ -1582,35 +1601,120 @@ function renderPerf() {
   let ps = [...perfRecords];
   if (empF)    ps = ps.filter(r => { const n = empName(gf(r,'面談員工')) || gf(r,'面談員工') || ''; return n === empF; });
   if (periodF) ps = ps.filter(r => (gf(r,'考核期間')||'').includes(periodF));
-  if (statusF) ps = ps.filter(r => (gf(r,'流程狀態')||'') === statusF);
+  if (typeF)   ps = ps.filter(r => (gf(r,'面談類型')||'') === typeF);
 
-  // 統計列
-  const total     = ps.length;
-  const done      = ps.filter(r => (gf(r,'流程狀態')||'').includes('已完成')).length;
-  const submitted = ps.filter(r => (gf(r,'流程狀態')||'').includes('已提交')).length;
-  const pending   = ps.filter(r => { const s = gf(r,'流程狀態')||''; return s.includes('待') || s.includes('確認'); }).length;
+  // ══ KPI ══
+  const total = ps.length;
+  // 受評人數 + 角色拆分（執行長評主管 → 主管；其餘 → 成員；同一人以主管優先）
+  const mgrSet = new Set(), memSet = new Set();
+  ps.forEach(r => {
+    const id = empName(gf(r,'面談員工')) || gf(r,'面談員工') || '';
+    if (!id) return;
+    if ((gf(r,'面談類型')||'') === '執行長評主管') mgrSet.add(id); else memSet.add(id);
+  });
+  memSet.forEach(x => { if (mgrSet.has(x)) memSet.delete(x); });
+  const rateeCount = mgrSet.size + memSet.size;
+  // 達標率：達標及以上 ÷ 全部評等
+  const rated   = ps.filter(r => (gf(r,'整體績效評等')||'').trim());
+  const passCnt = rated.filter(r => ['達標','超越期望'].includes((gf(r,'整體績效評等')||'').trim())).length;
+  const passRate = rated.length ? Math.round(passCnt / rated.length * 100) : 0;
+  // 面談期間（MM/DD）
+  const dsorted = ps.map(r => fmtDate(gf(r,'面談日期'))).filter(d => d && d !== '—').sort();
+  const dMin = dsorted.length ? dsorted[0].slice(5) : '—';
+  const dMax = dsorted.length ? dsorted[dsorted.length-1].slice(5) : '—';
 
-  const statsEl = document.getElementById('perf-stats');
-  if (statsEl) statsEl.innerHTML = [
-    ['本期總筆數', total, '#1a73e8'],
-    ['已完成', done, '#1D9E75'],
-    ['已提交', submitted, '#EF9F27'],
-    ['待處理', pending, '#E24B4A'],
-  ].map(([label, val, color]) => `
-    <div style="background:#f8f9fa;border-radius:8px;padding:10px 16px;min-width:80px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
-      <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${label}</div>
+  const kpiEl = document.getElementById('perf-kpi');
+  if (kpiEl) kpiEl.innerHTML = [
+    ['面談總筆數', `${total}`, '本期已完成面談紀錄', '#1a73e8'],
+    ['受評人數', `${rateeCount}<span style="font-size:13px;font-weight:600">人</span>`, `主管 ${mgrSet.size}・成員 ${memSet.size}`, '#1D9E75'],
+    ['評等達標率', `${passRate}<span style="font-size:13px;font-weight:600">%</span>`, `達標及以上 ÷ 全部評等（${passCnt}/${rated.length}）`, '#7B5EA7'],
+    ['面談期間', dsorted.length ? `<span style="font-size:17px">${dMin}–${dMax}</span>` : '—', dsorted.length ? `最新面談：${dMax}` : '本期尚無紀錄', '#EF9F27'],
+  ].map(([label, val, note, color]) => `
+    <div style="background:#fff;border-radius:12px;border:0.5px solid var(--border);padding:16px 18px;position:relative;overflow:hidden">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${color}"></div>
+      <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">${label}</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;color:${color}">${val}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:4px">${note}</div>
     </div>`).join('');
 
+  // ══ 圖表資料彙整 ══
+  // 評等分布（固定四級，未來自動反映待改善／不符期望）
+  const ratingColorMap = {'超越期望':'#1D9E75','達標':'#1a73e8','待改善':'#EF9F27','不符期望':'#E24B4A'};
+  const ratingCnt = {'超越期望':0,'達標':0,'待改善':0,'不符期望':0};
+  ps.forEach(r => { const v=(gf(r,'整體績效評等')||'').trim(); if (v) ratingCnt[v]=(ratingCnt[v]||0)+1; });
+  // 面談類型分布
+  const typeCnt = {};
+  ps.forEach(r => { const v=(gf(r,'面談類型')||'未分類').trim()||'未分類'; typeCnt[v]=(typeCnt[v]||0)+1; });
+  // 各評核人
+  const revCnt = {};
+  ps.forEach(r => { const v=(gf(r,'評核人(執行面談者)')||'—').trim()||'—'; revCnt[v]=(revCnt[v]||0)+1; });
+  const revSorted = Object.entries(revCnt).sort((a,b)=>b[1]-a[1]);
+  // 累積進度（依面談日期）
+  const dateCnt = {};
+  ps.forEach(r => { const d=fmtDate(gf(r,'面談日期')); if (d && d!=='—') dateCnt[d]=(dateCnt[d]||0)+1; });
+  const progDates = Object.keys(dateCnt).sort();
+  let cum=0; const progVals = progDates.map(d => (cum += dateCnt[d]));
+
+  // 銷毀舊圖，避免重複疊加
+  [perfRatingChart, perfTypeChart, perfReviewerChart, perfProgressChart].forEach(c => { if (c) c.destroy(); });
+  perfRatingChart = perfTypeChart = perfReviewerChart = perfProgressChart = null;
+
+  // 評等 donut + legend
+  const rd = document.getElementById('perf-rating-donut');
+  if (rd) {
+    const labels = Object.keys(ratingCnt);
+    perfRatingChart = new Chart(rd.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>ratingCnt[k]), backgroundColor:labels.map(k=>ratingColorMap[k]||'#bbb'), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('perf-rating-legend');
+    if (lg) lg.innerHTML = labels.map(k => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${ratingColorMap[k]||'#bbb'}"></span>${k}</span><b>${ratingCnt[k]}</b></div>`).join('');
+  }
+  // 類型 donut + legend
+  const tdc = document.getElementById('perf-type-donut');
+  if (tdc) {
+    const labels = Object.keys(typeCnt);
+    const palette = ['#1D9E75','#5DCAA5','#7B5EA7','#EF9F27','#1a73e8','#E24B4A'];
+    perfTypeChart = new Chart(tdc.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>typeCnt[k]), backgroundColor:labels.map((k,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('perf-type-legend');
+    if (lg) lg.innerHTML = labels.map((k,i) => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${palette[i%palette.length]}"></span>${k}</span><b>${typeCnt[k]}</b></div>`).join('');
+  }
+  // 各評核人 bar
+  const rb = document.getElementById('perf-reviewer-bar');
+  if (rb) {
+    perfReviewerChart = new Chart(rb.getContext('2d'), {
+      type:'bar',
+      data:{labels:revSorted.map(x=>x[0]), datasets:[{data:revSorted.map(x=>x[1]), backgroundColor:'#5DCAA5', borderRadius:5, maxBarThickness:34}]},
+      options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+        scales:{y:{beginAtZero:true, ticks:{stepSize:1, precision:0}, grid:{color:'#f0efe9'}}, x:{grid:{display:false}}}}
+    });
+  }
+  // 累積進度 line
+  const pl = document.getElementById('perf-progress-line');
+  if (pl) {
+    perfProgressChart = new Chart(pl.getContext('2d'), {
+      type:'line',
+      data:{labels:progDates.map(d=>d.slice(5)), datasets:[{data:progVals, borderColor:'#1D9E75', backgroundColor:'rgba(29,158,117,.12)', fill:true, tension:.3, pointBackgroundColor:'#1D9E75', pointRadius:4}]},
+      options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+        scales:{y:{beginAtZero:true, ticks:{stepSize:Math.max(1,Math.ceil(total/5)), precision:0}, grid:{color:'#f0efe9'}}, x:{grid:{display:false}}}}
+    });
+  }
+
+  // ══ 明細清單（預設收合，查詢用）══
   const countEl = document.getElementById('perf-count');
-  if (countEl) countEl.textContent = `共 ${ps.length} 筆`;
+  if (countEl) countEl.textContent = `📋 面談明細 · 共 ${ps.length} 筆（點擊展開）`;
 
   const listEl = document.getElementById('perf-list');
   if (!listEl) return;
 
   if (!ps.length) {
     listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text-sub);font-size:13px">
-      📋 尚無績效面談紀錄${empF||periodF||statusF ? '（符合篩選條件）' : ''}</div>`;
+      📋 尚無績效面談紀錄${empF||periodF||typeF ? '（符合篩選條件）' : ''}</div>`;
     return;
   }
 
@@ -1618,54 +1722,40 @@ function renderPerf() {
   ps.sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
 
   listEl.innerHTML = ps.map(r => {
-    const empId   = gf(r,'面談員工') || '';
-    const name    = empName(empId) || empId;
-    const cnName  = empCnName(empId);
-    const period  = gf(r,'考核期間') || '—';
-    const date    = fmtDate(gf(r,'面談日期'));
-    const method  = gf(r,'面談方式') || '—';
-    const mgr     = (gf(r,'主管')||'—').replace('KR-','').replace(/^ /,'');
-    const rating  = gf(r,'整體績效評等') || '';
-    const status  = gf(r,'流程狀態') || '—';
-    const confirm = gf(r,'雙方確認狀態') || '—';
-    const idp     = gf(r,'個人發展計畫(IDP)') || '';
-    const nextGoal= gf(r,'下期目標摘要') || '';
-    const suggest = gf(r,'建議_薪酬職級異動') || '';
-    const highlight = gf(r,'亮點回饋') || '';
-    const improve = gf(r,'待加強項目') || '';
-    const goalSummary = gf(r,'目標達成摘要') || '';
-
-    const statusColor = status.includes('已完成') ? 'color:#1D9E75;font-weight:600'
-      : status.includes('已提交') ? 'color:#EF9F27;font-weight:600'
-      : 'color:var(--text-sub)';
+    const empId    = gf(r,'面談員工') || '';
+    const name     = empName(empId) || empId;
+    const cnName   = empChineseName(empId);
+    const period   = gf(r,'考核期間') || '—';
+    const date     = fmtDate(gf(r,'面談日期'));
+    const type     = gf(r,'面談類型') || '—';
+    const reviewer = gf(r,'評核人(執行面談者)') || '—';
+    const rating   = gf(r,'整體績效評等') || '';
+    const fact     = gf(r,'具體事蹟(工作內容)') || '';
+    const summary  = gf(r,'面談摘要(面談內容)') || '';
+    const note     = gf(r,'備註') || '';
 
     const detailId = `perf-detail-${gf(r,'績效紀錄 ID')||Math.random()}`.replace(/[^a-zA-Z0-9-]/g,'');
 
     return `
-      <div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:#fff" onclick="togglePerfDetail('${detailId}')">
-          <div style="width:34px;height:34px;border-radius:50%;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--teal);flex-shrink:0">${(name[0]||'?').toUpperCase()}</div>
+      <div style="border:0.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;background:#fff" onclick="togglePerfDetail('${detailId}')">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--teal);flex-shrink:0">${(name[0]||'?').toUpperCase()}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${name}${cnName&&cnName!==name?` <span style="font-weight:400;color:var(--text-sub);font-size:11px">${cnName}</span>`:''}
-              <span style="margin-left:8px">${perfRatingBadge(rating)}</span>
+              <span style="margin-left:6px">${perfRatingBadge(rating)}</span>
+              <span style="margin-left:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--gray);color:var(--text-sub);border:0.5px solid var(--border)">${type}</span>
             </div>
             <div style="font-size:11px;color:var(--text-sub);margin-top:3px">
-              ${period} ｜ ${date} ｜ ${method} ｜ 主管：${mgr}
+              ${period} ｜ ${date} ｜ 評核人：${reviewer}
             </div>
           </div>
-          <div style="font-size:12px;${statusColor};white-space:nowrap">${status}</div>
           <div style="font-size:11px;color:var(--text-sub)">▾</div>
         </div>
-        <div id="${detailId}" style="display:none;padding:12px 16px;background:#fafbfc;border-top:0.5px solid var(--border);font-size:12px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:10px">
-            <div><span style="color:var(--text-sub)">雙方確認</span>　${confirm}</div>
-            <div><span style="color:var(--text-sub)">薪酬職級建議</span>　${suggest||'—'}</div>
-          </div>
-          ${goalSummary?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">目標達成摘要</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${goalSummary}</div></div>`:''}
-          ${highlight?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">✨ 亮點回饋</div><div style="background:#E6F9F4;border-radius:6px;padding:8px 10px">${highlight}</div></div>`:''}
-          ${improve?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">🔧 待加強項目</div><div style="background:#FFF3E0;border-radius:6px;padding:8px 10px">${improve}</div></div>`:''}
-          ${idp?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px">📌 個人發展計畫 (IDP)</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${idp}</div></div>`:''}
-          ${nextGoal?`<div><div style="color:var(--text-sub);margin-bottom:3px">🎯 下期目標摘要</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border)">${nextGoal}</div></div>`:''}
+        <div id="${detailId}" style="display:none;padding:12px 14px;background:#fafbfc;border-top:0.5px solid var(--border);font-size:12px;line-height:1.6">
+          ${fact?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px;font-size:11px">具體事蹟（工作內容）</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border);white-space:pre-wrap">${fact}</div></div>`:''}
+          ${summary?`<div style="margin-bottom:8px"><div style="color:var(--text-sub);margin-bottom:3px;font-size:11px">面談摘要（面談內容）</div><div style="background:#fff;border-radius:6px;padding:8px 10px;border:0.5px solid var(--border);white-space:pre-wrap">${summary}</div></div>`:''}
+          ${note?`<div><div style="color:var(--text-sub);margin-bottom:3px;font-size:11px">備註</div><div style="background:#FFF3E0;border-radius:6px;padding:8px 10px;white-space:pre-wrap">${note}</div></div>`:''}
+          ${!fact&&!summary&&!note?`<div style="color:var(--text-sub)">（無明細內容）</div>`:''}
         </div>
       </div>`;
   }).join('');
