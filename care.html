@@ -389,6 +389,13 @@
           <button onclick="resetRecordFilters()" style="font-size:11px;color:var(--text-sub);background:none;border:0.5px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'Noto Sans TC',sans-serif;white-space:nowrap">✕ 清除篩選</button>
         </div>
       </div>
+      <div id="rec-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:4px 0 16px"></div>
+      <div id="rec-charts" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px">
+        <div class="perf-chart-card"><h3>🚦 留任風險分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="rec-risk-donut"></canvas></div><div id="rec-risk-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>💬 關懷類型分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="rec-type-donut"></canvas></div><div id="rec-type-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>🧑‍💼 各主管關懷次數</h3><div class="perf-chart-box"><canvas id="rec-mgr-bar"></canvas><div id="rec-mgr-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-sub);font-size:12px">本期間尚無關懷紀錄</div></div></div>
+        <div class="perf-chart-card"><h3>📈 關懷累積進度</h3><div class="perf-chart-box"><canvas id="rec-progress-line"></canvas><div id="rec-progress-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-sub);font-size:12px">本期間尚無可統計的面談日期</div></div></div>
+      </div>
       <div id="rec-result-count" style="font-size:11px;color:var(--text-sub);margin-bottom:8px"></div>
       <div class="table-wrap"><div id="care-records"><div class="loading"><div class="spinner"></div>載入中...</div></div></div>
     </div>
@@ -551,6 +558,7 @@ let selectedPeriod = 'current';
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let riskChart = null, deptChart = null;
 let newbieBandChart = null, newbieTypeChart = null, newbieDimChart = null, newbieProgressChart = null;
+let recRiskChart = null, recTypeChart = null, recMgrChart = null, recProgressChart = null;
 
 function goTo(key) {
   if (!LINKS[key]) { alert('尚未設定跳轉連結'); return; }
@@ -1180,6 +1188,21 @@ function renderCareRecords() {
       : `共 ${fr.length} 筆`;
   }
 
+  // ── KPI + 圖表（依目前篩選後的 fr）──
+  const hasFilter = !!(empF || mgrF || typeF || riskF);
+  const kpiEl2 = document.getElementById('rec-kpi');
+  const chartsEl2 = document.getElementById('rec-charts');
+  if (!fr.length) {
+    if (kpiEl2) kpiEl2.style.display = 'none';
+    if (chartsEl2) chartsEl2.style.display = 'none';
+    [recRiskChart, recTypeChart, recMgrChart, recProgressChart].forEach(c => { if (c) c.destroy(); });
+    recRiskChart = recTypeChart = recMgrChart = recProgressChart = null;
+  } else {
+    if (kpiEl2) kpiEl2.style.display = 'grid';
+    if (chartsEl2) chartsEl2.style.display = 'grid';
+    renderCareCharts(fr);
+  }
+
   document.getElementById('care-records').innerHTML = fr.length
     ? `<table class="data-table">
         <thead><tr><th>員工</th><th>面談日期</th><th>類型</th><th>方式</th><th>主管</th><th>風險</th><th>流程狀態</th></tr></thead>
@@ -1196,7 +1219,119 @@ function renderCareRecords() {
           </tr>`;
         }).join('')}</tbody>
       </table>`
-    : '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">無符合條件的關懷紀錄</div>';
+    : (hasFilter
+        ? '<div style="color:var(--text-sub);font-size:13px;padding:20px;text-align:center">無符合條件的關懷紀錄（請調整篩選條件）</div>'
+        : '<div style="color:var(--text-sub);font-size:13px;padding:24px 20px;text-align:center;line-height:1.7">本期間無關懷紀錄。<br>關懷面談採季度制（2026 年於 6／9／12 月進行），可將上方「時間範圍」切換為<strong>近半年</strong>或<strong>整年度</strong>查看季度關懷資料。</div>');
+}
+
+// ── 關懷紀錄圖表（KPI + 留任風險 / 類型 / 各主管 / 累積進度）──
+function renderCareCharts(fr) {
+  const mgrName = r => (gf(r,'主管')||'—').replace('KR-','').replace(/\s+/g,'').trim() || '—';
+
+  // KPI
+  const total    = fr.length;
+  const empCount = new Set(fr.map(r=>gf(r,'關懷員工')).filter(Boolean)).size;
+  const highN    = fr.filter(r=>(gf(r,'留任風險等級')||'').includes('高')).length;
+  const midN     = fr.filter(r=>(gf(r,'留任風險等級')||'').includes('中')).length;
+  const hrHelp   = fr.filter(r=>(gf(r,'是否需 HR 協助')||'').includes('是')).length;
+  const focus    = highN + midN;
+  const focusColor = highN>0 ? '#E24B4A' : midN>0 ? '#EF9F27' : '#1D9E75';
+
+  const kpiEl = document.getElementById('rec-kpi');
+  if (kpiEl) kpiEl.innerHTML = [
+    ['關懷筆數', `${total}`, '本期關懷面談紀錄', '#1a73e8'],
+    ['關懷對象', `${empCount}<span style="font-size:13px;font-weight:600">人</span>`, '本期受關懷同仁', '#1D9E75'],
+    ['風險關注', `${focus}<span style="font-size:13px;font-weight:600">人次</span>`, focus>0?`高 ${highN}・中 ${midN}`:'本期無中高風險', focusColor],
+    ['需 HR 協助', `${hrHelp}<span style="font-size:13px;font-weight:600">件</span>`, hrHelp>0?'需 HR 介入跟進':'本期無需協助', hrHelp>0?'#7B5EA7':'#1D9E75'],
+  ].map(([label,val,note,color])=>`
+    <div style="background:#fff;border-radius:12px;border:0.5px solid var(--border);padding:16px 18px;position:relative;overflow:hidden">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${color}"></div>
+      <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">${label}</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;color:${color}">${val}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:4px">${note}</div>
+    </div>`).join('');
+
+  // 資料彙整
+  const riskColorMap = {'高風險':'#E24B4A','中風險':'#EF9F27','低風險':'#1D9E75','未評估':'#c4ccd4'};
+  const riskCnt = {'高風險':0,'中風險':0,'低風險':0};
+  let riskUnknown = 0;
+  fr.forEach(r => { const v=(gf(r,'留任風險等級')||'').trim();
+    if (v.includes('高')) riskCnt['高風險']++;
+    else if (v.includes('中')) riskCnt['中風險']++;
+    else if (v.includes('低')) riskCnt['低風險']++;
+    else riskUnknown++; });
+  if (riskUnknown>0) riskCnt['未評估'] = riskUnknown;
+
+  const typeCnt = {};
+  fr.forEach(r => { const v=(gf(r,'面談類型')||'未分類').trim()||'未分類'; typeCnt[v]=(typeCnt[v]||0)+1; });
+
+  const mgrCnt = {};
+  fr.forEach(r => { const v=mgrName(r); mgrCnt[v]=(mgrCnt[v]||0)+1; });
+  const mgrSorted = Object.entries(mgrCnt).sort((a,b)=>b[1]-a[1]);
+
+  const dateCnt = {};
+  fr.forEach(r => { const d=fmtDate(gf(r,'面談日期')); if (d && d!=='—') dateCnt[d]=(dateCnt[d]||0)+1; });
+  const progDates = Object.keys(dateCnt).sort();
+  let cum=0; const progVals = progDates.map(d => (cum += dateCnt[d]));
+
+  [recRiskChart, recTypeChart, recMgrChart, recProgressChart].forEach(c => { if (c) c.destroy(); });
+  recRiskChart = recTypeChart = recMgrChart = recProgressChart = null;
+
+  // 留任風險 donut
+  const rk = document.getElementById('rec-risk-donut');
+  if (rk) {
+    const labels = Object.keys(riskCnt);
+    recRiskChart = new Chart(rk.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>riskCnt[k]), backgroundColor:labels.map(k=>riskColorMap[k]||'#bbb'), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('rec-risk-legend');
+    if (lg) lg.innerHTML = labels.map(k => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${riskColorMap[k]||'#bbb'}"></span>${k}</span><b>${riskCnt[k]}</b></div>`).join('');
+  }
+  // 類型 donut
+  const td = document.getElementById('rec-type-donut');
+  if (td) {
+    const labels = Object.keys(typeCnt);
+    const palette = ['#1D9E75','#5DCAA5','#7B5EA7','#EF9F27','#1a73e8','#E24B4A'];
+    recTypeChart = new Chart(td.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>typeCnt[k]), backgroundColor:labels.map((k,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('rec-type-legend');
+    if (lg) lg.innerHTML = labels.map((k,i) => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${palette[i%palette.length]}"></span>${k}</span><b>${typeCnt[k]}</b></div>`).join('');
+  }
+  // 各主管 bar
+  const mb = document.getElementById('rec-mgr-bar');
+  const mbEmpty = document.getElementById('rec-mgr-empty');
+  if (mb) {
+    if (mgrSorted.length) {
+      if (mbEmpty) mbEmpty.style.display='none';
+      mb.style.display='';
+      recMgrChart = new Chart(mb.getContext('2d'), {
+        type:'bar',
+        data:{labels:mgrSorted.map(x=>x[0]), datasets:[{data:mgrSorted.map(x=>x[1]), backgroundColor:'#5DCAA5', borderRadius:5, maxBarThickness:34}]},
+        options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+          scales:{y:{beginAtZero:true, ticks:{stepSize:1, precision:0}, grid:{color:'#f0efe9'}}, x:{grid:{display:false}}}}
+      });
+    } else { mb.style.display='none'; if (mbEmpty) mbEmpty.style.display='flex'; }
+  }
+  // 累積進度 line
+  const pl = document.getElementById('rec-progress-line');
+  const plEmpty = document.getElementById('rec-progress-empty');
+  if (pl) {
+    if (progDates.length) {
+      if (plEmpty) plEmpty.style.display='none';
+      pl.style.display='';
+      recProgressChart = new Chart(pl.getContext('2d'), {
+        type:'line',
+        data:{labels:progDates.map(d=>d.slice(5)), datasets:[{data:progVals, borderColor:'#1D9E75', backgroundColor:'rgba(29,158,117,.12)', fill:true, tension:.3, pointBackgroundColor:'#1D9E75', pointRadius:4}]},
+        options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+          scales:{y:{beginAtZero:true, ticks:{stepSize:Math.max(1,Math.ceil(fr.length/5)), precision:0}, grid:{color:'#f0efe9'}}, x:{grid:{display:false}}}}
+      });
+    } else { pl.style.display='none'; if (plEmpty) plEmpty.style.display='flex'; }
+  }
 }
 
 function resetRecordFilters() {
