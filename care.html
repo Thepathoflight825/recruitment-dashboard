@@ -465,8 +465,14 @@
           <button onclick="document.getElementById('newbie-filter-emp').value='';document.getElementById('newbie-filter-type').value='';renderEvents();" style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:'Noto Sans TC',sans-serif;color:var(--text-sub)">✕ 清除篩選</button>
         </div>
       </div>
-      <div id="newbie-stats" style="display:flex;gap:12px;margin:14px 0 10px;flex-wrap:wrap"></div>
-      <div id="newbie-count" style="font-size:12px;color:var(--text-sub);margin-bottom:10px"></div>
+      <div id="newbie-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:14px 0 16px"></div>
+      <div id="newbie-charts" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px">
+        <div class="perf-chart-card"><h3>🌟 綜合評分等級分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="newbie-band-donut"></canvas></div><div id="newbie-band-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>🗂️ 關懷類型分布</h3><div class="perf-donut-wrap"><div class="perf-donut"><canvas id="newbie-type-donut"></canvas></div><div id="newbie-type-legend" class="perf-legend"></div></div></div>
+        <div class="perf-chart-card"><h3>🧭 各能力構面平均分</h3><div class="perf-chart-box"><canvas id="newbie-dim-radar"></canvas><div id="newbie-dim-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-sub);font-size:12px">尚無評分資料</div></div></div>
+        <div class="perf-chart-card"><h3>📈 新人關懷累積進度</h3><div class="perf-chart-box"><canvas id="newbie-progress-line"></canvas><div id="newbie-progress-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-sub);font-size:12px">尚無可統計的面談日期</div></div></div>
+      </div>
+      <div id="newbie-count" style="font-size:12px;color:var(--text-sub);margin:4px 0 10px;font-weight:700"></div>
       <div id="newbie-list"></div>
     </div>
   </div>
@@ -544,6 +550,7 @@ let employees = [], careRecords = [], perfRecords = [], promises = [], newbieRec
 let selectedPeriod = 'current';
 let reportSelectedPeriod = 'current'; // 分析報告獨立時間範圍
 let riskChart = null, deptChart = null;
+let newbieBandChart = null, newbieTypeChart = null, newbieDimChart = null, newbieProgressChart = null;
 
 function goTo(key) {
   if (!LINKS[key]) { alert('尚未設定跳轉連結'); return; }
@@ -1263,46 +1270,154 @@ function renderEvents() {
   const empF  = document.getElementById('newbie-filter-emp')?.value  || '';
   const typeF = document.getElementById('newbie-filter-type')?.value || '';
 
+  // 新進員工欄位（新版：「新進員工」；相容舊版：「關懷員工」）
+  const newbieEmp = r => gf(r,'新進員工') || gf(r,'關懷員工') || '';
+
   // 填充員工篩選（第一次呼叫時）
   const empSel = document.getElementById('newbie-filter-emp');
   if (empSel && empSel.options.length <= 1) {
     const names = [...new Set(newbieRecords.map(r => {
-      const larkId = gf(r,'關懷員工');
+      const larkId = newbieEmp(r);
       return empName(larkId) || larkId || '';
     }).filter(Boolean))].sort();
     names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; empSel.appendChild(o); });
   }
 
   let recs = [...newbieRecords];
-  if (empF)  recs = recs.filter(r => (empName(gf(r,'關懷員工')) || gf(r,'關懷員工') || '') === empF);
+  if (empF)  recs = recs.filter(r => (empName(newbieEmp(r)) || newbieEmp(r) || '') === empF);
   if (typeF) recs = recs.filter(r => (gf(r,'面談類型')||'').includes(typeF));
 
-  // 計算平均分
-  const scoreFields = ['工作適應(1-5分)','團隊融入(1-5分)','資源支援(1-5分)','身心狀態(1-5分)','未來期望(1-5分)'];
+  // 能力構面（短標籤 → 實際欄位名，對應 Lark「新人關懷」表）
+  const DIMS = [
+    ['工作計畫', '工作計畫達成值(1-5分)'],
+    ['導師評量', '導師對學員綜合能力評量(1-5分)'],
+    ['績效表現', '績效表現(1-5分)'],
+    ['溝通能力', '溝通能力(1-5分)'],
+    ['團隊合作', '團隊合作(1-5分)'],
+    ['能力落差', '五大核心能力落差分析(1-5分)'],
+    ['未來發展', '未來發展性(1-5分)'],
+  ];
+  const scoreFields = DIMS.map(d => d[1]);
+  const scoreLabels = DIMS.map(d => d[0]);
   function avgScore(rec) {
     const vals = scoreFields.map(f => parseFloat(gf(rec,f))).filter(v => !isNaN(v));
     return vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : null;
   }
 
-  const total   = recs.length;
-  const high    = recs.filter(r => { const v = avgScore(r); return v !== null && v >= 4; }).length;
-  const mid     = recs.filter(r => { const v = avgScore(r); return v !== null && v >= 3 && v < 4; }).length;
-  const low     = recs.filter(r => { const v = avgScore(r); return v !== null && v < 3; }).length;
+  // ══ KPI ══
+  const total    = recs.length;
+  const empCount = new Set(recs.map(r => empName(newbieEmp(r)) || newbieEmp(r) || '').filter(Boolean)).size;
+  // 通識測驗通過率
+  const tested   = recs.filter(r => (gf(r,'通識測驗')||'').trim());
+  const passCnt  = tested.filter(r => (gf(r,'通識測驗')||'').includes('通過') && !(gf(r,'通識測驗')||'').includes('未通過')).length;
+  const passRate = tested.length ? Math.round(passCnt / tested.length * 100) : 0;
+  // 綜合平均分
+  const avgList  = recs.map(avgScore).filter(v => v !== null);
+  const overallAvg = avgList.length ? (avgList.reduce((a,b)=>a+b,0) / avgList.length) : null;
+  const avgColorKpi = overallAvg === null ? '#EF9F27' : overallAvg >= 4 ? '#1D9E75' : overallAvg >= 3 ? '#EF9F27' : '#E24B4A';
 
-  const statsEl = document.getElementById('newbie-stats');
-  if (statsEl) statsEl.innerHTML = [
-    ['本期總筆數', total, '#1a73e8'],
-    ['平均分 ≥4', high, '#1D9E75'],
-    ['平均分 3-4', mid, '#EF9F27'],
-    ['平均分 <3',  low, '#E24B4A'],
-  ].map(([label, val, color]) => `
-    <div style="background:#f8f9fa;border-radius:8px;padding:10px 16px;min-width:80px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:${color}">${val}</div>
-      <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${label}</div>
+  const kpiEl = document.getElementById('newbie-kpi');
+  if (kpiEl) kpiEl.innerHTML = [
+    ['關懷筆數', `${total}`, '新人關懷紀錄', '#1a73e8'],
+    ['關懷對象', `${empCount}<span style="font-size:13px;font-weight:600">人</span>`, '本期新進員工', '#1D9E75'],
+    ['通識測驗通過率', tested.length ? `${passRate}<span style="font-size:13px;font-weight:600">%</span>` : '—', tested.length ? `通過 ÷ 已測（${passCnt}/${tested.length}）` : '尚無測驗資料', '#7B5EA7'],
+    ['綜合平均分', overallAvg === null ? '—' : `${overallAvg.toFixed(1)}<span style="font-size:13px;font-weight:600"> / 5</span>`, avgList.length ? `已評分 ${avgList.length} 筆平均` : '尚無評分資料', avgColorKpi],
+  ].map(([label, val, note, color]) => `
+    <div style="background:#fff;border-radius:12px;border:0.5px solid var(--border);padding:16px 18px;position:relative;overflow:hidden">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${color}"></div>
+      <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">${label}</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;color:${color}">${val}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:4px">${note}</div>
     </div>`).join('');
 
+  // ══ 圖表資料彙整 ══
+  // ① 綜合評分等級分布
+  const bandColorMap = {'優良（≥4）':'#1D9E75','良好（3–4）':'#1a73e8','待加強（<3）':'#E24B4A','未評分':'#c4ccd4'};
+  const bandCnt = {'優良（≥4）':0,'良好（3–4）':0,'待加強（<3）':0,'未評分':0};
+  recs.forEach(r => { const v = avgScore(r); bandCnt[v===null?'未評分':v>=4?'優良（≥4）':v>=3?'良好（3–4）':'待加強（<3）']++; });
+  // ② 關懷類型分布
+  const typeCnt = {};
+  recs.forEach(r => { const v=(gf(r,'面談類型')||'未分類').trim()||'未分類'; typeCnt[v]=(typeCnt[v]||0)+1; });
+  // ③ 各能力構面平均分
+  const dimAvg = DIMS.map(([lbl, f]) => {
+    const vals = recs.map(r => parseFloat(gf(r,f))).filter(v => !isNaN(v));
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+  });
+  const hasDimData = dimAvg.some(v => v > 0);
+  // ④ 累積進度（依面談日期）
+  const dateCnt = {};
+  recs.forEach(r => { const d=fmtDate(gf(r,'面談日期')); if (d && d!=='—') dateCnt[d]=(dateCnt[d]||0)+1; });
+  const progDates = Object.keys(dateCnt).sort();
+  let cum=0; const progVals = progDates.map(d => (cum += dateCnt[d]));
+
+  // 銷毀舊圖，避免重複疊加
+  [newbieBandChart, newbieTypeChart, newbieDimChart, newbieProgressChart].forEach(c => { if (c) c.destroy(); });
+  newbieBandChart = newbieTypeChart = newbieDimChart = newbieProgressChart = null;
+
+  // ① 綜合評分等級 donut + legend
+  const bd = document.getElementById('newbie-band-donut');
+  if (bd) {
+    const labels = Object.keys(bandCnt);
+    newbieBandChart = new Chart(bd.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>bandCnt[k]), backgroundColor:labels.map(k=>bandColorMap[k]), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('newbie-band-legend');
+    if (lg) lg.innerHTML = labels.map(k => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${bandColorMap[k]}"></span>${k}</span><b>${bandCnt[k]}</b></div>`).join('');
+  }
+  // ② 關懷類型 donut + legend
+  const td = document.getElementById('newbie-type-donut');
+  if (td) {
+    const labels = Object.keys(typeCnt);
+    const palette = ['#1D9E75','#5DCAA5','#7B5EA7','#EF9F27','#1a73e8','#E24B4A'];
+    newbieTypeChart = new Chart(td.getContext('2d'), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:labels.map(k=>typeCnt[k]), backgroundColor:labels.map((k,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fff'}]},
+      options:{cutout:'68%', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+    });
+    const lg = document.getElementById('newbie-type-legend');
+    if (lg) lg.innerHTML = labels.map((k,i) => `<div class="perf-legend-row"><span class="perf-legend-l"><span class="perf-dot" style="background:${palette[i%palette.length]}"></span>${k}</span><b>${typeCnt[k]}</b></div>`).join('');
+  }
+  // ③ 各能力構面平均分 radar
+  const dr = document.getElementById('newbie-dim-radar');
+  const drEmpty = document.getElementById('newbie-dim-empty');
+  if (dr) {
+    if (hasDimData) {
+      if (drEmpty) drEmpty.style.display = 'none';
+      dr.style.display = '';
+      newbieDimChart = new Chart(dr.getContext('2d'), {
+        type:'radar',
+        data:{labels:scoreLabels, datasets:[{data:dimAvg.map(v=>Math.round(v*10)/10), backgroundColor:'rgba(29,158,117,.15)', borderColor:'#1D9E75', borderWidth:2, pointBackgroundColor:'#1D9E75', pointRadius:3}]},
+        options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+          scales:{r:{suggestedMin:0, suggestedMax:5, ticks:{stepSize:1, backdropColor:'transparent', color:'#9aa5b1', font:{size:9}}, pointLabels:{font:{size:11}}, grid:{color:'#eceae2'}, angleLines:{color:'#eceae2'}}}}
+      });
+    } else {
+      dr.style.display = 'none';
+      if (drEmpty) drEmpty.style.display = 'flex';
+    }
+  }
+  // ④ 累積進度 line
+  const pl = document.getElementById('newbie-progress-line');
+  const plEmpty = document.getElementById('newbie-progress-empty');
+  if (pl) {
+    if (progDates.length) {
+      if (plEmpty) plEmpty.style.display = 'none';
+      pl.style.display = '';
+      newbieProgressChart = new Chart(pl.getContext('2d'), {
+        type:'line',
+        data:{labels:progDates.map(d=>d.slice(5)), datasets:[{data:progVals, borderColor:'#1D9E75', backgroundColor:'rgba(29,158,117,.12)', fill:true, tension:.3, pointBackgroundColor:'#1D9E75', pointRadius:4}]},
+        options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false,
+          scales:{y:{beginAtZero:true, ticks:{stepSize:Math.max(1,Math.ceil(total/5)), precision:0}, grid:{color:'#f0efe9'}}, x:{grid:{display:false}}}}
+      });
+    } else {
+      pl.style.display = 'none';
+      if (plEmpty) plEmpty.style.display = 'flex';
+    }
+  }
+
   const countEl = document.getElementById('newbie-count');
-  if (countEl) countEl.textContent = `共 ${recs.length} 筆`;
+  if (countEl) countEl.textContent = `📋 關懷明細 · 共 ${recs.length} 筆（點擊展開）`;
 
   const listEl = document.getElementById('newbie-list');
   if (!listEl) return;
@@ -1316,11 +1431,9 @@ function renderEvents() {
   // 依面談日期排序（新→舊）
   recs.sort((a,b) => (gf(b,'面談日期')||'').localeCompare(gf(a,'面談日期')||''));
 
-  const scoreLabels = ['工作適應','團隊融入','資源支援','身心狀態','未來期望'];
-
   listEl.innerHTML = recs.map(rec => {
-    const empId   = gf(rec,'關懷員工') || '';
-    const name    = empName(empId) || empId;
+    const empId   = newbieEmp(rec);
+    const name    = empName(empId) || empId || '—';
     const cnName  = empCnName(empId);
     const date    = fmtDate(gf(rec,'面談日期'));
     const type    = gf(rec,'面談類型') || '—';
@@ -1328,7 +1441,9 @@ function renderEvents() {
     const mgr     = (gf(rec,'主管')||'—').replace('KR-','').replace(/^ /,'');
     const hr      = (gf(rec,'HR參與者')||'').replace('KR-','').replace(/^ /,'');
     const summary = gf(rec,'訪談重點摘要') || '';
-    const feedback= gf(rec,'觀察與回饋') || '';
+    const feedback= gf(rec,'觀察與回饋') || gf(rec,'備註') || '';
+    const quiz    = (gf(rec,'通識測驗')||'').trim();
+    const quizPass= quiz.includes('通過') && !quiz.includes('未通過');
     const avg     = avgScore(rec);
     const avgColor = avg === null ? 'var(--text-sub)' : avg >= 4 ? '#1D9E75' : avg >= 3 ? '#EF9F27' : '#E24B4A';
     const detailId = `newbie-detail-${(gf(rec,'紀錄ID')||Math.random()).toString().replace(/[^a-zA-Z0-9-]/g,'')}`;
@@ -1353,6 +1468,7 @@ function renderEvents() {
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${name}${cnName&&cnName!==name?` <span style="font-weight:400;color:var(--text-sub);font-size:11px">${cnName}</span>`:''}
               ${avg !== null ? `<span style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:${avgColor}18;color:${avgColor}">avg ${avg.toFixed(1)}</span>` : ''}
+              ${quiz ? `<span style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:${quizPass?'#1D9E7518':'#E24B4A18'};color:${quizPass?'#1D9E75':'#E24B4A'}">通識測驗 ${quiz}</span>` : ''}
             </div>
             <div style="font-size:11px;color:var(--text-sub);margin-top:3px">
               ${type} ｜ ${date} ｜ ${method} ｜ 主管：${mgr}${hr?` ｜ HR：${hr}`:''}
