@@ -747,6 +747,10 @@ function getCareMonthLabel() {
   const next = careMonths.find(cm => cm >= m) || careMonths[0];
   return `${next} 月`;
 }
+// 當月是否為關懷月（僅關懷月才檢核「本季是否完成關懷」，未到關懷月不示警）
+function isCareMonthNow() { return getCareMonths().includes(new Date().getMonth() + 1); }
+// 所有關懷月的文字標籤，如「6月、9月、12月」（依年度自動切換）
+function careMonthsLabel() { return getCareMonths().map(x => x + '月').join('、'); }
 // 是否為績效面談月（7月 H1 / 1月 H2）
 function isPerfReviewMonth(mo) { return mo === 7 || mo === 1; }
 function isNearPerfReview() {
@@ -815,36 +819,30 @@ function computeRisks(m) {
   }
 
   // ⑤ 本季關懷覆蓋率不足
-  // 依當年關懷月切分「本季」：找最近一個已過的關懷月作為起點
-  const thisQuarterStart = (() => {
-    const now = new Date(); const mo = now.getMonth() + 1; const yr = now.getFullYear();
-    const careMonths = getCareMonths();
-    // 找最近已過（含當月）的關懷月
-    let startMo = null;
-    for (let i = careMonths.length - 1; i >= 0; i--) {
-      if (careMonths[i] <= mo) { startMo = careMonths[i]; break; }
+  //   僅在「關懷月」（6/9/12 月，2027 起 3/6/9/12）才檢核；未到當季關懷月不視為風險。
+  //   例：8 月尚未到 Q3 關懷月（9 月），不應提早示警「本季尚未完成」。
+  if (isCareMonthNow()) {
+    // 本季關懷期間 = 當月（關懷月）1 日起，只計入本關懷月內完成的面談
+    const thisQuarterStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const caredThisQ = new Set(
+      careRecords.filter(r => {
+        const d = fmtDate(gf(r,'面談日期'));
+        if (d === '—') return false;
+        return new Date(d.replace(/\//g,'-')) >= thisQuarterStart;
+      }).map(r => gf(r,'關懷員工'))
+    );
+    const uncaredEmps = m.activeEmps.filter(e => !caredThisQ.has(gf(e,'Lark 帳號 ID')));
+    if (uncaredEmps.length > 0) {
+      const uncaredNames = uncaredEmps.slice(0,5).map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、');
+      risks.push({
+        level: 'medium', icon: '💬', title: '本季尚未完成關懷面談',
+        tag: `覆蓋率 · 請於 ${getCareMonthLabel()} 底前完成`,
+        metric: `${uncaredEmps.length} 位員工本季尚無關懷紀錄`,
+        desc: `每季至少完成一次主管 1on1 關懷，關懷月為 ${careMonthsLabel()}。<br>
+               ▶ 待關懷員工：${uncaredNames}${uncaredEmps.length>5?` 等共 ${uncaredEmps.length} 人`:''}<br>
+               ▶ 主管每季首日會收到自動提醒，請於當季完成面談並填寫紀錄表單`,
+      });
     }
-    if (!startMo) startMo = careMonths[careMonths.length - 1]; // 年初前，取上年最後關懷月
-    return new Date(yr, startMo - 1, 1);
-  })();
-  const caredThisQ = new Set(
-    careRecords.filter(r => {
-      const d = fmtDate(gf(r,'面談日期'));
-      if (d === '—') return false;
-      return new Date(d.replace(/\//g,'-')) >= thisQuarterStart;
-    }).map(r => gf(r,'關懷員工'))
-  );
-  const uncaredEmps = m.activeEmps.filter(e => !caredThisQ.has(gf(e,'Lark 帳號 ID')));
-  if (uncaredEmps.length > 0) {
-    const uncaredNames = uncaredEmps.slice(0,5).map(e=>(gf(e,'英文名')||gf(e,'員工姓名')||'').trim()).filter(Boolean).join('、');
-    risks.push({
-      level: 'medium', icon: '💬', title: '本季尚未完成關懷面談',
-      tag: `覆蓋率 · 請於 ${getCareMonthLabel()} 底前完成`,
-      metric: `${uncaredEmps.length} 位員工本季尚無關懷紀錄`,
-      desc: `每季至少完成一次主管 1on1 關懷，關懷月為 6月、9月、12月。<br>
-             ▶ 待關懷員工：${uncaredNames}${uncaredEmps.length>5?` 等共 ${uncaredEmps.length} 人`:''}<br>
-             ▶ 主管每季首日會收到自動提醒，請於當季完成面談並填寫紀錄表單`,
-    });
   }
 
   // ⑥ 即將到來：上半年績效面談（6-7月）
@@ -1712,11 +1710,18 @@ function renderReportManager() {
   const periodLabel = document.getElementById('period-select').selectedOptions[0].text;
   const mgrName = currentUser.name;
 
-  // 待辦：本季尚未關懷的成員
-  const uncared = m.activeEmps.filter(e => {
+  // 待辦：本季（關懷月）尚未關懷的成員 — 僅在關懷月才檢核，未到關懷月不列為待辦
+  const careMonthActive = isCareMonthNow();
+  const careWindowStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const uncared = careMonthActive ? m.activeEmps.filter(e => {
     const larkId = gf(e,'Lark 帳號 ID');
-    return !careRecords.some(r => gf(r,'關懷員工') === larkId);
-  });
+    return !careRecords.some(r => {
+      if (gf(r,'關懷員工') !== larkId) return false;
+      const d = fmtDate(gf(r,'面談日期'));
+      if (d === '—') return false;
+      return new Date(d.replace(/\//g,'-')) >= careWindowStart;
+    });
+  }) : [];
 
   // 我的待兌現承諾
   const myPending = promises.filter(p => {
@@ -1798,6 +1803,17 @@ function renderReportManager() {
       title: `上半年績效面談即將到來（7月執行）`,
       desc: `績效面談執行期間為 7/1–7/31，請提前與成員溝通面談時程。`,
       action: '完成面談後，填寫績效紀錄並將流程狀態更新為「已提交」，提交後 HR 將於 5 個工作日內審核。'
+    });
+  }
+
+  // 未到關懷月時，給主管一則行事曆提醒（取代提早誤報「本季尚未完成」）
+  if (!careMonthActive) {
+    todos.push({
+      level: 'low',
+      icon: '📅',
+      title: `下次關懷月：${getCareMonthLabel()}`,
+      desc: `季度關懷月為 ${careMonthsLabel()}，目前尚未到關懷月，無需安排本季 1on1。`,
+      action: '系統將於關懷月首日自動提醒您安排團隊 1on1 關懷並填寫紀錄表單。'
     });
   }
 
