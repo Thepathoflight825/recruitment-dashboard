@@ -377,8 +377,6 @@
           </select>
           <select id="rec-type-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部類型</option>
-            <option value="1on1 關懷">1on1 關懷</option>
-            <option value="HR 關懷">HR 關懷</option>
           </select>
           <select id="rec-risk-filter" onchange="renderCareRecords()" style="font-size:12px;padding:4px 8px;border:0.5px solid var(--border);border-radius:6px;font-family:'Noto Sans TC',sans-serif;background:#fff">
             <option value="">全部風險</option>
@@ -1343,9 +1341,13 @@ function resetRecordFilters() {
 }
 
 function populateRecordFilters() {
+  // 重複呼叫（重整／同步）時避免選項累加：先清掉除第一個佔位選項外的所有 option
+  const resetToPlaceholder = el => { while (el && el.options.length > 1) el.remove(1); };
+
   // 員工選單（英文名顯示，Lark ID 作為 value）
   const empEl = document.getElementById('rec-emp-filter');
   if (!empEl) return;
+  resetToPlaceholder(empEl);
   const seenEmps = new Map();
   careRecords.forEach(r => {
     const lkId = gf(r,'關懷員工');
@@ -1357,11 +1359,13 @@ function populateRecordFilters() {
 
   // 主管選單
   const mgrEl = document.getElementById('rec-mgr-filter');
+  resetToPlaceholder(mgrEl);
   const mgrs = [...new Set(careRecords.map(r => (gf(r,'主管')||'').replace('KR-','').replace(/^ /,'')).filter(Boolean))].sort();
   mgrs.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; mgrEl.appendChild(o); });
 
-  // 面談類型選單
+  // 面談類型選單（選項一律由資料動態產生，HTML 不再寫死，避免重複）
   const typeEl = document.getElementById('rec-type-filter');
+  resetToPlaceholder(typeEl);
   const types = [...new Set(careRecords.map(r => gf(r,'面談類型')).filter(Boolean))].sort();
   types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; typeEl.appendChild(o); });
 }
