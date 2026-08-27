@@ -392,6 +392,32 @@ function updateMonthBadge() {
   document.getElementById('month-badge').textContent = periodLabel(selectedPeriod);
 }
 
+// ── 季度關懷排程（2026 = 6/9/12 月；2027 起 = 3/6/9/12 月）──
+function careMonthsOf(y){ return y >= 2027 ? [3,6,9,12] : [6,9,12]; }
+function careScheduleLabelOf(y){ return `${y} 年 ${careMonthsOf(y).join('/')} 月`; }
+function periodMonths(p){
+  const now=new Date(); const y=now.getFullYear(), m=now.getMonth()+1;
+  if(p==='current') return [{y,m}];
+  if(p==='prev'){ const pm=m===1?12:m-1, py=m===1?y-1:y; return [{y:py,m:pm}]; }
+  const range=getPeriodRange(p);
+  if(!range) return null; // 近半年／整年度／全部：視為涵蓋關懷月
+  const months=[]; let d=new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+  while(d<=range.end){ months.push({y:d.getFullYear(), m:d.getMonth()+1}); d=new Date(d.getFullYear(), d.getMonth()+1, 1); }
+  return months;
+}
+function isCarePeriod(p){
+  const ms=periodMonths(p);
+  if(ms===null) return true;
+  return ms.some(({y,m})=>careMonthsOf(y).includes(m));
+}
+function nextCareLabelOf(p){
+  const ms=periodMonths(p);
+  const ref=(ms && ms[0]) || {y:new Date().getFullYear(), m:new Date().getMonth()+1};
+  const up=careMonthsOf(ref.y).find(cm=>cm>=ref.m);
+  if(up) return `${ref.y} 年 ${up} 月`;
+  const ny=ref.y+1; return `${ny} 年 ${careMonthsOf(ny)[0]} 月`;
+}
+
 // ══════════════════════════════════════
 //  資料載入
 // ══════════════════════════════════════
@@ -508,7 +534,32 @@ function computeRecruitMetrics() {
   const avgScore = phoneScores.length ? parseFloat((phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2)) : null;
   // 開放職缺數：從當月履歷收件統計的「應徵職務」欄位去重，反映本月實際有收件的職缺
   const positions = [...new Set(fs.map(r=>gf(r,'應徵職務')).filter(Boolean))];
-  return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc };
+  // 錄取結果（職缺補人數皆為 1，有錄取即視為該職缺達標）
+  // 注意：錄取評估結果需用精確比對「通過」，避免「不通過」被 includes 誤判
+  const isHired = c => {
+    const stage  = String(gf(c,'關卡進度')||'');
+    const result = String(gf(c,'錄取評估結果')||'').trim();
+    return stage.includes('錄取') || result === '通過';
+  };
+  const filledPositions = new Set(allCandidates.filter(isHired).map(c=>gf(c,'應徵職務')).filter(Boolean));
+  const periodHires = fc.filter(isHired).map(c=>({ name:gf(c,'應徵者')||'—', job:gf(c,'應徵職務')||'—', onboard:gf(c,'預計到職日')||'' }));
+  // 職缺開放/關閉：以面談名單「職缺狀態」欄位為權威來源。
+  //  值為「開啟／已關閉」，且逐列填寫（HR 於錄取列標「已關閉」）。
+  //  規則：某職缺只要有任一列標「已關閉」即視為已關閉；若該職缺完全未填狀態，回退以「是否已錄取」判斷。
+  const closedPositions = new Set(
+    allCandidates.filter(c => String(gf(c,'職缺狀態')||'').includes('關閉'))
+                 .map(c => gf(c,'應徵職務')).filter(Boolean)
+  );
+  const statusKnownPositions = new Set(
+    allCandidates.filter(c => (gf(c,'職缺狀態')||'').trim())
+                 .map(c => gf(c,'應徵職務')).filter(Boolean)
+  );
+  const openUnfilled = positions.filter(p => {
+    if (closedPositions.has(p)) return false;           // 已關閉 → 非招募缺口
+    if (statusKnownPositions.has(p)) return true;        // 有填狀態且非關閉 → 招募中
+    return !filledPositions.has(p);                      // 未填狀態 → 回退用錄取判斷
+  });
+  return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc, filledPositions, closedPositions, statusKnownPositions, periodHires, openUnfilled };
 }
 
 // ── 人力資源指標 ──
@@ -543,7 +594,12 @@ function computeCareMetrics() {
   const coveredIds = [...new Set(fr.map(r => gf(r,'關懷員工')).filter(Boolean))];
   const coverageRate = activeEmps.length ? Math.round(coveredIds.length / activeEmps.length * 100) : 0;
   const pendingP = promises.filter(p => { const s=gf(p,'兌現狀態')||''; return s==='待處理'||s.includes('逾期'); }).length;
-  return { activeEmps, highRisk, midRisk, fr, coverageRate, overdueP, pendingP, coveredIds };
+  // 季度關懷：非關懷月無關懷紀錄屬正常，覆蓋率不視為缺口
+  const isCareMonth = isCarePeriod(selectedPeriod);
+  const refYear = (periodMonths(selectedPeriod)?.[0]?.y) || new Date().getFullYear();
+  const careScheduleLabel = careScheduleLabelOf(refYear);
+  const nextCareLabel = nextCareLabelOf(selectedPeriod);
+  return { activeEmps, highRisk, midRisk, fr, coverageRate, overdueP, pendingP, coveredIds, isCareMonth, careScheduleLabel, nextCareLabel };
 }
 
 // ══════════════════════════════════════
@@ -564,17 +620,20 @@ function computeAllRisks(rm, hm, cm) {
   if (hm.juniorPct > 30)
     risks.push({ level:'medium', icon:'🌱', source:'人力資源', title:'新進員工比例偏高', metric:`年資 0-1 年佔在職 ${hm.juniorPct}%`, desc:`大量新進員工需要較多培訓資源，短期內可能影響整體生產力，建議啟動配對導師制。` });
 
-  // ── 招募風險 ──
-  if (rm.total < 10)
-    risks.push({ level:'high', icon:'📥', source:'招募管理', title:'履歷收件量嚴重不足', metric:`本月收件 ${rm.total} 份，目標 ≥ 10 份`, desc:`收件量不足將導致後續各關卡候選人稀缺，建議立即擴大招募渠道。` });
-  else if (rm.total < 20)
-    risks.push({ level:'medium', icon:'📊', source:'招募管理', title:'履歷收件量偏低', metric:`本月收件 ${rm.total} 份`, desc:`收件量雖達最低門檻，但相對於職缺需求仍屬偏低，建議調整刊登策略。` });
+  // ── 招募風險（職缺補人數皆為 1，有錄取即達標；僅在仍有未補實職缺時才視為風險）──
+  if (rm.openUnfilled.length > 0) {
+    if (rm.total < 10)
+      risks.push({ level:'high', icon:'📥', source:'招募管理', title:'開放職缺收件量不足', metric:`本月收件 ${rm.total} 份（目標 ≥ 10 份），未補實職缺：${rm.openUnfilled.join('、')}`, desc:`仍有職缺未錄取且收件量偏低，將導致後續各關卡候選人稀缺，建議立即擴大招募渠道。` });
+    else if (rm.total < 20)
+      risks.push({ level:'medium', icon:'📊', source:'招募管理', title:'開放職缺收件量偏低', metric:`本月收件 ${rm.total} 份，未補實職缺：${rm.openUnfilled.join('、')}`, desc:`收件量雖達最低門檻，但相對於未補實職缺需求仍屬偏低，建議調整刊登策略。` });
 
-  if (rm.lossRate !== null && rm.lossRate > 30)
-    risks.push({ level:'high', icon:'🚪', source:'招募管理', title:'應徵者流失率超標', metric:`流失率 ${rm.lossRate}%，目標 ≤ 30%`, desc:`${rm.dec} 位候選人主動婉拒，建議縮短決策週期並了解薪資期望落差。` });
+    // 小樣本（收件 < 10 份）比率波動過大，不單以百分比判定高風險
+    if (rm.lossRate !== null && rm.lossRate > 30 && rm.fc.length >= 10)
+      risks.push({ level:'high', icon:'🚪', source:'招募管理', title:'應徵者流失率超標', metric:`流失率 ${rm.lossRate}%，目標 ≤ 30%`, desc:`${rm.dec} 位候選人主動婉拒，建議縮短決策週期並了解薪資期望落差。` });
 
-  if (rm.phoneRate !== null && rm.phoneRate < 60)
-    risks.push({ level:'medium', icon:'📞', source:'招募管理', title:'電訪完成率偏低', metric:`電訪完成率 ${rm.phoneRate}%，目標 ≥ 60%`, desc:`電訪接通率未達標，可能為聯絡時段不佳或求職者意願低落，建議調整電訪時段與話術。` });
+    if (rm.phoneRate !== null && rm.phoneRate < 60 && rm.fc.length >= 10)
+      risks.push({ level:'medium', icon:'📞', source:'招募管理', title:'電訪完成率偏低', metric:`電訪完成率 ${rm.phoneRate}%，目標 ≥ 60%`, desc:`電訪接通率未達標，可能為聯絡時段不佳或求職者意願低落，建議調整電訪時段與話術。` });
+  }
 
   // ── 員工關懷風險 ──
   if (cm.highRisk > 0) {
@@ -626,13 +685,15 @@ function renderKPIStrip(rm, hm, cm) {
     },
     {
       cls:'recruit', label:'本月履歷收件', val: rm.total, unit:'份',
-      sub: `電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}`,
-      tagCls: rm.total >= 10 ? 'tag-ok' : 'tag-danger',
-      tagTxt: rm.total >= 10 ? '達標' : '不足'
+      sub: rm.periodHires.length
+        ? `本月錄取 ${rm.periodHires.length} 人・${rm.openUnfilled.length === 0 ? '職缺已補實' : '尚有 ' + rm.openUnfilled.length + ' 職缺招募中'}`
+        : `電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}`,
+      tagCls: rm.openUnfilled.length === 0 ? 'tag-ok' : (rm.total >= 10 ? 'tag-ok' : 'tag-danger'),
+      tagTxt: rm.openUnfilled.length === 0 ? '職缺達標' : (rm.total >= 10 ? '達標' : '收件不足')
     },
     {
       cls:'care', label:'高留任風險員工', val: cm.highRisk, unit:'人',
-      sub: `中風險 ${cm.midRisk} 人・關懷覆蓋率 ${cm.coverageRate}%`,
+      sub: cm.isCareMonth ? `中風險 ${cm.midRisk} 人・關懷覆蓋率 ${cm.coverageRate}%` : `中風險 ${cm.midRisk} 人・本月非關懷月`,
       tagCls: cm.highRisk === 0 ? 'tag-ok' : 'tag-danger',
       tagTxt: cm.highRisk === 0 ? '良好' : '需立即處理'
     },
@@ -656,20 +717,24 @@ function renderBlockGrid(rm, hm, cm) {
     { label:'自願離職佔比',    val: hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '—', cls: '' },
   ];
   const recruitRows = [
-    { label:'收件總數',        val: rm.total + ' 份',     cls: rm.total >= 10 ? 'teal' : 'red' },
+    { label:'收件總數',        val: rm.total + ' 份',     cls: (rm.openUnfilled.length === 0 || rm.total >= 10) ? 'teal' : 'red' },
+    { label:'本月錄取',        val: rm.periodHires.length ? rm.periodHires.map(h=>h.name).join('、') : '—', cls: rm.periodHires.length ? 'teal' : '' },
     { label:'電訪完成率',      val: rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無', cls: rm.phoneRate !== null ? (rm.phoneRate >= 60 ? 'teal' : 'amber') : '' },
     { label:'初試達成率',      val: rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無', cls: rm.interviewRate !== null ? (rm.interviewRate >= 60 ? 'teal' : 'amber') : '' },
-    { label:'應徵者流失率',    val: rm.lossRate !== null ? rm.lossRate + '%' : '暫無', cls: rm.lossRate !== null ? (rm.lossRate <= 30 ? 'teal' : 'red') : '' },
+    { label:'應徵者流失率',    val: rm.lossRate !== null ? rm.lossRate + '%' : '暫無', cls: rm.lossRate !== null ? (rm.lossRate <= 30 ? 'teal' : (rm.openUnfilled.length === 0 ? '' : 'red')) : '' },
     { label:'電訪平均評分',    val: rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無', cls: rm.avgScore !== null ? (rm.avgScore >= 3.5 ? 'teal' : 'amber') : '' },
-    { label:'開放職缺數',      val: rm.positions.length + ' 個', cls: '' },
+    { label:'職缺狀態',        val: rm.positions.length ? rm.positions.map(p=>rm.openUnfilled.includes(p)?`${p}（招募中）`:`${p}（已關閉）`).join('、') : '本月無收件職缺', cls: (rm.positions.length && rm.openUnfilled.length === 0) ? 'teal' : '' },
   ];
   const careRows = [
     { label:'在職員工總數',    val: cm.activeEmps.length + ' 人', cls: '' },
     { label:'高留任風險',      val: cm.highRisk + ' 人', cls: cm.highRisk > 0 ? 'red' : 'teal' },
     { label:'中留任風險',      val: cm.midRisk + ' 人',  cls: cm.midRisk >= 2 ? 'amber' : '' },
-    { label:'本月關懷次數',    val: cm.fr.length + ' 次', cls: cm.fr.length > 0 ? 'teal' : 'amber' },
-    { label:'關懷覆蓋率',      val: cm.coverageRate + '%', cls: cm.coverageRate >= 80 ? 'teal' : cm.coverageRate >= 50 ? 'amber' : 'red' },
+    { label:'本月關懷次數',    val: cm.fr.length + ' 次', cls: !cm.isCareMonth ? '' : (cm.fr.length > 0 ? 'teal' : 'amber') },
+    cm.isCareMonth
+      ? { label:'關懷覆蓋率', val: cm.coverageRate + '%', cls: cm.coverageRate >= 80 ? 'teal' : cm.coverageRate >= 50 ? 'amber' : 'red' }
+      : { label:'關懷覆蓋率', val: '非關懷月', cls: '' },
     { label:'逾期承諾',        val: cm.overdueP + ' 項', cls: cm.overdueP > 0 ? 'red' : 'teal' },
+    { label:'關懷排程',        val: cm.isCareMonth ? '本月為關懷月' : `下次：${cm.nextCareLabel}`, cls: '' },
   ];
 
   function buildBlock(icon, title, color, rows) {
@@ -719,7 +784,7 @@ function renderActions(risks, rm, hm, cm) {
   const actions = [];
   const tags = risks.map(r => r.source + ':' + r.title);
 
-  if (hm.exitCnt > 0 || (rm.lossRate !== null && rm.lossRate > 20))
+  if (hm.exitCnt > 0 || (rm.lossRate !== null && rm.lossRate > 20 && rm.openUnfilled.length > 0 && rm.fc.length >= 10))
     actions.push({ icon:'🤝', title:'縮短決策週期・降低人才流失', tag:'短期・本週優先',
       body:`<li>電訪評分 ≥ 4 分的候選人，建議 <strong>3 個工作日內</strong> 完成主管面試安排</li>
             <li>離職員工進行<strong>離職訪談</strong>，記錄原因並每月彙整一次呈報管理層</li>
@@ -733,7 +798,7 @@ function renderActions(risks, rm, hm, cm) {
             <li>HR 獨立約談高風險員工，了解主管無法得知的深層狀況</li>`,
       steps:['主管本週安排 1on1','更新逾期承諾','HR 獨立約談'] });
 
-  if (rm.total < 20)
+  if (rm.total < 20 && rm.openUnfilled.length > 0)
     actions.push({ icon:'📢', title:'擴大招募渠道・提升收件量', tag:'短期・立即執行',
       body:`<li>同步開啟 <strong>LinkedIn、CakeResume、Yourator</strong> 刊登，避免依賴單一平台</li>
             <li>請部門主管協助 <strong>內部轉介</strong>，推薦潛力人才</li>
@@ -807,15 +872,17 @@ function copyDataForAI() {
 - 初試達成率：${rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無資料'}（目標 ≥ 60%）
 - 應徵者流失率：${rm.lossRate !== null ? rm.lossRate + '%' : '暫無資料'}（目標 ≤ 30%）
 - 電訪平均評分：${rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無資料'}（目標 ≥ 3.5）
-- 開放職缺：${rm.positions.join('、') || '無'}
+- 本月錄取：${rm.periodHires.length ? rm.periodHires.map(h=>`${h.name}（${h.job}${h.onboard ? '・預計到職 ' + h.onboard : ''}）`).join('、') : '無'}
+- 職缺狀態：${rm.positions.length ? rm.positions.map(p=>rm.openUnfilled.includes(p) ? `${p}（招募中）` : `${p}（已關閉）`).join('、') : '本月無收件職缺'}
+- 招募判讀提醒：職缺是否仍需招募，以「職缺狀態」為準（已關閉＝該職缺已成功補實或結案，不需再招募）。若職缺已關閉，即使收件數低於目標亦屬正常結果，不得判為招募風險或「收件嚴重不足」。小樣本（收件 < 10 份）的比率指標（如流失率、電訪完成率）波動大，不得單以百分比判定為高風險。
 
 ■ 員工關懷
 - 在職員工：${cm.activeEmps.length} 人
 - 高留任風險員工：${cm.highRisk} 人
 - 中留任風險員工：${cm.midRisk} 人
-- 本月關懷次數：${cm.fr.length} 次
-- 關懷覆蓋率：${cm.coverageRate}%
 - 逾期未兌現承諾：${cm.overdueP} 項
+- 關懷制度：季度關懷（${cm.careScheduleLabel}），主管每季進行一次 1on1 關懷面談
+- 本月關懷狀態：${cm.isCareMonth ? `本月為關懷月，已關懷 ${cm.coveredIds.length} 人，關懷覆蓋率 ${cm.coverageRate}%` : `本月為非關懷月（下次關懷月：${cm.nextCareLabel}），無關懷紀錄屬正常，不得判定為關懷不足、關懷覆蓋率過低或員工關懷高風險`}
 
 ■ 本月主要風險
 ${risks.length > 0 ? risks.map(r => `- [${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}風險][${r.source}] ${r.title}：${r.metric}`).join('\n') : '- 本月無顯著風險'}`;
@@ -837,8 +904,8 @@ function copyReportText() {
   const period = periodLabel(selectedPeriod);
   const text = `【${period} 月度人力資源報告數據摘要】\n\n` +
     `人力資源：在職 ${hm.activeCnt} 人・離職 ${hm.exitCnt} 人・新進 ${hm.newCnt} 人・離職率 ${hm.monthlyRate}%\n` +
-    `招募管理：收件 ${rm.total} 份・電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}・流失率 ${rm.lossRate !== null ? rm.lossRate + '%' : '暫無'}\n` +
-    `員工關懷：高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・覆蓋率 ${cm.coverageRate}%・逾期承諾 ${cm.overdueP} 項`;
+    `招募管理：收件 ${rm.total} 份・本月錄取 ${rm.periodHires.length} 人・${rm.openUnfilled.length === 0 ? '職缺已補實' : '尚有 ' + rm.openUnfilled.length + ' 職缺招募中'}\n` +
+    `員工關懷：高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・${cm.isCareMonth ? '覆蓋率 ' + cm.coverageRate + '%' : '本月非關懷月'}・逾期承諾 ${cm.overdueP} 項`;
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.querySelector('.print-btn:last-child');
     const orig = btn.textContent;
