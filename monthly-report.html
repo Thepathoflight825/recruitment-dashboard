@@ -539,7 +539,8 @@ function computeRecruitMetrics() {
   const isHired = c => {
     const stage  = String(gf(c,'關卡進度')||'');
     const result = String(gf(c,'錄取評估結果')||'').trim();
-    return stage.includes('錄取') || result === '通過';
+    const cur    = String(gf(c,'當前關卡')||'').trim();
+    return stage.includes('錄取') || result === '通過' || cur === '錄取' || cur === '到職';
   };
   const filledPositions = new Set(allCandidates.filter(isHired).map(c=>gf(c,'應徵職務')).filter(Boolean));
   const periodHires = fc.filter(isHired).map(c=>({ name:gf(c,'應徵者')||'—', job:gf(c,'應徵職務')||'—', onboard:gf(c,'預計到職日')||'' }));
@@ -559,7 +560,46 @@ function computeRecruitMetrics() {
     if (statusKnownPositions.has(p)) return true;        // 有填狀態且非關閉 → 招募中
     return !filledPositions.has(p);                      // 未填狀態 → 回退用錄取判斷
   });
-  return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc, filledPositions, closedPositions, statusKnownPositions, periodHires, openUnfilled };
+
+  // ── 成效導向補強（與招募儀表板同一套邏輯）──
+  // 每職缺實際進入評估流程人數（＝進面談名單者，本期）
+  const posPipeline = {};
+  fc.forEach(c => { const p = gf(c,'應徵職務'); if (p) posPipeline[p] = (posPipeline[p]||0)+1; });
+  // 每職缺本期收件（來自履歷收件統計）
+  const posResume = {};
+  fs.forEach(r => { const p = (gf(r,'應徵職務')||'').trim(); if (!p) return;
+    posResume[p] = (posResume[p]||0) + (gf(r,'主要來源')==='HR搜尋' ? n(gf(r,'HR推薦')) : n(gf(r,'主動應徵_履歷總數'))); });
+
+  const filledCount = positions.filter(p => !openUnfilled.includes(p)).length;
+  const fillRate = positions.length ? Math.round(filledCount / positions.length * 100) : null;
+
+  // 招募精準度（評估效率）＝ 已補實職缺進入評估流程人數 ÷ 本月錄取人數（分母不含達成後持續進件）
+  const hireJobs = new Set(periodHires.map(h => h.job).filter(Boolean));
+  let evalPipeline = 0;
+  hireJobs.forEach(p => { evalPipeline += (posPipeline[p] || 0); });
+  const precisionEval = periodHires.length ? +(evalPipeline / periodHires.length).toFixed(1) : null;
+
+  // 達成後持續進件（未進評估）＝ 已補實/已關閉職缺的收件 − 進評估人數（刊登未關閉的殘餘進件）
+  const ongoingUnevaluated = positions.filter(p => !openUnfilled.includes(p))
+    .reduce((a, p) => a + Math.max((posResume[p]||0) - (posPipeline[p]||0), 0), 0);
+
+  // 有效流失 vs 自然未續行：職缺已達成後其餘婉拒屬正常結案，不計入流失
+  let effDeclined = 0, natNonPursue = 0, effBase = 0;
+  fc.forEach(c => {
+    const p = gf(c,'應徵職務');
+    const isDec = String(gf(c,'關卡進度')||'').includes('婉拒');
+    if (p && !openUnfilled.includes(p)) { if (isDec) natNonPursue++; }
+    else { effBase++; if (isDec) effDeclined++; }
+  });
+  const effLossRate = effBase ? Math.round(effDeclined / effBase * 100) : null;
+  const rejected = fc.filter(c => gf(c,'關卡進度') === '不通過').length;   // 公司篩選淘汰（非流失）
+
+  // 平均招募週期（天）：已錄取者「招募週期天數」的平均
+  const cycleArr = fc.filter(isHired).map(c => parseFloat(gf(c,'招募週期天數'))).filter(v => !isNaN(v) && v > 0);
+  const avgCycleDays = cycleArr.length ? Math.round(cycleArr.reduce((a,b)=>a+b,0)/cycleArr.length) : null;
+
+  return { total, phoneRate, interviewRate, lossRate, avgScore, positions, phoneCompleted, phoneDenom, dec, fc, filledPositions, closedPositions, statusKnownPositions, periodHires, openUnfilled,
+           filledCount, fillRate, precisionEval, evalPipeline, ongoingUnevaluated, effDeclined, natNonPursue, effBase, effLossRate, rejected, avgCycleDays, posPipeline, posResume };
 }
 
 // ── 人力資源指標 ──
@@ -627,9 +667,10 @@ function computeAllRisks(rm, hm, cm) {
     else if (rm.total < 20)
       risks.push({ level:'medium', icon:'📊', source:'招募管理', title:'開放職缺收件量偏低', metric:`本月收件 ${rm.total} 份，未補實職缺：${rm.openUnfilled.join('、')}`, desc:`收件量雖達最低門檻，但相對於未補實職缺需求仍屬偏低，建議調整刊登策略。` });
 
-    // 小樣本（收件 < 10 份）比率波動過大，不單以百分比判定高風險
-    if (rm.lossRate !== null && rm.lossRate > 30 && rm.fc.length >= 10)
-      risks.push({ level:'high', icon:'🚪', source:'招募管理', title:'應徵者流失率超標', metric:`流失率 ${rm.lossRate}%，目標 ≤ 30%`, desc:`${rm.dec} 位候選人主動婉拒，建議縮短決策週期並了解薪資期望落差。` });
+    // 小樣本（進流程 < 10 人）比率波動過大，不單以百分比判定高風險
+    // 流失以「有效流失率」為準：只計尚未補實職缺的主動婉拒；自然未續行/公司不通過不計入
+    if (rm.effLossRate !== null && rm.effLossRate > 30 && rm.effBase >= 10)
+      risks.push({ level:'high', icon:'🚪', source:'招募管理', title:'有效流失率超標', metric:`有效流失率 ${rm.effLossRate}%（未補實職缺中 ${rm.effDeclined} 位主動婉拒）`, desc:`尚未補實的職缺仍有候選人主動婉拒，建議縮短決策週期並了解薪資期望落差。` });
 
     if (rm.phoneRate !== null && rm.phoneRate < 60 && rm.fc.length >= 10)
       risks.push({ level:'medium', icon:'📞', source:'招募管理', title:'電訪完成率偏低', metric:`電訪完成率 ${rm.phoneRate}%，目標 ≥ 60%`, desc:`電訪接通率未達標，可能為聯絡時段不佳或求職者意願低落，建議調整電訪時段與話術。` });
@@ -686,7 +727,7 @@ function renderKPIStrip(rm, hm, cm) {
     {
       cls:'recruit', label:'本月履歷收件', val: rm.total, unit:'份',
       sub: rm.periodHires.length
-        ? `本月錄取 ${rm.periodHires.length} 人・${rm.openUnfilled.length === 0 ? '職缺已補實' : '尚有 ' + rm.openUnfilled.length + ' 職缺招募中'}`
+        ? `本月錄取 ${rm.periodHires.length} 人・精準度 ${rm.precisionEval !== null ? rm.precisionEval + ' 人/錄取' : '—'}${rm.avgCycleDays !== null ? '・' + rm.avgCycleDays + ' 天' : ''}`
         : `電訪完成率 ${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無'}`,
       tagCls: rm.openUnfilled.length === 0 ? 'tag-ok' : (rm.total >= 10 ? 'tag-ok' : 'tag-danger'),
       tagTxt: rm.openUnfilled.length === 0 ? '職缺達標' : (rm.total >= 10 ? '達標' : '收件不足')
@@ -717,11 +758,14 @@ function renderBlockGrid(rm, hm, cm) {
     { label:'自願離職佔比',    val: hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '—', cls: '' },
   ];
   const recruitRows = [
-    { label:'收件總數',        val: rm.total + ' 份',     cls: (rm.openUnfilled.length === 0 || rm.total >= 10) ? 'teal' : 'red' },
+    { label:'收件總數',        val: rm.total + ' 份' + (rm.ongoingUnevaluated > 0 ? `（含達成後持續進件 ${rm.ongoingUnevaluated} 份）` : ''), cls: (rm.openUnfilled.length === 0 || rm.total >= 10) ? 'teal' : 'red' },
     { label:'本月錄取',        val: rm.periodHires.length ? rm.periodHires.map(h=>h.name).join('、') : '—', cls: rm.periodHires.length ? 'teal' : '' },
+    { label:'職缺填補率',      val: rm.fillRate !== null ? `${rm.fillRate}%（${rm.filledCount}/${rm.positions.length}）` : '—', cls: rm.fillRate === 100 ? 'teal' : rm.fillRate > 0 ? 'amber' : '' },
+    { label:'招募精準度',      val: rm.precisionEval !== null ? `${rm.precisionEval} 人/錄取` : '暫無', cls: rm.precisionEval !== null ? 'teal' : '' },
+    { label:'平均招募週期',    val: rm.avgCycleDays !== null ? `${rm.avgCycleDays} 天` : '暫無', cls: rm.avgCycleDays !== null ? 'teal' : '' },
     { label:'電訪完成率',      val: rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無', cls: rm.phoneRate !== null ? (rm.phoneRate >= 60 ? 'teal' : 'amber') : '' },
     { label:'初試達成率',      val: rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無', cls: rm.interviewRate !== null ? (rm.interviewRate >= 60 ? 'teal' : 'amber') : '' },
-    { label:'應徵者流失率',    val: rm.lossRate !== null ? rm.lossRate + '%' : '暫無', cls: rm.lossRate !== null ? (rm.lossRate <= 30 ? 'teal' : (rm.openUnfilled.length === 0 ? '' : 'red')) : '' },
+    { label:'有效流失率',      val: rm.effLossRate !== null ? `${rm.effLossRate}%` + (rm.natNonPursue > 0 ? `（另 ${rm.natNonPursue} 人自然未續行）` : '') : (rm.natNonPursue > 0 ? `0%（${rm.natNonPursue} 人自然未續行）` : '暫無'), cls: rm.effLossRate === null || rm.effLossRate <= 30 ? 'teal' : 'red' },
     { label:'電訪平均評分',    val: rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無', cls: rm.avgScore !== null ? (rm.avgScore >= 3.5 ? 'teal' : 'amber') : '' },
     { label:'職缺狀態',        val: rm.positions.length ? rm.positions.map(p=>rm.openUnfilled.includes(p)?`${p}（招募中）`:`${p}（已關閉）`).join('、') : '本月無收件職缺', cls: (rm.positions.length && rm.openUnfilled.length === 0) ? 'teal' : '' },
   ];
@@ -784,7 +828,7 @@ function renderActions(risks, rm, hm, cm) {
   const actions = [];
   const tags = risks.map(r => r.source + ':' + r.title);
 
-  if (hm.exitCnt > 0 || (rm.lossRate !== null && rm.lossRate > 20 && rm.openUnfilled.length > 0 && rm.fc.length >= 10))
+  if (hm.exitCnt > 0 || (rm.effLossRate !== null && rm.effLossRate > 20 && rm.openUnfilled.length > 0 && rm.effBase >= 10))
     actions.push({ icon:'🤝', title:'縮短決策週期・降低人才流失', tag:'短期・本週優先',
       body:`<li>電訪評分 ≥ 4 分的候選人，建議 <strong>3 個工作日內</strong> 完成主管面試安排</li>
             <li>離職員工進行<strong>離職訪談</strong>，記錄原因並每月彙整一次呈報管理層</li>
@@ -867,14 +911,17 @@ function copyDataForAI() {
 - 自願離職佔本月離職：${hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '無離職'}
 
 ■ 招募管理
-- 本月收件總數：${rm.total} 份（目標 ≥ 10 份）
+- 本月收件總數：${rm.total} 份（目標 ≥ 10 份）${rm.ongoingUnevaluated > 0 ? `，其中 ${rm.ongoingUnevaluated} 份為「達成後持續進件」（職缺已補實、104 刊登未關閉，未進入評估流程，屬正常現象）` : ''}
+- 本月錄取：${rm.periodHires.length ? rm.periodHires.map(h=>`${h.name}（${h.job}${h.onboard ? '・預計到職 ' + h.onboard : ''}）`).join('、') : '無'}
+- 職缺填補率：${rm.fillRate !== null ? `${rm.fillRate}%（已補實 ${rm.filledCount}／在招 ${rm.positions.length} 個職缺）` : '暫無資料'}
+- 招募精準度（評估效率）：${rm.precisionEval !== null ? `每 1 位錄取平均評估 ${rm.precisionEval} 位候選人（分母為進入評估流程人數，不含達成後持續進件；數值越低＝來源越精準）` : '暫無資料（本月尚無錄取）'}
+- 平均招募週期：${rm.avgCycleDays !== null ? rm.avgCycleDays + ' 天（收件至錄取）' : '暫無資料'}
 - 電訪完成率：${rm.phoneRate !== null ? rm.phoneRate + '%' : '暫無資料'}（目標 ≥ 60%）
 - 初試達成率：${rm.interviewRate !== null ? rm.interviewRate + '%' : '暫無資料'}（目標 ≥ 60%）
-- 應徵者流失率：${rm.lossRate !== null ? rm.lossRate + '%' : '暫無資料'}（目標 ≤ 30%）
+- 有效流失率：${rm.effLossRate !== null ? rm.effLossRate + '%' : '0%'}（目標 ≤ 30%；僅計「尚未補實職缺」的主動婉拒）${rm.natNonPursue > 0 ? `；另有 ${rm.natNonPursue} 人屬「自然未續行」（職缺已補實後其餘人選未再推進，非流失）` : ''}${rm.rejected > 0 ? `；另有 ${rm.rejected} 人為公司篩選不通過（正常淘汰，非流失）` : ''}
 - 電訪平均評分：${rm.avgScore !== null ? rm.avgScore + ' / 5' : '暫無資料'}（目標 ≥ 3.5）
-- 本月錄取：${rm.periodHires.length ? rm.periodHires.map(h=>`${h.name}（${h.job}${h.onboard ? '・預計到職 ' + h.onboard : ''}）`).join('、') : '無'}
 - 職缺狀態：${rm.positions.length ? rm.positions.map(p=>rm.openUnfilled.includes(p) ? `${p}（招募中）` : `${p}（已關閉）`).join('、') : '本月無收件職缺'}
-- 招募判讀提醒：職缺是否仍需招募，以「職缺狀態」為準（已關閉＝該職缺已成功補實或結案，不需再招募）。若職缺已關閉，即使收件數低於目標亦屬正常結果，不得判為招募風險或「收件嚴重不足」。小樣本（收件 < 10 份）的比率指標（如流失率、電訪完成率）波動大，不得單以百分比判定為高風險。
+- 招募判讀提醒：職缺是否仍需招募，以「職缺狀態」為準（已關閉＝該職缺已成功補實或結案，不需再招募）。若職缺已補實，即使收件數低於目標亦屬正常結果，不得判為招募風險或「收件嚴重不足」。評估效率請以「招募精準度」判讀（進入評估流程人數÷錄取），不可用收件總量除以錄取數（會被達成後持續進件稀釋而失真）。流失請以「有效流失率」判讀，「自然未續行」與「公司篩選不通過」皆非招募流失，不得計入。小樣本（收件 < 10 份）的比率指標波動大，不得單以百分比判定為高風險。
 
 ■ 員工關懷
 - 在職員工：${cm.activeEmps.length} 人
