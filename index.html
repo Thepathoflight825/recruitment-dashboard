@@ -797,7 +797,7 @@ function computeMetrics() {
   const byPosition = {};
   fc.forEach(c => {
     const pos = gf(c,'應徵職務') || '未知';
-    if (!byPosition[pos]) byPosition[pos] = { total:0, declined:0, phone:0, interview:0, hired:0, active:0, closed:false };
+    if (!byPosition[pos]) byPosition[pos] = { total:0, declined:0, phone:0, interview:0, hired:0, active:0, closed:false, paused:false };
     const P = byPosition[pos];
     const es   = effStage(c);
     const prog = String(gf(c,'關卡進度')||'');
@@ -807,22 +807,43 @@ function computeMetrics() {
     if (['初試','複試','錄取','到職'].includes(es)) P.interview++;
     if (isHired(c)) P.hired++;
     if (prog === '進行中') P.active++;
-    // 職缺狀態：若資料表有「職缺狀態」欄位（開啟/已關閉）則以其為權威來源
-    if (String(gf(c,'職缺狀態')||'').includes('關閉')) P.closed = true;
+    // 職缺狀態（若資料表有此欄位則以其為權威來源）：已關閉＝已補實/結案；暫緩擱置＝刻意暫停、持續收件但不進流程
+    const st = String(gf(c,'職缺狀態')||'');
+    if (st.includes('關閉')) P.closed = true;
+    else if (/暫|緩|缓|擱/.test(st)) P.paused = true;
   });
 
   // ── 職缺成效判定層 ──
-  // achieved＝已達成錄取（有錄取/到職 或 職缺狀態=已關閉）｜active＝進行中有候選人｜gap＝開啟中但無進展也無錄取（真缺口）
+  // achieved＝已達成錄取｜active＝進行中有候選人｜gap＝開啟中但無進展也無錄取（真缺口）｜paused＝暫緩擱置（不列入在招與填補率）
   const posList = Object.entries(byPosition).map(([pos, P]) => {
     const filled = P.hired > 0 || P.closed;
-    const status = filled ? 'achieved' : (P.active > 0 ? 'active' : 'gap');
+    const status = P.paused && !filled ? 'paused' : (filled ? 'achieved' : (P.active > 0 ? 'active' : 'gap'));
     return { pos, ...P, filled, status };
   });
-  const openCount   = posList.length;                          // 在招職缺數（以面談名單出現的職缺估算）
-  const filledCount = posList.filter(p => p.filled).length;    // 已達成錄取的職缺數
-  const gapPositions    = posList.filter(p => p.status === 'gap');
-  const activePositions = posList.filter(p => p.status === 'active');
+  const scoped      = posList.filter(p => p.status !== 'paused');   // 在招範圍：排除暫緩擱置
+  const openCount   = scoped.length;                                // 在招職缺數（不含擱置）
+  const filledCount = scoped.filter(p => p.filled).length;          // 已達成錄取的職缺數
+  const gapPositions    = scoped.filter(p => p.status === 'gap');
+  const activePositions = scoped.filter(p => p.status === 'active');
+  const pausedPositions = posList.filter(p => p.status === 'paused');
   const fillRate    = openCount ? Math.round(filledCount / openCount * 100) : 0;
+
+  // 暫緩職缺可能只在履歷收件統計出現（未進面談名單，如暫緩中的 PM／架構師）。
+  //   以該職缺最新一列的職缺狀態欄或備注欄為準，補入暫緩清單（僅供呈現，本就不列入在招/成效）。
+  const isPausedStatus = s => /暫|緩|缓|擱/.test(String(s||''));
+  const posLatestStatus = {};
+  fs.forEach(r => {
+    const p = (gf(r,'應徵職務')||'').trim(); if (!p) return;
+    const d = parseDateVal(gf(r,'統計日期')) || new Date(0);
+    const st = gf(r,'職缺狀態') || gf(r,'備注') || gf(r,'備註') || '';
+    if (!posLatestStatus[p] || d >= posLatestStatus[p].d) posLatestStatus[p] = { d, st };
+  });
+  const knownPos = new Set(posList.map(p => p.pos));
+  Object.entries(posLatestStatus).forEach(([p, o]) => {
+    if (isPausedStatus(o.st) && !String(o.st).includes('關閉') && !knownPos.has(p)) {
+      pausedPositions.push({ pos: p, statsOnly: true });
+    }
+  });
 
   // 各職缺收件量（來自履歷收件統計）→ 用於區分「進入評估流程」與「未進評估（達成後持續進件）」
   const posResume = {};
@@ -839,13 +860,14 @@ function computeMetrics() {
   // 招募精準度（評估效率）：每 1 位錄取所需「評估的候選人數」，只計已填補職缺
   //   分母＝進入評估流程人數，而非 104 收件總量 → 排除「職缺已滿、刊登未關閉」的未評估殘餘進件
   let filledPipeline = 0, filledHires = 0;
-  posList.forEach(p => { if (p.filled && p.hired>0) { filledPipeline += p.pipeline; filledHires += p.hired; } });
+  posList.forEach(p => { if (p.filled && p.hired>0 && p.status !== 'paused') { filledPipeline += p.pipeline; filledHires += p.hired; } });
   const precisionEval = filledHires ? (filledPipeline / filledHires) : 0;
-  const filledUnevaluated = posList.filter(p=>p.filled).reduce((a,p)=>a+p.unevaluated,0);
+  const filledUnevaluated = posList.filter(p=>p.filled && p.status !== 'paused').reduce((a,p)=>a+p.unevaluated,0);
 
-  // 有效流失 vs 自然未續行：職缺已達成後其餘婉拒屬正常結案，不計入流失
+  // 有效流失 vs 自然未續行：擱置職缺不列入；職缺已達成後其餘婉拒屬正常結案，不計入流失
   let effectiveDeclined = 0, naturalNonPursue = 0, effectiveBase = 0;
   posList.forEach(p => {
+    if (p.status === 'paused') return;               // 擱置職缺不計入流失判讀
     if (p.filled) { naturalNonPursue += p.declined; }
     else { effectiveDeclined += p.declined; effectiveBase += p.total; }
   });
@@ -864,7 +886,7 @@ function computeMetrics() {
            statsTotal, statsAI, statsHR, statsSent, statsMgr,
            phoneRate, interviewRate, lossRate, sentRate, mgrRate,
            avgPhoneScore, byPosition, fp,
-           posList, openCount, filledCount, fillRate, gapPositions, activePositions,
+           posList, openCount, filledCount, fillRate, gapPositions, activePositions, pausedPositions,
            effectiveDeclined, naturalNonPursue, effectiveBase, effectiveLossRate,
            precisionRatio, avgCycleDays, posResume,
            precisionEval, filledPipeline, filledHires, filledUnevaluated };
@@ -983,6 +1005,12 @@ function computeHighlights(m) {
   if (m.filledUnevaluated > 0) {
     h.push({ icon:'📥', title:`達成後持續進件 ${m.filledUnevaluated} 份（未進評估）`,
       desc:`已填補職缺的 104 刊登尚未關閉，仍持續收到履歷；因職缺已達成錄取，這些履歷未進入評估流程，屬正常現象，不影響招募成效，也不列入精準度計算。` });
+  }
+
+  // H2c 暫緩擱置職缺 — 刻意暫停，不列入在招與填補率
+  if (m.pausedPositions && m.pausedPositions.length) {
+    h.push({ icon:'⏸️', title:`${m.pausedPositions.length} 個職缺暫緩擱置`,
+      desc:`${m.pausedPositions.map(p=>p.pos).join('、')}：刊登開放、持續收履歷但暫不進面試流程，屬刻意擱置，不列入在招職缺與填補率分母，也不計為招募缺口。` });
   }
 
   // H3 職缺填補率
