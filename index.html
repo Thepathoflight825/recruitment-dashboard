@@ -111,6 +111,7 @@
   .alert-banner.critical { background: #FFF0F0; border: 1px solid #F5C0C0; color: #8B2020; }
   .alert-banner.warning  { background: #FFFBF0; border: 1px solid #F5DFA0; color: #7A4D00; }
   .alert-banner.info     { background: #F0F6FF; border: 1px solid #B8D4F5; color: #1A4A80; }
+  .alert-banner.success  { background: #F0FBF6; border: 1px solid #A8E0C8; color: #0E6B47; }
   .alert-banner-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
   .alert-banner-body { flex: 1; }
   .alert-banner-title { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
@@ -245,7 +246,7 @@
       <div class="stat-card blue"><div class="stat-label">本月履歷總數</div><div class="stat-value" id="s-total">—</div><div class="stat-sub" id="s-total-sub">載入中</div><div class="stat-icon">📄</div></div>
       <div class="stat-card teal"><div class="stat-label">電訪完成</div><div class="stat-value" id="s-phone">—</div><div class="stat-sub" id="s-phone-sub">載入中</div><div class="stat-icon">📞</div></div>
       <div class="stat-card amber"><div class="stat-label">進行中</div><div class="stat-value" id="s-progress">—</div><div class="stat-sub">待後續安排</div><div class="stat-icon">⏳</div></div>
-      <div class="stat-card red"><div class="stat-label">應徵者婉拒</div><div class="stat-value" id="s-declined">—</div><div class="stat-sub">本月流失</div><div class="stat-icon">❌</div></div>
+      <div class="stat-card red"><div class="stat-label">應徵者婉拒</div><div class="stat-value" id="s-declined">—</div><div class="stat-sub" id="s-declined-sub">本月流失</div><div class="stat-icon">❌</div></div>
     </div>
     <div class="panel-grid-2">
       <div class="panel"><div class="panel-title">📊 各關卡人數分佈</div><canvas id="chart-funnel" height="190"></canvas></div>
@@ -413,9 +414,19 @@ const STAGE_CUMULATIVE = {
   '錄取': ['錄取','到職'],
   '到職': ['到職'],
 };
+// 有效關卡：錄取可能記在「關卡進度=錄取」或「錄取評估結果=通過」，而「當前關卡」未必已推進到錄取
+// （例：於初試階段即拍板錄取，當前關卡仍為初試）。此處統一還原為真正到達的關卡。
+function effStage(c) {
+  if (gf(c,'關卡進度') === '錄取' || gf(c,'錄取評估結果') === '通過') {
+    return gf(c,'當前關卡') === '到職' ? '到職' : '錄取';
+  }
+  return gf(c,'當前關卡');
+}
+function isHired(c) { const s = effStage(c); return s === '錄取' || s === '到職'; }
+
 function stageCumCount(list, stage) {
   const set = STAGE_CUMULATIVE[stage] || [stage];
-  return list.filter(c => set.includes(gf(c,'當前關卡'))).length;
+  return list.filter(c => set.includes(effStage(c))).length;
 }
 const STAGE_COLOR = { '初試':'badge-blue','電訪':'badge-teal','AI評分':'badge-amber','AI評分通過':'badge-amber','複試':'badge-amber','錄取':'badge-teal','到職':'badge-teal','收件':'badge-gray' };
 const PROG_COLOR  = { '進行中':'badge-teal','應徵者婉拒':'badge-red','待安排':'badge-amber','通過':'badge-teal','不通過':'badge-red','錄取':'badge-teal','AI評分通過':'badge-amber' };
@@ -599,12 +610,21 @@ function renderStats() {
   const inProgress = fc.filter(c => gf(c,'關卡進度') === '進行中').length;
   const declined = fc.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒')).length;
   const statsTotal = getStatsTotal(fs);
+  const m = computeMetrics();  // 成效層：錄取數、自然未續行
   document.getElementById('s-total').textContent = statsTotal || total;
-  document.getElementById('s-total-sub').textContent = statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`;
+  document.getElementById('s-total-sub').textContent =
+    (statsTotal ? `收件 ${statsTotal} 份` : `進入電訪 ${total} 人`) + (m.hired>0 ? `　｜　錄取 ${m.hired} 位` : '');
   document.getElementById('s-phone').textContent = phoneCount;
   document.getElementById('s-phone-sub').textContent = fp.length ? `平均 ${avgScoreFromList(fp)}分` : '電訪人數';
   document.getElementById('s-progress').textContent = inProgress;
   document.getElementById('s-declined').textContent = declined;
+  // 婉拒卡副標：區分「有效流失」與「職缺達成後自然未續行」，避免主管誤讀為全部流失
+  const dSub = document.getElementById('s-declined-sub');
+  if (dSub) {
+    dSub.textContent = m.naturalNonPursue>0
+      ? (m.effectiveDeclined>0 ? `含 ${m.naturalNonPursue} 位錄取後未續行` : `${m.naturalNonPursue} 位錄取後未續行(非流失)`)
+      : '本月主動婉拒';
+  }
 }
 
 function avgScoreFromList(list) {
@@ -755,12 +775,13 @@ function computeMetrics() {
   const statsSent    = statsAI + statsHR;
 
   const total        = statsTotal || fc.length;
-  const phoneCount   = fc.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const phoneCount   = fc.filter(c=>['電訪','AI評分','初試','複試','錄取','到職'].includes(effStage(c))).length;
   const interviewDone= interviewRecords.filter(r=>gf(r,'應徵者')).length;
-  const iReal        = interviewDone || fc.filter(c=>['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const iReal        = interviewDone || fc.filter(c=>['初試','複試','錄取','到職'].includes(effStage(c))).length;
   const declined     = fc.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
+  const rejected     = fc.filter(c=>gf(c,'關卡進度')==='不通過').length;   // 公司篩選淘汰（≠候選人流失）
   const inProgress   = fc.filter(c=>gf(c,'關卡進度')==='進行中').length;
-  const hired        = fc.filter(c=>['錄取','到職'].includes(gf(c,'當前關卡'))).length;
+  const hired        = fc.filter(isHired).length;                          // 錄取：以有效關卡判定（含初試即錄取者）
 
   // 電訪覆蓋率 = 已電訪 / 主管篩選通過（電訪的正確母數）
   // 若無統計資料則 fallback 到收件總數
@@ -772,49 +793,110 @@ function computeMetrics() {
   const mgrRate      = statsSent ? Math.round(statsMgr/statsSent*100): 0;
   const avgPhoneScore= parseFloat(avgScoreFromList(fp)) || 0;
 
-  // 各職缺個別統計
+  // 各職缺個別統計（含成效判定）
   const byPosition = {};
   fc.forEach(c => {
     const pos = gf(c,'應徵職務') || '未知';
-    if (!byPosition[pos]) byPosition[pos] = { total:0, declined:0, phone:0, interview:0 };
-    byPosition[pos].total++;
-    if (String(gf(c,'關卡進度')||'').includes('婉拒')) byPosition[pos].declined++;
-    if (['電訪','AI評分','初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))) byPosition[pos].phone++;
-    if (['初試','複試','錄取','到職'].includes(gf(c,'當前關卡'))) byPosition[pos].interview++;
+    if (!byPosition[pos]) byPosition[pos] = { total:0, declined:0, phone:0, interview:0, hired:0, active:0, closed:false };
+    const P = byPosition[pos];
+    const es   = effStage(c);
+    const prog = String(gf(c,'關卡進度')||'');
+    P.total++;
+    if (prog.includes('婉拒')) P.declined++;
+    if (['電訪','AI評分','初試','複試','錄取','到職'].includes(es)) P.phone++;
+    if (['初試','複試','錄取','到職'].includes(es)) P.interview++;
+    if (isHired(c)) P.hired++;
+    if (prog === '進行中') P.active++;
+    // 職缺狀態：若資料表有「職缺狀態」欄位（開啟/已關閉）則以其為權威來源
+    if (String(gf(c,'職缺狀態')||'').includes('關閉')) P.closed = true;
   });
 
-  return { total, phoneCount, iReal, declined, inProgress, hired,
+  // ── 職缺成效判定層 ──
+  // achieved＝已達成錄取（有錄取/到職 或 職缺狀態=已關閉）｜active＝進行中有候選人｜gap＝開啟中但無進展也無錄取（真缺口）
+  const posList = Object.entries(byPosition).map(([pos, P]) => {
+    const filled = P.hired > 0 || P.closed;
+    const status = filled ? 'achieved' : (P.active > 0 ? 'active' : 'gap');
+    return { pos, ...P, filled, status };
+  });
+  const openCount   = posList.length;                          // 在招職缺數（以面談名單出現的職缺估算）
+  const filledCount = posList.filter(p => p.filled).length;    // 已達成錄取的職缺數
+  const gapPositions    = posList.filter(p => p.status === 'gap');
+  const activePositions = posList.filter(p => p.status === 'active');
+  const fillRate    = openCount ? Math.round(filledCount / openCount * 100) : 0;
+
+  // 各職缺收件量（來自履歷收件統計）→ 用於區分「進入評估流程」與「未進評估（達成後持續進件）」
+  const posResume = {};
+  fs.forEach(r => {
+    const pos = (gf(r,'應徵職務')||'').trim(); if (!pos) return;
+    const v = gf(r,'主要來源')==='HR搜尋' ? (parseFloat(gf(r,'HR推薦'))||0) : (parseFloat(gf(r,'主動應徵_履歷總數'))||0);
+    posResume[pos] = (posResume[pos]||0) + v;
+  });
+  posList.forEach(p => {
+    p.resume = posResume[p.pos] || 0;                              // 該職缺累計收件（含刊登持續進件）
+    p.pipeline = p.total;                                          // 實際進入評估流程人數（＝進面談名單者）
+    p.unevaluated = p.filled ? Math.max(p.resume - p.pipeline, 0) : 0; // 已填補職缺：未進評估的收件（達成後持續進件為主）
+  });
+  // 招募精準度（評估效率）：每 1 位錄取所需「評估的候選人數」，只計已填補職缺
+  //   分母＝進入評估流程人數，而非 104 收件總量 → 排除「職缺已滿、刊登未關閉」的未評估殘餘進件
+  let filledPipeline = 0, filledHires = 0;
+  posList.forEach(p => { if (p.filled && p.hired>0) { filledPipeline += p.pipeline; filledHires += p.hired; } });
+  const precisionEval = filledHires ? (filledPipeline / filledHires) : 0;
+  const filledUnevaluated = posList.filter(p=>p.filled).reduce((a,p)=>a+p.unevaluated,0);
+
+  // 有效流失 vs 自然未續行：職缺已達成後其餘婉拒屬正常結案，不計入流失
+  let effectiveDeclined = 0, naturalNonPursue = 0, effectiveBase = 0;
+  posList.forEach(p => {
+    if (p.filled) { naturalNonPursue += p.declined; }
+    else { effectiveDeclined += p.declined; effectiveBase += p.total; }
+  });
+  const effectiveLossRate = effectiveBase ? Math.round(effectiveDeclined / effectiveBase * 100) : 0;
+
+  // 招募精準度：每產出 1 位錄取所需履歷數（越低越精準）
+  const precisionRatio = hired ? (total / hired) : 0;
+
+  // 平均招募週期（天）：取已錄取者「招募週期天數」欄位的平均，衡量填補速度
+  const cycleDays = fc.filter(isHired)
+    .map(c => parseFloat(gf(c,'招募週期天數')))
+    .filter(v => !isNaN(v) && v > 0);
+  const avgCycleDays = cycleDays.length ? Math.round(cycleDays.reduce((a,b)=>a+b,0)/cycleDays.length) : 0;
+
+  return { total, phoneCount, iReal, declined, rejected, inProgress, hired,
            statsTotal, statsAI, statsHR, statsSent, statsMgr,
            phoneRate, interviewRate, lossRate, sentRate, mgrRate,
-           avgPhoneScore, byPosition, fp };
+           avgPhoneScore, byPosition, fp,
+           posList, openCount, filledCount, fillRate, gapPositions, activePositions,
+           effectiveDeclined, naturalNonPursue, effectiveBase, effectiveLossRate,
+           precisionRatio, avgCycleDays, posResume,
+           precisionEval, filledPipeline, filledHires, filledUnevaluated };
 }
 
 function computeRisks(m) {
   const risks = [];
+  // 全數職缺已達成錄取時，量能/轉換類指標不再具風險意義（已有成果）
+  const allAchieved = m.openCount > 0 && m.filledCount === m.openCount;
 
-  // R1 收件量不足
-  if (m.total < 10) {
-    risks.push({ level:'high', icon:'📉', title:'履歷收件量嚴重不足',
-      metric:`本期收件 ${m.total} 份，目標 ≥ 10 份`,
-      desc:`目前收件量僅達目標的 ${m.total*10}%，若持續不足將導致後續各關卡候選人稀缺，可能拖延整體招募時程。`,
-      tag:'量能風險' });
-  } else if (m.total < 20) {
-    risks.push({ level:'medium', icon:'📊', title:'履歷收件量偏低',
-      metric:`本期收件 ${m.total} 份`,
-      desc:`收件量雖達最低門檻，但相對於職缺需求仍屬偏低，建議擴大刊登渠道或調整職缺吸引力以提升來源多樣性。`,
+  // R1 收件量能不足 —— 只針對「開啟中、無進行中候選人、也尚未錄取」的真缺口職缺
+  //    已達成錄取的精簡招募不再誤判為風險（收件量少＝精準，不＝不足）
+  if (m.gapPositions.length > 0) {
+    const gapNames   = m.gapPositions.map(p => p.pos).join('、');
+    const gapResumes = m.gapPositions.reduce((a, p) => a + p.total, 0);
+    risks.push({ level:'high', icon:'📉', title:'職缺收件量能不足',
+      metric:`${m.gapPositions.length} 個職缺無有效進展（${gapNames}）`,
+      desc:`這些職缺目前無進行中候選人、也尚未產生錄取，累計收件僅 ${gapResumes} 份，量能不足以支撐後續關卡，建議立即擴大來源或檢視 JD 吸引力。`,
       tag:'量能風險' });
   }
 
-  // R2 應徵者流失率過高
-  if (m.lossRate > 30) {
-    risks.push({ level:'high', icon:'🚪', title:'應徵者流失率超標',
-      metric:`流失率 ${m.lossRate}%，目標 ≤ 30%`,
-      desc:`${m.declined} 位候選人主動婉拒，可能原因包含：薪資期望落差、面試流程過長、其他公司競搶等。高流失率直接壓縮最終可錄取人選數。`,
+  // R2 有效流失率過高 —— 只計「職缺尚未達成錄取」情況下的主動婉拒
+  //    職缺已達成錄取後，其餘人選未再推進屬「自然未續行」，不列為流失風險
+  if (m.effectiveBase >= 3 && m.effectiveDeclined >= 2 && m.effectiveLossRate > 30) {
+    risks.push({ level:'high', icon:'🚪', title:'有效流失率超標',
+      metric:`有效流失率 ${m.effectiveLossRate}%（未達成職缺中 ${m.effectiveDeclined} 位主動婉拒）`,
+      desc:`在尚未產生錄取的職缺中仍有候選人主動婉拒，可能反映薪資落差、面試流程過長或同業競搶，將直接壓縮可錄取人選，建議逐一記錄婉拒原因。`,
       tag:'流失風險' });
-  } else if (m.lossRate > 20) {
-    risks.push({ level:'medium', icon:'⚠️', title:'應徵者流失率偏高',
-      metric:`流失率 ${m.lossRate}%`,
-      desc:`流失率接近警戒線，需持續追蹤每位婉拒候選人的原因，作為後續薪資結構或流程優化的依據。`,
+  } else if (m.effectiveBase >= 3 && m.effectiveDeclined >= 2 && m.effectiveLossRate > 20) {
+    risks.push({ level:'medium', icon:'⚠️', title:'有效流失率偏高',
+      metric:`有效流失率 ${m.effectiveLossRate}%`,
+      desc:`未達成職缺的流失率接近警戒線，建議追蹤每位婉拒原因，作為薪資結構或流程優化依據。`,
       tag:'流失風險' });
   }
 
@@ -832,13 +914,13 @@ function computeRisks(m) {
       tag:'資料完整性' });
   }
 
-  // R4 初試達成率
-  if (m.phoneCount > 0 && m.interviewRate < 40) {
+  // R4 初試達成率（職缺已全數達成錄取時不判定：已錄取即代表轉換有效）
+  if (!allAchieved && m.phoneCount > 0 && m.interviewRate < 40) {
     risks.push({ level:'high', icon:'🤝', title:'電訪轉初試率過低',
       metric:`初試達成率 ${m.interviewRate}%（初試完成 ${m.iReal} / 電訪 ${m.phoneCount}）`,
       desc:`電訪完成後大量候選人未能進入初試，可能為電訪評分標準過嚴、候選人等待期過長，或初試邀約後對方未回應，建議檢視電訪至邀約的 SLA 天數。`,
       tag:'轉換風險' });
-  } else if (m.phoneCount > 0 && m.interviewRate < 60) {
+  } else if (!allAchieved && m.phoneCount > 0 && m.interviewRate < 60) {
     risks.push({ level:'medium', icon:'📋', title:'電訪轉初試率待提升',
       metric:`初試達成率 ${m.interviewRate}%`,
       desc:`電訪→初試轉換率未達 60% 目標，建議縮短電訪後邀約等待天數，並確認主管檔期安排。`,
@@ -864,15 +946,69 @@ function computeRisks(m) {
       tag:'管道風險' });
   }
 
-  // R7 電訪評分
+  // R7 電訪評分（已產生錄取時降為中風險：仍有參考價值，但已非緊急）
   if (m.avgPhoneScore > 0 && m.avgPhoneScore < 3.0) {
-    risks.push({ level:'high', icon:'⭐', title:'電訪平均評分偏低',
-      metric:`平均 ${m.avgPhoneScore.toFixed(2)} / 5.0`,
+    risks.push({ level: m.hired > 0 ? 'medium' : 'high', icon:'⭐', title:'電訪平均評分偏低',
+      metric:`平均 ${m.avgPhoneScore.toFixed(2)} / 5.0${m.hired > 0 ? '（本期仍完成錄取）' : ''}`,
       desc:`候選人整體素質評分偏低，建議重新審視 JD 描述是否精準反映職位要求，以吸引更匹配的應徵者。`,
       tag:'品質風險' });
   }
 
   return risks.sort((a,b) => ({'high':0,'medium':1,'low':2}[a.level]-{'high':0,'medium':1,'low':2}[b.level]));
+}
+
+// ══════════════════════════════════════
+//  成效亮點：把好成果主動呈現給主管
+// ══════════════════════════════════════
+function computeHighlights(m) {
+  const h = [];
+
+  // H1 完成錄取
+  if (m.hired > 0) {
+    const filledNames = m.posList.filter(p => p.filled).map(p => p.pos);
+    h.push({ icon:'🎉', title:`本期完成 ${m.hired} 位錄取`,
+      desc: filledNames.length ? `已達成職缺：${filledNames.join('、')}。` : '職缺已產出錄取人員。' });
+  }
+
+  // H2 逐職缺錄取效率（進入評估流程之候選人數 → 錄取）；數字夠精簡才以「精準」定調
+  const filledRoles = m.posList.filter(p => p.filled && p.hired>0);
+  if (filledRoles.length) {
+    const parts = filledRoles.map(p => `${p.pos} 評估 ${p.pipeline} 人 → 錄取 ${p.hired} 位`);
+    const anyPrecise = filledRoles.some(p => p.pipeline / p.hired <= 8);
+    h.push({ icon:'🎯', title: anyPrecise ? '精準招募（以精簡評估量完成錄取）' : '各職缺錄取效率',
+      desc:`${parts.join('；')}。${anyPrecise ? '以較少候選人即完成錄取，來源精準、評估效率高，優於量產式招募。' : '數值為各職缺進入評估流程之候選人對應錄取數（不含未評估的持續進件）。'}` });
+  }
+
+  // H2b 達成後持續進件（未評估）— 明白告訴主管這是正常現象
+  if (m.filledUnevaluated > 0) {
+    h.push({ icon:'📥', title:`達成後持續進件 ${m.filledUnevaluated} 份（未進評估）`,
+      desc:`已填補職缺的 104 刊登尚未關閉，仍持續收到履歷；因職缺已達成錄取，這些履歷未進入評估流程，屬正常現象，不影響招募成效，也不列入精準度計算。` });
+  }
+
+  // H3 職缺填補率
+  if (m.openCount > 0 && m.fillRate === 100) {
+    h.push({ icon:'✅', title:`職缺填補率 100%`, desc:`本期在招職缺已全數完成填補。` });
+  } else if (m.openCount > 0 && m.filledCount > 0) {
+    h.push({ icon:'📈', title:`職缺填補率 ${m.fillRate}%`, desc:`${m.openCount} 個在招職缺已填補 ${m.filledCount} 個。` });
+  }
+
+  // H4 候選人素質
+  if (m.avgPhoneScore >= 3.5 && m.phoneCount > 0) {
+    h.push({ icon:'⭐', title:`電訪平均評分 ${m.avgPhoneScore.toFixed(2)} / 5`, desc:`候選人整體素質維持良好水準。` });
+  }
+
+  // H4b 招募速度
+  if (m.avgCycleDays > 0) {
+    h.push({ icon:'⚡', title:`平均招募週期 ${m.avgCycleDays} 天`, desc:`從收件到錄取的平均填補天數，可作為跨期招募效率的比較基準。` });
+  }
+
+  // H5 自然未續行澄清（把被誤判成流失的數字，明確標示為正常結案）
+  if (m.naturalNonPursue > 0) {
+    h.push({ icon:'ℹ️', title:`${m.naturalNonPursue} 位屬「自然未續行」`,
+      desc:`這些候選人是在職缺已達成錄取後才未再推進，屬正常結案，非招募流失，不影響招募成效判讀。` });
+  }
+
+  return h;
 }
 
 function computeStrategies(m, risks) {
@@ -932,23 +1068,43 @@ function computeStrategies(m, risks) {
 function renderAlertBanners() {
   const m = computeMetrics();
   const risks = computeRisks(m);
+  const highlights = computeHighlights(m);
   const el = document.getElementById('alert-banners');
   if (!el) return;
 
   const highRisks = risks.filter(r=>r.level==='high');
   const medRisks  = risks.filter(r=>r.level==='medium');
 
-  if (!risks.length) {
-    el.innerHTML = `<div class="alert-banner info">
-      <div class="alert-banner-icon">✅</div>
+  let html = '';
+
+  // ── 成效亮點橫幅（綠色，永遠置頂）：有好成果就先讓主管看到 ──
+  if (highlights.length) {
+    const lead = highlights[0];
+    const rest = highlights.slice(1);
+    html += `<div class="alert-banner success">
+      <div class="alert-banner-icon">${lead.icon}</div>
       <div class="alert-banner-body">
-        <div class="alert-banner-title">招募狀態良好</div>
-        <div class="alert-banner-desc">本期各項指標均在健康範圍，請維持現有招募節奏。</div>
+        <div class="alert-banner-title">成效亮點（${highlights.length} 項）— ${lead.title}</div>
+        <div class="alert-banner-desc">${lead.desc}${rest.length ? '　｜　' + rest.map(x=>`${x.icon} ${x.title}`).join('　｜　') : ''}</div>
       </div></div>`;
+  }
+
+  // 無風險時：若有亮點已置頂，補一句健康結語；若完全無資料則顯示良好狀態
+  if (!risks.length) {
+    if (!highlights.length) {
+      html += `<div class="alert-banner info">
+        <div class="alert-banner-icon">✅</div>
+        <div class="alert-banner-body">
+          <div class="alert-banner-title">招募狀態良好</div>
+          <div class="alert-banner-desc">本期各項指標均在健康範圍，請維持現有招募節奏。</div>
+        </div></div>`;
+    } else {
+      html += `<div style="text-align:right;margin-bottom:6px"><button onclick="switchTab('report')" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;text-decoration:underline">→ 查看完整成效分析報告</button></div>`;
+    }
+    el.innerHTML = html;
     return;
   }
 
-  let html = '';
   if (highRisks.length) {
     html += `<div class="alert-banner critical">
       <div class="alert-banner-icon">🚨</div>
@@ -984,37 +1140,51 @@ function renderReport() {
   selectedPeriod = _prev; // 還原
 
   const risks = computeRisks(m);
+  const highlights = computeHighlights(m);
   const strategies = computeStrategies(m, risks);
 
-  // ── 摘要總結 ──
+  // ── 摘要總結（成效優先）──
   const highCount = risks.filter(r=>r.level==='high').length;
+  const gapCount  = m.gapPositions.length;
   const now = new Date();
   const periodLabel = {current:'當月',prev:'上個月','3m':'近三個月','6m':'近半年','1y':'整年度','all':'全部期間'}[reportSelectedPeriod]||'本期';
-  const statusColor = highCount > 0 ? '#E24B4A' : risks.length > 0 ? '#EF9F27' : '#1D9E75';
-  const statusText  = highCount > 0 ? `⚠ 高風險` : risks.length > 0 ? `注意` : `✓ 健康`;
+  // 整體狀態：先看成效（有錄取且無真缺口＝成效達標），再看風險
+  const statusColor = (highCount>0 || gapCount>0) ? '#E24B4A' : (m.hired>0 ? '#1D9E75' : (risks.length>0 ? '#EF9F27' : '#1D9E75'));
+  const statusText  = (highCount>0 || gapCount>0) ? '⚠ 需處理' : (m.hired>0 ? '✓ 成效達標' : (risks.length>0 ? '注意' : '✓ 健康'));
+  const fillColor = m.fillRate===100 ? '#5DCAA5' : m.fillRate>0 ? '#EFC94C' : '#F08080';
 
   document.getElementById('report-summary-wrap').innerHTML = `
     <div class="report-summary-box">
-      <div class="rs-title">招募狀況摘要 — ${periodLabel}</div>
+      <div class="rs-title">招募成效摘要 — ${periodLabel}</div>
       <div class="rs-sub">產出時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')}　｜　整體狀態：<span style="color:${statusColor};font-weight:700">${statusText}</span></div>
       <div class="rs-body">
-        本期共收件 <strong style="color:#fff">${m.total}</strong> 份，
-        送審人選 <strong style="color:#fff">${m.statsSent}</strong> 人（AI評分 ${m.statsAI} + HR推薦 ${m.statsHR}），
-        主管篩選通過 <strong style="color:#fff">${m.statsMgr}</strong> 人，
-        完成電訪 <strong style="color:#fff">${m.phoneCount}</strong> 人，
-        完成初試 <strong style="color:#fff">${m.iReal}</strong> 人，
-        應徵者婉拒 <strong style="color:${m.lossRate>30?'#F08080':'#fff'}">${m.declined}</strong> 人（流失率 ${m.lossRate}%）。
+        本期在招職缺 <strong style="color:#fff">${m.openCount}</strong> 個，已達成錄取 <strong style="color:${fillColor}">${m.filledCount}</strong> 個（填補率 ${m.fillRate}%）、
+        錄取 <strong style="color:${m.hired>0?'#5DCAA5':'#fff'}">${m.hired}</strong> 位${m.hired>0&&m.filledHires&&m.filledPipeline?`，已填補職缺平均每 <strong style="color:#5DCAA5">${(m.filledPipeline/m.filledHires).toFixed(1)}</strong> 位候選人完成 1 位錄取（僅計進入評估流程者）`:''}${m.avgCycleDays>0?`，平均招募週期 <strong style="color:#5DCAA5">${m.avgCycleDays}</strong> 天`:''}。
+        過程面：收件 <strong style="color:#fff">${m.total}</strong> 份、送審 <strong style="color:#fff">${m.statsSent}</strong> 人、完成電訪 <strong style="color:#fff">${m.phoneCount}</strong> 人、完成初試 <strong style="color:#fff">${m.iReal}</strong> 人${m.filledUnevaluated>0?`（另有 <strong style="color:#fff">${m.filledUnevaluated}</strong> 份為已填補職缺、刊登未關閉之持續進件，未進入評估流程）`:''}。
+        流失面：有效流失 <strong style="color:${m.effectiveLossRate>30?'#F08080':'#fff'}">${m.effectiveDeclined}</strong> 人（有效流失率 ${m.effectiveLossRate}%）${m.naturalNonPursue>0?`，另 <strong style="color:#fff">${m.naturalNonPursue}</strong> 人屬職缺達成後自然未續行（非流失）`:''}${m.rejected>0?`；另有 <strong style="color:#fff">${m.rejected}</strong> 人為公司篩選不通過（屬正常淘汰，非流失）`:''}。
         ${m.avgPhoneScore > 0 ? `電訪平均評分 <strong style="color:${m.avgPhoneScore>=3.5?'#5DCAA5':'#F08080'}">${m.avgPhoneScore.toFixed(2)}</strong> 分。` : ''}
-        共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項，建議優先處理。
+        ${risks.length ? `共識別 <strong style="color:${statusColor}">${risks.length}</strong> 項風險，其中高風險 <strong style="color:#F08080">${highCount}</strong> 項。` : '本期無顯著風險。'}
       </div>
       <div class="rs-kpi-row">
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.total>=10?'#5DCAA5':'#F08080'}">${m.total}</div><div class="rs-kpi-lbl">收件份數</div></div>
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.phoneRate>=60?'#5DCAA5':'#F08080'}">${m.phoneRate}%</div><div class="rs-kpi-lbl">電訪覆蓋率${m.statsMgr?'':'*'}</div></div>
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.lossRate<=30?'#5DCAA5':'#F08080'}">${m.lossRate}%</div><div class="rs-kpi-lbl">應徵者流失率</div></div>
-        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.interviewRate>=60?'#5DCAA5':'#F08080'}">${m.interviewRate}%</div><div class="rs-kpi-lbl">初試達成率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${fillColor}">${m.fillRate}%</div><div class="rs-kpi-lbl">職缺填補率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.hired>0?'#5DCAA5':'#EFC94C'}">${m.hired}</div><div class="rs-kpi-lbl">本期錄取</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.hired>0?'#5DCAA5':'#9db4cc'}">${m.hired?(m.total/m.hired).toFixed(1):'—'}</div><div class="rs-kpi-lbl">份/錄取</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.effectiveLossRate<=30?'#5DCAA5':'#F08080'}">${m.effectiveLossRate}%</div><div class="rs-kpi-lbl">有效流失率</div></div>
+        <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.interviewRate>=60?'#5DCAA5':'#EFC94C'}">${m.interviewRate}%</div><div class="rs-kpi-lbl">初試達成率</div></div>
         ${m.avgPhoneScore>0?`<div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${m.avgPhoneScore>=3.5?'#5DCAA5':'#F08080'}">${m.avgPhoneScore.toFixed(1)}</div><div class="rs-kpi-lbl">電訪平均分</div></div>`:''}
       </div>
-    </div>`;
+    </div>
+    ${highlights.length ? `
+    <div style="margin-top:14px;background:#F0FBF6;border:1px solid #A8E0C8;border-radius:10px;padding:14px 18px">
+      <div style="font-size:13px;font-weight:700;color:#0E6B47;margin-bottom:8px">🌟 本期成效亮點</div>
+      <div style="display:grid;gap:8px">
+        ${highlights.map(x=>`<div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:15px;flex-shrink:0">${x.icon}</span>
+          <div><div style="font-size:12px;font-weight:600;color:#0E6B47">${x.title}</div>
+          ${x.desc?`<div style="font-size:11px;color:#3A7D5E;line-height:1.5;margin-top:1px">${x.desc}</div>`:''}</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}`;
 
   // ── 風險卡片 ──
   const riskEl = document.getElementById('report-risks');
@@ -1058,8 +1228,8 @@ function renderReportManagerRecruit() {
   const active   = allCandidates.filter(c => !['應徵者婉拒','不通過'].includes(gf(c,'關卡進度')));
   const declined = allCandidates.filter(c => String(gf(c,'關卡進度')||'').includes('婉拒'));
   const toInterview = allCandidates.filter(c => ['AI評分','主管篩選通過'].includes(gf(c,'當前關卡')));
-  const interviewed = allCandidates.filter(c => ['初試','複試','錄取','到職'].includes(gf(c,'當前關卡')));
-  const hired    = allCandidates.filter(c => ['錄取','到職'].includes(gf(c,'當前關卡')));
+  const interviewed = allCandidates.filter(c => ['初試','複試','錄取','到職'].includes(effStage(c)));
+  const hired    = allCandidates.filter(isHired);
 
   const statusColor = toInterview.length > 0 ? '#EF9F27' : total === 0 ? '#E24B4A' : '#1D9E75';
   const statusText  = toInterview.length > 0 ? '待安排面試' : total === 0 ? '無進行中招募' : '✓ 進行中';
@@ -1139,6 +1309,7 @@ function renderReportManagerRecruit() {
 }
 
 function renderKPI() {
+  const m = computeMetrics();                 // 成效層指標（填補率／錄取／精準度／有效流失）
   const fc = getFilteredCandidates();
   const fs = filterByPeriod(statsRecords, '統計日期');
   const fp = filterByPeriod(phoneRecords, '電訪日期');
@@ -1146,41 +1317,86 @@ function renderKPI() {
   const statsTotal = getStatsTotal(fs);
   const total = statsTotal || fc.length;
 
-  // 電訪完成率：分母 = 當月面談名單（招募名單）收件人數 fc.length
-  //             分子 = 當月電訪紀錄（依電訪日期篩選）筆數 fp.length
-  const phoneCompletedCount = fp.length;  // 當月有電訪紀錄的人數
-  const phoneDenominator    = fc.length;  // 當月面談名單收件人數
+  // 電訪完成率：分母 = 當月面談名單（招募名單）收件人數 fc.length；分子 = 當月電訪紀錄筆數 fp.length
+  const phoneCompletedCount = fp.length;
+  const phoneDenominator    = fc.length;
 
-  // 初試達成率：分母 = 當月有電訪紀錄的人數（phoneCompletedCount）
-  //             分子 = 面談紀錄表中依「面試日期」篩出的當月筆數
-  //             說明：當前關卡顯示「初試」不代表已完成面談（如：初試＋應徵者婉拒，
-  //             代表在安排初試前就婉拒了，電訪紀錄有記錄但面談紀錄不會有），
-  //             因此必須以面談紀錄表的實際面試日期為準。
+  // 初試達成率：分母 = 當月有電訪紀錄的人數；分子 = 面談紀錄表依「面試日期」篩出的當月筆數
+  //   （當前關卡顯示「初試」不代表已完成面談，故以面談紀錄實際面試日期為準）
   const fi = filterByPeriod(interviewRecords, '面試日期');
   const iReal = fi.filter(r => gf(r,'應徵者')).length;
-  const dec = fc.filter(c=>String(gf(c,'關卡進度')||'').includes('婉拒')).length;
 
   const phoneScores = fp.map(r => parseFloat(gf(r,'總體評分'))).filter(v => !isNaN(v));
   const avgPhoneScore = phoneScores.length ? (phoneScores.reduce((a,b)=>a+b,0)/phoneScores.length).toFixed(2) : null;
 
+  const filledAll   = m.openCount > 0 && m.filledCount === m.openCount;
+  const phoneRateOk = phoneDenominator > 0 && phoneCompletedCount / phoneDenominator >= 0.6;
+  const iniRateOk   = phoneCompletedCount > 0 && iReal / phoneCompletedCount >= 0.6;
+
+  // state: ok(✅綠) | warn(⏳琥珀，進行中或可接受但待觀察) | bad(❌紅) | nodata(⚠️尚無資料)
   const kpis = [
-    { name:'每月履歷收件數', target:'≥ 10 份',   val:total,                                                                   unit:'份', ok:total>=10,                                                   noData:total===0 },
-    { name:'電訪完成率',     target:'≥ 60%',      val:phoneDenominator?Math.round(phoneCompletedCount/phoneDenominator*100):0, unit:'%',  ok:phoneDenominator>0&&phoneCompletedCount/phoneDenominator>=0.6, noData:phoneDenominator===0 },
-    { name:'初試達成率',     target:'≥ 60%',      val:phoneCompletedCount?Math.round(iReal/phoneCompletedCount*100):0,         unit:'%',  ok:phoneCompletedCount?iReal/phoneCompletedCount>=0.6:false,    noData:phoneCompletedCount===0 },
-    { name:'應徵者流失率',   target:'≤ 30%',      val:fc.length?Math.round(dec/fc.length*100):0,                               unit:'%',  ok:fc.length?dec/fc.length<=0.3:true,                          noData:fc.length===0 },
-    { name:'電訪平均評分',   target:'≥ 3.5 / 5', val:avgPhoneScore ?? 0,                                                      unit:'/5', ok:avgPhoneScore!==null&&parseFloat(avgPhoneScore)>=3.5,        noData:avgPhoneScore===null },
+    { group:'成效指標　—　招募最終產出（主管關注重點）' },
+    { name:'職缺填補率', target:'職缺全數達成錄取',
+      val: m.openCount ? m.fillRate : 0, unit:'%',
+      state: m.openCount===0 ? 'nodata' : m.fillRate===100 ? 'ok' : m.filledCount>0 ? 'warn' : (m.activePositions.length>0?'warn':'bad'),
+      note: m.openCount ? `${m.filledCount}/${m.openCount} 職缺已達成錄取${m.gapPositions.length?`，${m.gapPositions.length} 個待補強`:''}` : '' },
+    { name:'本期錄取人數', target:'招募最終成果',
+      val: m.hired, unit:'位',
+      state: m.hired>0 ? 'ok' : (m.activePositions.length>0 ? 'warn' : 'bad'),
+      note: m.hired>0 ? '已產出錄取人員' : (m.activePositions.length>0 ? '招募進行中' : '尚未產生錄取') },
+    { name:'招募精準度', target:'每 1 錄取需評估的候選人數（越低越精準）',
+      val: (m.filledHires && m.filledPipeline) ? (m.filledPipeline/m.filledHires).toFixed(1) : '—',
+      unit:'人/錄取',
+      state: m.hired>0 ? 'ok' : 'nodata',
+      note: m.hired>0
+              ? '分母為進入評估流程人數，不含達成後持續進件　｜　' + m.posList.filter(p=>p.filled&&p.hired>0).map(p=>`${p.pos} 評估${p.pipeline}→${p.hired}人`).join('　')
+              : '產生錄取後可計算' },
+    { name:'平均招募週期', target:'收件→錄取的填補天數',
+      val: m.avgCycleDays || '—', unit:'天',
+      state: m.avgCycleDays>0 ? 'ok' : 'nodata',
+      note: m.avgCycleDays>0 ? '可作為跨期效率比較基準' : '錄取者填入招募週期天數後可計算' },
+
+    { group:'流程指標　—　招募過程效率' },
+    { name:'電訪完成率', target:'≥ 60%',
+      val: phoneDenominator?Math.round(phoneCompletedCount/phoneDenominator*100):0, unit:'%',
+      state: phoneDenominator===0 ? 'nodata' : phoneRateOk ? 'ok' : 'warn' },
+    { name:'初試達成率', target:'≥ 60%',
+      val: phoneCompletedCount?Math.round(iReal/phoneCompletedCount*100):0, unit:'%',
+      state: phoneCompletedCount===0 ? 'nodata' : iniRateOk ? 'ok' : 'warn' },
+    { name:'有效流失率', target:'≤ 30%（僅計未達成職缺）',
+      val: m.effectiveBase?m.effectiveLossRate:0, unit:'%',
+      state: m.effectiveBase===0 ? 'ok' : m.effectiveLossRate<=30 ? 'ok' : 'bad',
+      note: m.effectiveBase
+              ? `僅計未達成職缺${m.naturalNonPursue?`；另 ${m.naturalNonPursue} 位屬自然未續行`:''}`
+              : `職缺皆已達成，無有效流失${m.naturalNonPursue?`（另 ${m.naturalNonPursue} 位自然未續行）`:''}` },
+    { name:'電訪平均評分', target:'≥ 3.5 / 5',
+      val: avgPhoneScore ?? 0, unit:'/5',
+      state: avgPhoneScore===null ? 'nodata' : parseFloat(avgPhoneScore)>=3.5 ? 'ok' : 'warn' },
+
+    { group:'輔助指標　—　量能參考（非成效判準）' },
+    { name:'每月履歷收件數', target: filledAll ? '職缺已達成，量能非限制' : '≥ 10 份',
+      val: total, unit:'份',
+      state: total===0 ? 'nodata' : filledAll ? 'ok' : (total>=10 ? 'ok' : 'warn'),
+      note: (filledAll ? '已完成錄取，收件量不再是限制因素' : '')
+            + (m.filledUnevaluated>0 ? `${filledAll?'；':''}其中 ${m.filledUnevaluated} 份為達成後持續進件（未進評估）` : '') },
   ];
 
+  const ICON  = { ok:'✅', warn:'⏳', bad:'❌', nodata:'⚠️' };
+  const COLOR = { ok:'var(--teal)', warn:'#EF9F27', bad:'var(--red)', nodata:'#EF9F27' };
+
   document.getElementById('kpi-list').innerHTML = kpis.map(k => {
-    const icon  = k.noData ? '⚠️' : k.ok ? '✅' : '❌';
-    const color = k.noData ? '#EF9F27' : k.ok ? 'var(--teal)' : 'var(--red)';
-    const displayVal = k.noData
+    if (k.group) {
+      return `<div style="font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.3px;margin:14px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--border)">${k.group}</div>`;
+    }
+    const displayVal = k.state==='nodata'
       ? `<span style="font-size:12px;color:#EF9F27;font-weight:600">暫無紀錄可計算</span>`
       : `${k.val}<span style="font-size:11px;color:var(--text-sub)">${k.unit}</span>`;
     return `<div class="kpi-row">
-      <div><div class="kpi-name">${k.name}</div><div class="kpi-target">目標：${k.target}</div></div>
-      <div class="kpi-value" style="color:${color}">${displayVal}</div>
-      <div style="font-size:16px">${icon}</div></div>`;
+      <div><div class="kpi-name">${k.name}</div>
+        <div class="kpi-target">目標：${k.target}</div>
+        ${k.note?`<div style="font-size:10px;color:var(--text-sub);margin-top:2px">${k.note}</div>`:''}</div>
+      <div class="kpi-value" style="color:${COLOR[k.state]}">${displayVal}</div>
+      <div style="font-size:16px">${ICON[k.state]}</div></div>`;
   }).join('');
 }
 
@@ -1196,7 +1412,7 @@ function renderJobProgress() {
     const key = `${pos}|${dept}`;
     if (!jobs[key]) jobs[key] = { pos, dept, count:0, stages:{} };
     jobs[key].count++;
-    const s = gf(c,'當前關卡'); if (s) jobs[key].stages[s] = (jobs[key].stages[s]||0)+1;
+    const s = effStage(c); if (s) jobs[key].stages[s] = (jobs[key].stages[s]||0)+1;
   });
 
   // 若招募名單當期無資料，改從 statsRecords 建立職缺列表
@@ -1265,6 +1481,25 @@ function renderCharts() {
 
   const fCtx = document.getElementById('chart-funnel').getContext('2d');
   if (funnelChart) funnelChart.destroy();
+  // 每根長條上方標數值：收件量遠大於後段關卡時，個位數的棒仍讀得到數字
+  const barValueLabels = {
+    id: 'barValueLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.font = '600 11px "Noto Sans TC", sans-serif';
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      meta.data.forEach((bar, i) => {
+        const v = chart.data.datasets[0].data[i];
+        if (v == null) return;
+        ctx.fillText(v, bar.x, bar.y - 3);
+      });
+      ctx.restore();
+    }
+  };
   funnelChart = new Chart(fCtx, {
     type: 'bar',
     data: {
@@ -1276,10 +1511,12 @@ function renderCharts() {
         borderSkipped: false
       }]
     },
+    plugins: [barValueLabels],
     options: {
-      plugins: { legend: { display: false } },
+      layout: { padding: { top: 20 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
       scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
+        y: { beginAtZero: true, ticks: { precision: 0, maxTicksLimit: 6 } },
         x: { grid: { display: false }, ticks: { font: { size: 10 } } }
       },
       responsive: true,
