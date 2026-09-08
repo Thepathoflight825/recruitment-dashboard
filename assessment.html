@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五大核心能力評核表｜勝海科技</title>
+<style>
+  :root{
+    --bg:#eef1f4; --surface:#ffffff; --surface-2:#f7f9fb;
+    --ink:#182430; --ink-2:#3a4a59; --muted:#6b7b8a; --faint:#93a2b0;
+    --line:#dde3e9; --line-2:#eaeef2;
+    --hr:#2f6d94; --hr-soft:#e3eef4;
+    --mgr:#b06f22; --mgr-soft:#f6ecdd;
+    --avg:#2b7a5b; --avg-soft:#e3f0ea;
+    --warn:#b23a48; --warn-soft:#f7e6e8;
+    --shadow:0 1px 2px rgba(24,36,48,.05),0 8px 24px rgba(24,36,48,.06);
+    --radius:12px;
+    --font:"Microsoft JhengHei","PingFang TC","Noto Sans TC","Hiragino Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 120px}
+
+  /* Header */
+  header.masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:22px}
+  .brand{font-size:13px;letter-spacing:.06em;color:var(--muted);margin:0 0 6px}
+  h1{font-size:26px;font-weight:800;margin:0;letter-spacing:.01em}
+  h1 .sub{display:block;font-size:14px;font-weight:500;color:var(--ink-2);margin-top:6px;letter-spacing:0}
+  .masthead .aim{font-size:13px;color:var(--muted);max-width:360px;text-align:right}
+
+  /* Panel */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .sec-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;margin:0 0 4px}
+  .sec-title .tagcol{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px}
+  .tagcol.hrc{color:var(--hr);background:var(--hr-soft)}
+  .tagcol.mgrc{color:var(--mgr);background:var(--mgr-soft)}
+
+  .meta{padding:18px 20px;margin-bottom:16px}
+  .meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:820px){.meta-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.meta-grid{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12.5px;color:var(--muted);font-weight:600}
+  .field input,.field select,.field textarea{font-family:inherit;font-size:14.5px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--hr);outline-offset:1px;background:#fff}
+  .field select{cursor:pointer}
+  .field textarea{resize:vertical;min-height:70px;width:100%;line-height:1.6}
+  .field input[readonly]{background:#eef2f5;color:var(--ink-2);cursor:default}
+
+  /* Scorer config */
+  .scfg{padding:16px 20px 18px;margin-bottom:16px}
+  .scfg-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:720px){.scfg-cols{grid-template-columns:1fr}}
+  .sc-col{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface-2)}
+  .sc-col.hrcol{border-top:3px solid var(--hr)}
+  .sc-col.mgrcol{border-top:3px solid var(--mgr)}
+  .sc-col h4{margin:0 0 10px;font-size:13.5px;display:flex;align-items:center;gap:7px}
+  .sc-col h4 .dot{width:9px;height:9px;border-radius:50%}
+  .hrcol h4 .dot{background:var(--hr)} .mgrcol h4 .dot{background:var(--mgr)}
+  .sc-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .sc-row .idx{flex:none;width:52px;font-size:12px;font-weight:700;color:var(--muted)}
+  .hrcol .sc-row .idx{color:var(--hr)} .mgrcol .sc-row .idx{color:var(--mgr)}
+  .sc-row input{flex:1;font-family:inherit;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 10px;color:var(--ink)}
+  .sc-row input:focus{outline:2px solid var(--hr);outline-offset:1px}
+  .sc-del{flex:none;width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:7px;color:var(--faint);cursor:pointer;font-size:15px;line-height:1}
+  .sc-del:hover{color:var(--warn);border-color:var(--warn)}
+  .sc-del:disabled{opacity:.35;cursor:not-allowed}
+  .sc-add{font-family:inherit;font-size:13px;font-weight:600;background:#fff;border:1px dashed var(--line);border-radius:7px;padding:7px 12px;cursor:pointer;color:var(--ink-2);margin-top:2px}
+  .hrcol .sc-add:hover{color:var(--hr);border-color:var(--hr)}
+  .mgrcol .sc-add:hover{color:var(--mgr);border-color:var(--mgr)}
+  .scfg-hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+
+  /* Category card */
+  .cat{padding:18px 20px 16px;margin-bottom:16px}
+  .cat-head{display:flex;align-items:baseline;gap:11px;margin-bottom:4px}
+  .cat-no{flex:none;width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center;transform:translateY(3px)}
+  .cat-name{font-size:17px;font-weight:700;margin:0}
+  .cat-flag{font-size:11.5px;color:var(--mgr);background:var(--mgr-soft);padding:2px 8px;border-radius:20px;font-weight:600;transform:translateY(-1px)}
+  .cat-sel-desc{font-size:13.5px;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--line);padding:9px 12px;border-radius:0 7px 7px 0;margin:10px 0 4px;min-height:20px}
+  .cat-sel-desc.empty{color:var(--faint);border-left-color:var(--line-2)}
+  .cat-sel-desc b{color:var(--ink)}
+
+  .rubric-toggle{font-size:12.5px;color:var(--hr);background:none;border:none;cursor:pointer;padding:4px 0;font-family:inherit;font-weight:600}
+  .rubric-toggle:hover{text-decoration:underline}
+  .rubric{display:none;margin:6px 0 4px;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+  .rubric.open{display:block}
+  .rubric .rr{display:grid;grid-template-columns:70px 1fr;gap:0;border-top:1px solid var(--line-2);font-size:12.5px}
+  .rubric .rr:first-child{border-top:none}
+  .rubric .rl{background:var(--surface-2);font-weight:700;color:var(--ink-2);padding:8px 10px;text-align:center}
+  .rubric .rd{padding:8px 12px;color:var(--ink-2)}
+
+  .scorers{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .scorer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .scorer .who{flex:none;min-width:96px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .who.hr .dot{background:var(--hr)} .who.mgr .dot{background:var(--mgr)}
+  .who.hr{color:var(--hr)} .who.mgr{color:var(--mgr)}
+  .btns{display:flex;gap:6px}
+  .sbtn{width:38px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-family:inherit;font-size:15px;font-weight:700;color:var(--ink-2);cursor:pointer;transition:transform .06s,background .12s,color .12s,border-color .12s}
+  .sbtn:hover{border-color:var(--faint)}
+  .sbtn:active{transform:scale(.94)}
+  .scorer.hr .sbtn.on{background:var(--hr);border-color:var(--hr);color:#fff}
+  .scorer.mgr .sbtn.on{background:var(--mgr);border-color:var(--mgr);color:#fff}
+  .catavg{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+  .catavg b{color:var(--avg);font-size:15px}
+  .catavg .gsplit{color:var(--faint);font-size:12px;margin-left:2px}
+  @media(max-width:520px){.catavg{margin-left:0;width:100%}}
+
+  /* Summary aside */
+  aside{position:sticky;top:16px}
+  .sum{padding:0;overflow:hidden}
+  .sum h2{font-size:14px;margin:0;padding:14px 18px;background:var(--ink);color:#fff;font-weight:700;letter-spacing:.03em}
+  .sum-body{padding:16px 18px}
+  .scoreline{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:13.5px;border-bottom:1px dashed var(--line-2)}
+  .scoreline .lab{color:var(--ink-2);display:flex;align-items:center;gap:7px}
+  .scoreline .val{font-weight:700;font-variant-numeric:tabular-nums}
+  .val.hr{color:var(--hr)} .val.mgr{color:var(--mgr)}
+  .scoreline .cnt{font-size:11px;color:var(--faint);font-weight:500;margin-left:4px}
+  .final{margin-top:14px;background:var(--avg-soft);border:1px solid #cfe6da;border-radius:10px;padding:14px 16px;text-align:center}
+  .final .num{font-size:40px;font-weight:800;color:var(--avg);line-height:1;font-variant-numeric:tabular-nums}
+  .final .cap{font-size:12px;color:var(--ink-2);margin-top:5px}
+  .tierbox{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .tierbox .tname{font-size:15px;font-weight:800}
+  .tierbox .band{font-size:22px;font-weight:800;letter-spacing:.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+  .tierbox .bandcap{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tierbox.j{border-color:#cdd8e0} .tierbox.m{border-color:#cfe0ea;background:#f2f8fb} .tierbox.s{border-color:#d9cdbf;background:#faf5ee}
+  .incomplete{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 11px;margin-top:12px;display:none}
+  .incomplete.show{display:block}
+
+  /* Decision + 任用資訊 */
+  .decision{padding:18px 20px;margin-top:6px}
+  .decision h3{margin:0 0 4px;font-size:15px}
+  .decision .subcap{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+  .radio-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .radio-row label{flex:1;min-width:96px;text-align:center;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;background:var(--surface-2)}
+  .radio-row input{display:none}
+  .radio-row label:has(input:checked){background:var(--ink);color:#fff;border-color:var(--ink)}
+  .radio-row.hire label:has(input:checked){background:var(--avg);border-color:var(--avg);color:#fff}
+  .radio-row.hold label:has(input:checked){background:var(--mgr);border-color:var(--mgr);color:#fff}
+  .radio-row.no label:has(input:checked){background:var(--warn);border-color:var(--warn);color:#fff}
+  .radio-row.bonus label:has(input:checked){background:var(--avg);border-color:var(--avg);color:#fff}
+  .take-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
+  @media(max-width:560px){.take-grid{grid-template-columns:1fr}}
+  .band-ref{background:var(--avg-soft);border:1px solid #cfe6da;border-radius:9px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:var(--ink-2)}
+  .band-ref .bnum{font-size:17px;font-weight:800;color:var(--avg);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .band-ref .bnote{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .salary-note{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .exp-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);margin:2px 0 14px;cursor:pointer}
+  .exp-toggle input{width:16px;height:16px;accent-color:var(--hr)}
+  .link-btn{font-family:inherit;font-size:12.5px;font-weight:600;color:var(--hr);background:none;border:none;cursor:pointer;padding:0}
+  .link-btn:hover{text-decoration:underline}
+
+  /* Actions */
+  .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+  .btn{font-family:inherit;font-size:14.5px;font-weight:700;border-radius:10px;padding:12px 20px;cursor:pointer;border:1px solid transparent;transition:filter .12s,background .12s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--ink);color:#fff}
+  .btn-primary:hover{filter:brightness(1.15)}
+  .btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
+  .btn-secondary:hover{background:var(--surface-2)}
+  .btn-ghost{background:none;color:var(--muted);border-color:transparent}
+  .btn-ghost:hover{color:var(--warn)}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:10px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
+  .empty-state .big{font-size:17px;color:var(--ink-2);font-weight:600;margin-bottom:6px}
+
+  footer.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint);line-height:1.7}
+
+  @media print{
+    body{background:#fff}
+    .no-print{display:none!important}
+    .wrap{padding:0;max-width:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <p class="brand">勝海科技有限公司 · 人力資源部</p>
+      <h1>五大核心能力評核表<span class="sub">面試 / 試用期能力評分 · 錄取審核用</span></h1>
+    </div>
+    <p class="aim">人資與用人主管各自評分（可多位），系統自動取平均為「能力分數」並對應市場行情薪資帶。面談主管填寫任用資訊後，下載報告存入「任用名單」，由 Lark 自動化送任用群審核。</p>
+  </header>
+
+  <!-- Candidate meta -->
+  <section class="panel meta no-print">
+    <div class="meta-grid">
+      <div class="field"><label for="m-name">應徵者姓名</label><input id="m-name" type="text" placeholder="請輸入姓名"></div>
+      <div class="field"><label for="m-role">應徵職務（選擇模板）</label>
+        <select id="m-role">
+          <option value="">— 請選擇職務 —</option>
+          <option value="FE">前端工程（FE）</option>
+          <option value="BE">後端工程（BE）</option>
+          <option value="PM">營運／PM</option>
+          <option value="SRE">運維／SRE</option>
+        </select>
+      </div>
+      <div class="field"><label for="m-years">實際年資（年）</label><input id="m-years" type="text" inputmode="decimal" placeholder="例：3.5"></div>
+      <div class="field"><label for="m-date">面試 / 評核日期</label><input id="m-date" type="date"></div>
+    </div>
+  </section>
+
+  <!-- Scorer configuration -->
+  <section class="panel scfg no-print">
+    <p class="sec-title">評分人設定　<span class="tagcol hrc">人資</span><span class="tagcol mgrc">面談主管</span></p>
+    <p class="subcap" style="font-size:12.5px;color:var(--muted);margin:2px 0 14px">預設 2 位人資＋2 位面談主管，可自由增減。每位填寫的姓名會顯示在各項能力的評分列與報告表頭。</p>
+    <div class="scfg-cols">
+      <div class="sc-col hrcol">
+        <h4><span class="dot"></span>人資評分人</h4>
+        <div id="hrList"></div>
+        <button class="sc-add" data-add="hr">＋ 新增人資</button>
+      </div>
+      <div class="sc-col mgrcol">
+        <h4><span class="dot"></span>面談主管評分人</h4>
+        <div id="mgrList"></div>
+        <button class="sc-add" data-add="mgr">＋ 新增面談主管</button>
+      </div>
+    </div>
+    <p class="scfg-hint">能力分數＝各項「該項所有評分人的平均」再取五項平均；「人資平均／主管平均」則各自加總平均，供交叉參考。未填分的評分人不影響平均。</p>
+  </section>
+
+  <div class="layout">
+    <!-- Left: competencies -->
+    <main>
+      <label class="exp-toggle no-print" id="expToggleWrap" style="display:none">
+        <input type="checkbox" id="expToggle" checked>
+        將「技能經驗」計入能力分數平均（取消則此項僅供參考、不計分）
+      </label>
+      <div id="cats">
+        <div class="panel empty-state" id="emptyState">
+          <div class="big">請先於上方選擇應徵職務</div>
+          <div>選定後將載入該職務的五大核心能力標準供評分。</div>
+        </div>
+      </div>
+
+      <!-- Industry-experience bonus -->
+      <section class="panel decision no-print" id="bonusPanel" style="display:none">
+        <h3>直接產業經驗加分</h3>
+        <label class="exp-toggle" style="margin:0 0 4px"><input type="checkbox" id="bonusEnable"> 應徵者具直接同產業或同技術棧經驗（可加分）</label>
+        <div id="bonusOpts" style="display:none;margin-top:12px">
+          <div class="field" style="margin-bottom:14px">
+            <label>加分幅度（加至綜合能力分數，上限 5 分）</label>
+            <div class="radio-row bonus" id="bonusRow">
+              <label><input type="radio" name="bonus" value="0.5"><span>＋0.5 分</span></label>
+              <label><input type="radio" name="bonus" value="1"><span>＋1.0 分</span></label>
+            </div>
+          </div>
+          <div class="field"><label for="bonusNote">產業／技術棧說明或佐證（選填）</label><input id="bonusNote" type="text" placeholder="例：曾任同業後端 3 年，熟悉相同金流架構"></div>
+          <div class="salary-note">加分後若使核薪逾該層 mid，仍須附說明或相關證照並送執行長核准。</div>
+        </div>
+      </section>
+
+      <!-- 任用資訊（面談主管填寫） -->
+      <section class="panel decision no-print" id="takePanel" style="display:none">
+        <h3>任用資訊　<span style="font-size:12px;font-weight:600;color:var(--mgr);background:var(--mgr-soft);padding:2px 8px;border-radius:20px;vertical-align:2px">面談主管填寫</span>
+          <button class="link-btn" id="btnPull" style="float:right;font-weight:600">↻ 帶入上方基本資料</button>
+        </h3>
+        <p class="subcap">此區內容將隨評核報告一併輸出，作為「任用名單」錄取與核薪依據。</p>
+
+        <div class="field" style="margin-bottom:14px">
+          <label>是否錄取</label>
+          <div class="radio-row hire" id="hireRow">
+            <label class="hire"><input type="radio" name="hire" value="錄取"><span>錄取</span></label>
+            <label class="hold"><input type="radio" name="hire" value="待議・複試"><span>待議・複試</span></label>
+            <label class="no"><input type="radio" name="hire" value="不錄取"><span>不錄取</span></label>
+          </div>
+        </div>
+
+        <div class="take-grid">
+          <div class="field"><label for="t-time">面試時間</label><input id="t-time" type="date"></div>
+          <div class="field"><label for="t-landing-date">到職時間</label><input id="t-landing-date" type="date"></div>
+          <div class="field"><label for="t-name">應徵者</label><input id="t-name" type="text" placeholder="姓名"></div>
+          <div class="field"><label for="t-item">項目（應徵職務 / 專案）</label><input id="t-item" type="text" placeholder="例：AI 前端工程師 / 技術中心"></div>
+          <div class="field"><label for="t-func">職能（職務類別）</label><input id="t-func" type="text" placeholder="例：前端工程（FE）"></div>
+          <div class="field"><label for="t-expect">期望薪資（薪資區間）</label><input id="t-expect" type="text" placeholder="例：55–60K"></div>
+        </div>
+
+        <div class="band-ref" id="bandRef">
+          <div>市場行情參考薪資帶（依綜合分數層級自動帶出，千元/月）</div>
+          <div class="bnum" id="bandRefNum">— 尚未評分 —</div>
+          <div class="bnote">min 保守起敘 ／ mid 核薪預設上限 ／ max 特例上限。逾 mid 須附說明或證照並送執行長核准。</div>
+        </div>
+
+        <div class="take-grid">
+          <div class="field"><label for="t-base">建議本薪（千元/月）</label><input id="t-base" type="text" inputmode="decimal" placeholder="例：60"></div>
+          <div class="field"><label>敘薪落點</label>
+            <div class="radio-row" id="landingRow" style="margin-bottom:0">
+              <label><input type="radio" name="landing" value="min"><span>近 min</span></label>
+              <label><input type="radio" name="landing" value="mid"><span>近 mid</span></label>
+              <label><input type="radio" name="landing" value="over"><span>逾 mid</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:14px"><label for="t-salary-note">核薪說明</label><textarea id="t-salary-note" placeholder="例：建議本薪 60K，落於 Mid 帶 mid 值；候選人期望 55–60K，符合。逾 mid 部分另附證照佐證。"></textarea></div>
+        <div class="field"><label for="m-comment">綜合評語（優勢、疑慮、待驗證項目）</label><textarea id="m-comment" placeholder="例：前端框架掌握扎實，惟大型架構經驗待驗證；建議試用期觀察 Code Review 主導能力。"></textarea></div>
+      </section>
+
+      <div class="actions no-print" id="actions" style="display:none">
+        <button class="btn btn-primary" id="btnDownload">下載評核報告（HTML）</button>
+        <button class="btn btn-secondary" id="btnPrint">列印 / 另存 PDF</button>
+        <button class="btn btn-secondary" id="btnCopy">複製任用資訊摘要</button>
+        <button class="btn btn-ghost" id="btnReset">清除全部</button>
+      </div>
+    </main>
+
+    <!-- Right: live summary -->
+    <aside class="no-print" id="asideWrap" style="display:none">
+      <div class="panel sum">
+        <h2>即時評分摘要</h2>
+        <div class="sum-body">
+          <div class="scoreline"><span class="lab"><span class="dot" style="background:var(--hr)"></span>人資平均<span class="cnt" id="cntHr"></span></span><span class="val hr" id="sumHr">—</span></div>
+          <div class="scoreline"><span class="lab"><span class="dot" style="background:var(--mgr)"></span>主管平均<span class="cnt" id="cntMgr"></span></span><span class="val mgr" id="sumMgr">—</span></div>
+          <div class="final">
+            <div class="num" id="sumFinal">—</div>
+            <div class="cap" id="finalCap">綜合能力分數（各項平均，滿分 5）</div>
+          </div>
+          <div class="tierbox" id="tierBox" style="display:none">
+            <div class="tname" id="tierName"></div>
+            <div class="band" id="tierBand"></div>
+            <div class="bandcap">對應薪資帶 min／mid／max（千元/月）</div>
+          </div>
+          <div class="incomplete" id="incomplete"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    能力分數 1–5 對應五大核心能力等級標準；綜合分數 &lt;2.5 對應 Junior、2.5–3.4 對應 Mid-level、≥3.5 對應 Senior。薪資帶引自「職等定義與薪資帶彙整表」。本表為內部招募審核文件，請妥善保存。
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- 五大核心能力等級標準（依各職務模板） ---------- */
+const RUBRICS = {
+  FE: { label:"前端工程（FE）", cats:[
+    { name:"前端語言與框架技術", levels:[
+      "了解 HTML、CSS、JavaScript／TypeScript 等前端基礎語言與語法；了解前端框架基本概念，能在指導下使用既有框架開發，依既有規範完成簡單頁面及基礎功能。",
+      "能熟練運用 HTML／CSS／JS／TS 完成一般前端功能；能獨立使用團隊既有框架進行功能開發與 API 串接；能運用常見套件與工具處理一般前端問題。",
+      "能熟練運用主流框架進行中大型功能開發；能獨立處理複雜元件邏輯、狀態管理及前後端資料交換；能依專案需求選擇技術與套件並解決技術問題。",
+      "具備多種前端框架與相關技術實務經驗，能因應不同專案選型；能處理複雜應用與技術整合，並改善優化既有技術；能掌握趨勢、評估新技術導入效益。",
+      "對前端核心技術及主流框架具深厚實務經驗，能處理大型高複雜度系統；能主導重大技術選型與架構方向；能持續導入新興技術、建立團隊標準並指導他人。"
+    ]},
+    { name:"前端架構與元件設計", levels:[
+      "了解專案基本架構與檔案組織，能理解既有程式碼邏輯；了解元件化概念，能依規範建立簡單元件；能在指導下完成頁面切分、元件使用與基本資料傳遞。",
+      "能遵循既有架構開發並維持一致性與可讀性；能獨立設計一般功能元件、處理元件間資料傳遞與基本狀態管理；能辨識不合理結構並進行基本元件抽離與整理。",
+      "能獨立規劃中型功能的前端架構，合理拆分頁面、元件及資料流；能設計具重用性與可維護性的共用元件；能處理較複雜的狀態管理、元件關聯與架構問題。",
+      "能規劃大型應用架構，掌握模組切分、元件設計與資料流管理；能分析重構既有架構、解決可維護性／擴充性／技術債；能制定架構與元件規範並協助團隊一致化。",
+      "具大型系統架構設計能力，能從長期維護與擴充角度規劃整體架構；能主導複雜架構設計與重構；能建立團隊層級架構標準與設計原則並指導他人。"
+    ]},
+    { name:"開發流程與測試", levels:[
+      "了解基本開發流程及 Git 版控概念，能依規範提交程式碼；了解 Branch／Merge／PR／Code Review 等流程；能在指導下進行基本測試與錯誤排查並依回饋修正。",
+      "能獨立遵循團隊流程完成 Branch／Commit／PR／Code Review；能對功能進行基本測試並用開發工具排查；能理解測試結果與錯誤訊息、獨立處理一般 Bug。",
+      "能獨立完成需求理解→開發→測試→Code Review→修正的完整流程；能依功能設計單元／整合／E2E 測試；能分析複雜問題根因、快速定位並提出有效修正。",
+      "能建立中大型專案的開發及測試流程、提升品質與效率；能規劃完整測試策略；能主導 Code Review、技術規範或流程改善，降低錯誤與維護成本。",
+      "能制定團隊層級開發規範、Code Review 標準及測試策略；能主導複雜架構的品質管理與工程流程；能分析團隊瓶頸、推動工具與流程導入，持續提升整體品質。"
+    ]},
+    { name:"瀏覽器相容性與性能優化", levels:[
+      "了解不同瀏覽器與裝置的基本相容性問題；能依規範完成基本 RWD，確保常見裝置正常呈現；能在指導下用開發工具檢查基本頁面錯誤與效能問題。",
+      "能獨立處理常見瀏覽器、裝置與螢幕尺寸的相容性問題；能用開發工具分析載入、網路請求與 JS 執行等基本效能問題；能對圖片、資源與程式碼做基本優化。",
+      "能分析頁面效能瓶頸，針對載入速度、Rendering、API 與程式執行優化；能處理複雜相容性與 RWD 問題；能運用 Lazy Loading／Code Splitting／Cache 改善效能。",
+      "能為大型應用建立完整性能優化方案（程式碼、資源、渲染）；能分析解決複雜瀏覽器效能問題、找出體驗關鍵瓶頸；能建立性能監控與優化指標並持續追蹤。",
+      "能主導大型系統性能優化與整體架構效能規劃；能建立團隊性能標準與最佳實務、制定評估與優化方法；能處理高流量／高複雜度情境並帶領團隊完成重大優化。"
+    ]},
+    { name:"技能經驗", isExp:true, levels:[
+      "1 年或小於 1 年前端相關經驗；具基礎開發經驗，能在指導下完成一般前端工作。",
+      "2 年或小於 2 年前端相關經驗；能獨立完成一般功能開發並參與實際專案。",
+      "3～5 年前端相關經驗；能獨立完成中型專案或複雜功能，具獨立分析解決問題的實務經驗。",
+      "大於 5 年前端相關經驗；具大型專案開發或技術主導經驗，曾任前端技術負責人／Tech Lead／Team Leader。",
+      "大於 8 年前端相關經驗；具大型系統架構設計與技術決策經驗，能帶領團隊完成大型專案並建立技術規範。"
+    ]}
+  ]},
+
+  BE: { label:"後端工程（BE）", cats:[
+    { name:"後端語言與技術", levels:[
+      "學習過一種語言基本語法（Java／Python／PHP／Node.js）與簡單架構概念；理解基本程式結構與語法；能使用簡單的輸入輸出功能。",
+      "能用至少一種後端語言完成基本功能（如 CRUD）；熟悉基本資料結構與演算法（陣列、鏈表、排序）；能使用基本開發工具與環境並修改程式碼。",
+      "能理解多線程與網路協議（HTTP／FTP／SMTP）及相關問題；能設計工具類與接口並制定規範（含協議與安全）；理解常見安全演算法（MD5／SHA／RSA 等）；熟悉常用框架（Spring／Laravel／Django／Express）。",
+      "設計過大型系統，具備處理複雜問題與高效能、可擴展架構能力；熟悉多種設計模式並能依需求選型；具良好文檔撰寫與代碼評審能力。",
+      "於至少一種後端語言與相關領域有豐富經驗與深厚專業；能從業務需求出發，設計兼具效能、擴充性、可讀性、易維護與低耦合的架構；能理解效能瓶頸與安全議題、設計安全穩定架構。"
+    ]},
+    { name:"架構設計與資料庫管理", levels:[
+      "對資料庫有基本認識，能進行簡單操作；能使用基本 SQL（SELECT／INSERT／UPDATE／DELETE）；能建立管理簡單資料表、使用 Join 與 View。",
+      "熟悉基本資料庫設計原則與正規化；能編寫基本查詢做簡單分析；能使用 Function 與 Stored Procedure；能用工具快速生成 DB 程式碼；能使用基本 Redis 或同類功能。",
+      "能獨立管理中小型資料庫系統；熟悉 MySQL／MongoDB／Redis 使用情境與常見問題；具處理基本安全性能力；理解備份與恢復策略；能使用儲存服務（S3／MinIO）與消息佇列（MQ）。",
+      "具資料庫效能優化專業，能做複雜查詢優化與索引設計；熟悉高可用與災難恢復、能設計高效能集群；能用 MQ 佇列與發佈／訂閱解決分散式問題；能用註冊中心處理參數與註冊問題。",
+      "理解並使用中間件（Nginx／Ansible／HAProxy）解決複雜問題；能指導培養其他 DBA、進行技術培訓與分享；能預見資料庫技術趨勢並引入新技術提升團隊水準。"
+    ]},
+    { name:"開發流程與測試", levels:[
+      "了解版控系統（Git／SVN）基本操作（提交、推送、拉取）；理解基本測試概念（測試用例、覆蓋率）。",
+      "能撰寫與運行單元測試並理解失敗原因；理解並能執行基本 TDD 流程；能用簡單 CI 工具（Jenkins／Travis CI）進行自動化測試。",
+      "熟悉 Git 進階操作（分支合併、衝突解決、回退）；理解並能實施 CI/CD 流程；具基本代碼審查能力，能參與代碼評審。",
+      "能設計實施高效開發流程，確保效率與質量；熟悉並能使用多種 CI/CD 工具、設計自動化部署；具良好問題解決能力，能快速解決複雜問題。",
+      "具設計實施大型系統 CI/CD 流水線能力，確保穩定高效交付；熟悉最新測試框架與工具、能引入新技術提升質量；具出色代碼審查與技術決策能力，能提供團隊指導。"
+    ]},
+    { name:"雲端服務與性能優化", levels:[
+      "對雲端服務有基本認識，了解 AWS／Azure／GCP 基本概念；能進行基本雲端資源操作（啟停虛擬機）；了解性能優化基本概念（響應時間、吞吐量）。",
+      "理解並能設置雲端基本安全措施（身份驗證、授權）；具初步性能優化能力、能做簡單資源調整；能用 AWS／Azure／GCP 進行基本資源配置與管理。",
+      "熟悉雲端各種功能（儲存、資料庫、網路）；能設計實施雲端資源自動化部署與管理；能做全面性能監控分析並依數據優化。",
+      "能設計管理大規模雲端基礎設施、確保高可用與可擴展；熟悉容器化（Docker／Kubernetes）；具出色自動化運維能力、能用 IaC 工具（Terraform／Ansible）。",
+      "熟悉多雲與混合雲架構、能設計管理複雜跨雲部署；熟悉最新雲端技術，能做應用層／網路層／硬體層調優；能帶領團隊設計實施大規模高效能雲端架構。"
+    ]},
+    { name:"技能經驗", isExp:true, levels:[
+      "1 年或小於 1 年的相關經驗。",
+      "2 年或小於 2 年的相關經驗。",
+      "3～5 年的相關經驗；能獨立完成專案。",
+      "大於 5 年相關經驗；擔任過 Team Leader。",
+      "大於 8 年的相關經驗；帶領團隊開發大型專案。"
+    ]}
+  ]},
+
+  PM: { label:"營運／PM", cats:[
+    { name:"專案規劃與執行", levels:[
+      "了解專案管理基本概念與流程；能在指導下參與專案計劃制定與執行；熟悉基本工具與方法（如甘特圖）。",
+      "能獨立制定簡單專案計劃（時間管理、資源分配）；能協助管理預算、做基本成本效益分析；能與團隊及部分利害關係人有效溝通協調。",
+      "能獨立管理專案預算與成本效益分析；具較強應變能力，於變動環境做有效決策；熟悉並能靈活運用多種專案管理工具與方法。",
+      "能制定並執行複雜專案計劃，掌握高效時間管理與資源分配；能與高層及多方利害關係人高效溝通協調。",
+      "能在不同層級利害關係人間高度協調，平衡並滿足各方需求；對多種工具與方法有深厚知識與實踐經驗，能指導他人並依需求創新應用。"
+    ]},
+    { name:"技術與產品管理", levels:[
+      "了解技術與產品管理基本概念與流程；熟悉基本工具與方法（如產品生命週期管理 PLM）。",
+      "能協助管理技術項目，具基本技術評估與選型能力；能協助產品開發、參與需求分析與基本產品規劃。",
+      "能獨立管理中等複雜度技術項目，具選型與評估能力；能獨立進行產品開發、制定規劃並管理需求；熟練使用 JIRA／Confluence 等工具。",
+      "能制定並執行全面產品開發計劃（需求分析到發布全程）；能運用敏捷（Agile）與精益產品開發（Lean）等高階方法。",
+      "能在高度複雜動態環境領導技術管理、制定前瞻技術戰略；能設計執行全公司產品管理體系、指導從構思到上市全過程；對高階方法有深厚經驗並能培訓他人。"
+    ]},
+    { name:"風險與品質管理", levels:[
+      "了解風險與品質管理基本概念與流程；能在指導下參與風險評估與品質管理活動。",
+      "能協助品質檢查與簡單品質控制；能使用常見工具（風險登記表、魚骨圖）。",
+      "能獨立識別、評估與管理中等複雜度風險，制定詳細應對計劃；熟練使用多種工具與方法（如 SWOT 分析）。",
+      "能全面識別、評估與管理複雜風險，於變動環境靈活調整策略；能運用高階技術（蒙特卡羅模擬、全面品質管理 TQM）。",
+      "能設計執行高效且持續改進的品質管理計劃並指導團隊落實最佳實踐；能在高度不確定環境領導風險管理、制定前瞻創新的應對策略。"
+    ]},
+    { name:"領導與國際管理", levels:[
+      "能在指導下參與基本領導與國際管理活動；熟悉基本工具（團隊管理技巧、跨文化溝通）。",
+      "能協助管理小型團隊，具基本領導能力；能使用常見工具（SMART Goals、文化差異分析）。",
+      "能在多文化環境有效管理專案、處理跨文化溝通協作；熟練使用情境領導理論、跨文化管理模型（Hofstede's Cultural Dimensions）。",
+      "能運用高階領導與國際管理技術（變革管理 Change Management、全球戰略管理）；能全面管理大型團隊，具出色領導與變革能力。",
+      "能在高度複雜多變的國際環境領導與激勵大型多國團隊、制定前瞻領導戰略；對高階領導與國際管理有深厚經驗並能培訓他人。"
+    ]},
+    { name:"技能經驗", isExp:true, levels:[
+      "1 年或小於 1 年的相關經驗。",
+      "2 年或小於 2 年的相關經驗。",
+      "3～5 年的相關經驗；能獨立完成專案。",
+      "大於 5 年相關經驗；擔任過 Team Leader。",
+      "大於 8 年的相關經驗；帶領團隊開發大型專案。"
+    ]}
+  ]},
+
+  SRE: { label:"運維／SRE", cats:[
+    { name:"系統維運與操作執行", levels:[
+      "能依標準作業流程執行日常維運與例行檢查。",
+      "可獨立處理例行性服務重啟、資源檢查與管理。",
+      "能分析系統日誌並排除常見異常，維護備份與監控紀錄。",
+      "能針對效能瓶頸提出改善方案，規劃維運自動化流程。",
+      "能主導跨服務架構優化，規劃高可用架構與容災演練。"
+    ]},
+    { name:"監控與異常應變", levels:[
+      "能透過監控系統接收告警並回報問題。",
+      "能依既有 SOP 進行初步異常排查與記錄事件。",
+      "可分析監控數據，辨識異常趨勢並提出改善建議。",
+      "能建立監控規則、告警策略與流量分析報表。",
+      "能整合多源監控（系統、網路、應用）並自動化告警處理。"
+    ]},
+    { name:"自動化與持續整合（CI/CD）", levels:[
+      "了解自動化與版本控制基本流程（Jenkins、Git 操作）。",
+      "能依範例編寫簡單的 Ansible Playbook 或 Jenkins 任務。",
+      "可維護與調整現有的 CI/CD 流程，整合測試與部署。",
+      "能設計多環境部署流程，整合多服務模組（API、Web、DB）。",
+      "能主導整體 DevOps 流程設計與最佳化，落實基礎建設即程式（IaC）。"
+    ]},
+    { name:"架構設計與系統可靠性提升", levels:[
+      "了解常見伺服器架構與基礎網路概念（VLAN、DNS）。",
+      "能依照規劃進行伺服器建置與部署，確保系統可用性。",
+      "能針對網路與服務拓樸提出優化建議，提升穩定性。",
+      "能規劃跨區部署、CDN 加速與資源隔離策略。",
+      "能設計高可靠性與可觀測架構（HA、分散式監控、雲端混合環境）。"
+    ]},
+    { name:"品質紀錄與責任落實能力", levels:[
+      "能依規定記錄日常維運作業與事件處理結果。",
+      "能依模板撰寫異常回報、追蹤處理進度。",
+      "能主動建立問題追蹤紀錄，並回溯分析根因。",
+      "能制定並推動維運紀錄與報告標準化流程。",
+      "能建立品質稽核制度，確保團隊作業透明與持續改善。"
+    ]}
+  ]}
+};
+
+/* 市場行情薪資帶（Junior／Mid／Senior，min／mid／max，千元/月） */
+const BANDS = {
+  FE: {J:"42／54／65", M:"46／60／80", S:"50／66／85"},
+  BE: {J:"46／58／70", M:"50／64／85", S:"55／70／92"},
+  PM: {J:"42／52／64", M:"48／60／84", S:"53／68／94"},
+  SRE:{J:"45／57／68", M:"49／64／84", S:"53／70／92"}
+};
+
+/* ---------- 狀態 ---------- */
+let currentRole = "";
+let scorers = [];          // [{id, group:'hr'|'mgr', name}]
+let scores  = {};          // {catIndex:{scorerId:value}}
+let _seq = 0;
+
+const $ = s => document.querySelector(s);
+const catsEl = $("#cats");
+const ROLE_LABEL = {FE:"前端工程（FE）", BE:"後端工程（BE）", PM:"營運／PM", SRE:"運維／SRE"};
+
+function fmt(n){ return (Math.round(n*10)/10).toFixed(1); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800); }
+
+/* ---------- 評分人管理 ---------- */
+function addScorer(group, name){ const id="s"+(++_seq); scorers.push({id, group, name:name||""}); return id; }
+function removeScorer(id){
+  scorers = scorers.filter(s=>s.id!==id);
+  Object.keys(scores).forEach(ci=>{ if(scores[ci]) delete scores[ci][id]; });
+}
+function groupList(group){ return scorers.filter(s=>s.group===group); }
+function scorerIndex(sc){ return groupList(sc.group).findIndex(x=>x.id===sc.id)+1; }
+function scorerFallback(sc){ return (sc.group==="hr"?"人資":"主管")+scorerIndex(sc); }
+function scorerName(sc){ return (sc.name&&sc.name.trim()) ? sc.name.trim() : scorerFallback(sc); }
+function scorerById(id){ return scorers.find(s=>s.id===id); }
+
+function renderScorerConfig(){
+  ["hr","mgr"].forEach(group=>{
+    const host = $(group==="hr"?"#hrList":"#mgrList");
+    const list = groupList(group);
+    host.innerHTML = list.map(sc=>`
+      <div class="sc-row" data-id="${sc.id}">
+        <span class="idx">${scorerFallback(sc)}</span>
+        <input type="text" value="${(sc.name||"").replace(/"/g,"&quot;")}" placeholder="輸入姓名（可留空）" data-name="${sc.id}">
+        <button class="sc-del" data-del="${sc.id}" title="移除" ${list.length<=1?"disabled":""}>✕</button>
+      </div>`).join("");
+  });
+}
+
+/* ---------- 能力項目渲染 ---------- */
+function render(){
+  const role = currentRole;
+  if(!role){ catsEl.innerHTML = '<div class="panel empty-state" id="emptyState"><div class="big">請先於上方選擇應徵職務</div><div>選定後將載入該職務的五大核心能力標準供評分。</div></div>'; return; }
+  const cats = RUBRICS[role].cats;
+  let html = "";
+  cats.forEach((c,ci)=>{
+    const sel = scores[ci] || {};
+    const rows = scorers.map(sc=>{
+      const v = sel[sc.id];
+      return `<div class="scorer ${sc.group}" data-sid="${sc.id}" data-ci="${ci}">
+        <span class="who ${sc.group}"><span class="dot"></span>${scorerName(sc)}</span>
+        <div class="btns">${[1,2,3,4,5].map(n=>`<button class="sbtn${v===n?' on':''}" data-v="${n}">${n}</button>`).join("")}</div>
+      </div>`;
+    }).join("");
+    html += `<section class="panel cat" data-ci="${ci}">
+      <div class="cat-head">
+        <span class="cat-no">${ci+1}</span>
+        <h2 class="cat-name">${c.name}</h2>
+        ${c.isExp?'<span class="cat-flag">經驗參考</span>':''}
+        <span class="catavg" id="catavg-${ci}">${catAvgText(ci)}</span>
+      </div>
+      <div class="cat-sel-desc empty" id="desc-${ci}">選擇等級後顯示對應標準說明。</div>
+      <button class="rubric-toggle" data-toggle="${ci}">顯示五等級完整標準 ▾</button>
+      <div class="rubric" id="rubric-${ci}">
+        ${c.levels.map((d,i)=>`<div class="rr"><div class="rl">L${i+1}</div><div class="rd">${d}</div></div>`).join("")}
+      </div>
+      <div class="scorers">${rows}</div>
+    </section>`;
+  });
+  catsEl.innerHTML = html;
+  cats.forEach((c,ci)=>updateDesc(ci));
+  updateSummary();
+}
+
+/* 單項：全部評分人的平均，及人資/主管分組平均 */
+function catValues(ci){ const s=scores[ci]||{}; return scorers.map(sc=>s[sc.id]).filter(v=>typeof v==="number"); }
+function catGroupValues(ci, group){ const s=scores[ci]||{}; return groupList(group).map(sc=>s[sc.id]).filter(v=>typeof v==="number"); }
+function mean(arr){ return arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+
+function catAvgText(ci){
+  const vals = catValues(ci);
+  if(!vals.length) return "小計 —";
+  const hrM = mean(catGroupValues(ci,"hr"));
+  const mgM = mean(catGroupValues(ci,"mgr"));
+  const parts=[];
+  if(hrM!==null) parts.push(`人資 ${fmt(hrM)}`);
+  if(mgM!==null) parts.push(`主管 ${fmt(mgM)}`);
+  const split = parts.length? ` <span class="gsplit">(${parts.join(" ／ ")})</span>` : "";
+  return `小計 <b>${fmt(mean(vals))}</b>${split}`;
+}
+
+function updateDesc(ci){
+  const c = RUBRICS[currentRole].cats[ci];
+  const el = $(`#desc-${ci}`); if(!el) return;
+  const vals = catValues(ci);
+  if(!vals.length){ el.className="cat-sel-desc empty"; el.textContent="選擇等級後顯示對應標準說明。"; return; }
+  const avg = mean(vals);
+  const shown = Math.round(avg);
+  el.className="cat-sel-desc";
+  const spread = Math.max(...vals)-Math.min(...vals);
+  const extra = (spread>0)? ` <span style="color:var(--faint)">（各評分 ${vals.join("、")}，平均 ${fmt(avg)}，下方為 L${shown} 標準）</span>` : "";
+  el.innerHTML = `<b>L${shown}：</b>${c.levels[shown-1]}${extra}`;
+}
+
+function updateSummary(){
+  const cats = RUBRICS[currentRole].cats;
+  const includeExp = $("#expToggle").checked;
+  let hrVals=[], mgrVals=[], catAvgs=[], scoredCats=0, totalScorable=0, filledCells=0, totalCells=0;
+  cats.forEach((c,ci)=>{
+    if(c.isExp && !includeExp) return;
+    totalScorable++;
+    const vals = catValues(ci);
+    totalCells += scorers.length;
+    filledCells += vals.length;
+    hrVals = hrVals.concat(catGroupValues(ci,"hr"));
+    mgrVals = mgrVals.concat(catGroupValues(ci,"mgr"));
+    if(vals.length){ catAvgs.push(mean(vals)); scoredCats++; }
+  });
+  const hrAvg = mean(hrVals), mgrAvg = mean(mgrVals);
+  const baseAvg = mean(catAvgs);
+  const bonus = getBonus();
+  const finalAvg = baseAvg!==null? Math.min(baseAvg + bonus, 5) : null;
+
+  $("#sumHr").textContent = hrAvg!==null? fmt(hrAvg):"—";
+  $("#sumMgr").textContent = mgrAvg!==null? fmt(mgrAvg):"—";
+  $("#sumFinal").textContent = finalAvg!==null? fmt(finalAvg):"—";
+  $("#cntHr").textContent = groupList("hr").length? `（${groupList("hr").length} 位）`:"";
+  $("#cntMgr").textContent = groupList("mgr").length? `（${groupList("mgr").length} 位）`:"";
+
+  const cap = $("#finalCap");
+  if(finalAvg!==null && bonus>0){
+    cap.innerHTML = `基礎 ${fmt(baseAvg)}　＋產業經驗加分 ${fmt(bonus)}　＝ <b>${fmt(finalAvg)}</b>（上限 5）`;
+  } else {
+    cap.textContent = "綜合能力分數（各項平均，滿分 5）";
+  }
+
+  const tb = $("#tierBox");
+  let band = "— 尚未評分 —";
+  if(finalAvg!==null){
+    const t = tierOf(finalAvg);
+    band = BANDS[currentRole][t.key];
+    tb.style.display="block";
+    tb.className = "tierbox "+t.key.toLowerCase();
+    $("#tierName").textContent = t.name;
+    $("#tierBand").textContent = band;
+  } else { tb.style.display="none"; }
+  const brn = $("#bandRefNum"); if(brn) brn.textContent = (finalAvg!==null)? band : "— 尚未評分 —";
+
+  const inc = $("#incomplete");
+  if(finalAvg!==null && filledCells<totalCells){
+    inc.classList.add("show");
+    inc.textContent = `尚有評分人未完整評分（已評 ${filledCells}/${totalCells} 格）。分數以目前已填項目計算。`;
+  } else { inc.classList.remove("show"); }
+}
+
+function tierOf(avg){
+  if(avg < 2.5) return {key:"J", name:"Junior 層級"};
+  if(avg < 3.5) return {key:"M", name:"Mid-level 層級"};
+  return {key:"S", name:"Senior 層級"};
+}
+
+/* ---------- 事件：職務切換 ---------- */
+$("#m-role").addEventListener("change", e=>{
+  currentRole = e.target.value;
+  scores = {};
+  const has = !!currentRole;
+  $("#asideWrap").style.display = has?"block":"none";
+  $("#bonusPanel").style.display = has?"block":"none";
+  $("#takePanel").style.display = has?"block":"none";
+  $("#actions").style.display = has?"flex":"none";
+  const expWrap = $("#expToggleWrap");
+  expWrap.style.display = (has && RUBRICS[currentRole].cats.some(c=>c.isExp))?"flex":"none";
+  if(has) prefillTake(false);
+  render();
+});
+
+$("#expToggle").addEventListener("change", updateSummary);
+
+/* ---------- 評分人設定事件 ---------- */
+$(".scfg").addEventListener("click", e=>{
+  const add = e.target.closest("[data-add]");
+  if(add){ addScorer(add.getAttribute("data-add")); renderScorerConfig(); render(); return; }
+  const del = e.target.closest("[data-del]");
+  if(del && !del.disabled){ removeScorer(del.getAttribute("data-del")); renderScorerConfig(); render(); return; }
+});
+$(".scfg").addEventListener("input", e=>{
+  const nm = e.target.closest("[data-name]");
+  if(nm){
+    const sc = scorerById(nm.getAttribute("data-name"));
+    if(sc){ sc.name = nm.value; if(currentRole) render(); }
+  }
+});
+
+/* ---------- 直接產業經驗加分 ---------- */
+function getBonus(){
+  if(!$("#bonusEnable").checked) return 0;
+  const r = document.querySelector('input[name="bonus"]:checked');
+  return r? parseFloat(r.value) : 0;
+}
+$("#bonusEnable").addEventListener("change", e=>{
+  $("#bonusOpts").style.display = e.target.checked? "block":"none";
+  if(e.target.checked && !document.querySelector('input[name="bonus"]:checked')){
+    const first = document.querySelector('input[name="bonus"][value="0.5"]'); if(first) first.checked = true;
+  }
+  updateSummary();
+});
+$("#bonusRow").addEventListener("change", updateSummary);
+
+/* ---------- 評分點擊 ---------- */
+catsEl.addEventListener("click", e=>{
+  const tgl = e.target.closest("[data-toggle]");
+  if(tgl){
+    const ci = tgl.getAttribute("data-toggle");
+    const r = $(`#rubric-${ci}`);
+    const open = r.classList.toggle("open");
+    tgl.textContent = open? "收合等級標準 ▴" : "顯示五等級完整標準 ▾";
+    return;
+  }
+  const btn = e.target.closest(".sbtn");
+  if(btn){
+    const row = btn.closest(".scorer");
+    const ci = +row.getAttribute("data-ci");
+    const sid = row.getAttribute("data-sid");
+    const v = +btn.getAttribute("data-v");
+    scores[ci] = scores[ci]||{};
+    if(scores[ci][sid]===v){ delete scores[ci][sid]; } // 再點一次取消
+    else { scores[ci][sid]=v; }
+    row.querySelectorAll(".sbtn").forEach(b=>b.classList.toggle("on", +b.getAttribute("data-v")===scores[ci][sid]));
+    $(`#catavg-${ci}`).innerHTML = catAvgText(ci);
+    updateDesc(ci);
+    updateSummary();
+  }
+});
+
+/* ---------- 任用資訊：帶入基本資料 ---------- */
+function prefillTake(overwrite){
+  const set=(id,val)=>{ const el=$(id); if(el && (overwrite || !el.value)) el.value=val||""; };
+  set("#t-name", $("#m-name").value.trim());
+  set("#t-time", $("#m-date").value);
+  set("#t-func", ROLE_LABEL[currentRole]||"");
+}
+$("#btnPull").addEventListener("click", ()=>{ prefillTake(true); toast("已帶入應徵者、面試時間與職能"); });
+
+/* ---------- 清除 ---------- */
+$("#btnReset").addEventListener("click", ()=>{
+  if(!confirm("確定清除所有輸入與評分？（評分人名單會重設為預設 2＋2）")) return;
+  scores={};
+  ["m-name","m-years","bonusNote","m-comment","t-name","t-item","t-func","t-expect","t-base","t-salary-note"].forEach(id=>{const el=$("#"+id); if(el) el.value="";});
+  ["m-date","t-time","t-landing-date"].forEach(id=>{const el=$("#"+id); if(el) el.value="";});
+  $("#bonusEnable").checked=false; $("#bonusOpts").style.display="none";
+  document.querySelectorAll('input[name="hire"],input[name="landing"],input[name="bonus"]').forEach(r=>r.checked=false);
+  initScorers();
+  renderScorerConfig();
+  render();
+  (function(){var d=new Date();$("#m-date").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+});
+
+/* ---------- 列印 ---------- */
+$("#btnPrint").addEventListener("click", ()=>{
+  if(!currentRole){ alert("請先選擇職務。"); return; }
+  const html = reportHTML(collect());
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(()=>{ iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(()=>iframe.remove(), 1500); }, 350);
+});
+
+/* ---------- 蒐集資料 ---------- */
+function collect(){
+  const cats = RUBRICS[currentRole].cats;
+  const includeExp = $("#expToggle").checked;
+  const rows = cats.map((c,ci)=>{
+    const s = scores[ci]||{};
+    const cells = scorers.map(sc=>({id:sc.id, group:sc.group, name:scorerName(sc), v:(typeof s[sc.id]==="number"?s[sc.id]:null)}));
+    const vals = cells.map(x=>x.v).filter(v=>typeof v==="number");
+    const avg = vals.length? mean(vals) : null;
+    const counted = !(c.isExp && !includeExp);
+    return {name:c.name, isExp:!!c.isExp, counted, cells, avg,
+            hrAvg:mean(catGroupValues(ci,"hr")), mgrAvg:mean(catGroupValues(ci,"mgr")),
+            levelDesc:(avg!==null)?c.levels[Math.round(avg)-1]:""};
+  });
+  const catAvgs = rows.filter(r=>r.counted && r.avg!==null).map(r=>r.avg);
+  const baseAvg = catAvgs.length? mean(catAvgs) : null;
+  const bonus = getBonus();
+  const finalAvg = baseAvg!==null? Math.min(baseAvg + bonus, 5) : null;
+  const hrCells=[], mgrCells=[];
+  rows.forEach(r=>{ if(!r.counted) return; r.cells.forEach(c=>{ if(typeof c.v==="number"){ (c.group==="hr"?hrCells:mgrCells).push(c.v); } }); });
+  const hrAvg = hrCells.length? mean(hrCells):null;
+  const mgrAvg = mgrCells.length? mean(mgrCells):null;
+  const tier = finalAvg!==null? tierOf(finalAvg):null;
+  const band = tier? BANDS[currentRole][tier.key] : "—";
+  return {rows, scorers:scorers.slice(), baseAvg, bonus, finalAvg, hrAvg, mgrAvg, tier, band,
+    meta:{
+      name:$("#m-name").value.trim(), role:ROLE_LABEL[currentRole]||RUBRICS[currentRole].label, roleKey:currentRole,
+      years:$("#m-years").value.trim(), date:$("#m-date").value,
+      hire:(document.querySelector('input[name="hire"]:checked')||{}).value||"",
+      landing:(document.querySelector('input[name="landing"]:checked')||{}).value||"",
+      comment:$("#m-comment").value.trim(),
+      bonusNote:$("#bonusNote").value.trim(),
+      take:{
+        time:$("#t-time").value, landingDate:$("#t-landing-date").value,
+        name:$("#t-name").value.trim(), item:$("#t-item").value.trim(),
+        func:$("#t-func").value.trim(), expect:$("#t-expect").value.trim(),
+        base:$("#t-base").value.trim(), salaryNote:$("#t-salary-note").value.trim()
+      }
+    }};
+}
+
+/* ---------- 任用資訊摘要（複製到「任用名單」） ---------- */
+function summaryText(d){
+  const m=d.meta, t=m.take;
+  const L={min:"近 min（保守起敘）",mid:"近 mid（預設上限）",over:"逾 mid（需送執行長核准）"};
+  const lines=[
+    `【五大核心能力評核｜任用資訊】`,
+    `應徵者：${t.name||m.name||"—"}`,
+    `項目：${t.item||"—"}`,
+    `職能：${t.func||m.role}`,
+    `面試時間：${t.time||m.date||"—"}`,
+    `綜合能力分數：${d.finalAvg!==null?fmt(d.finalAvg):"—"}（${d.tier?d.tier.name:"—"}）`,
+    `　├ 人資平均：${d.hrAvg!==null?fmt(d.hrAvg):"—"}（${d.scorers.filter(s=>s.group==="hr").length} 位）`,
+    `　└ 主管平均：${d.mgrAvg!==null?fmt(d.mgrAvg):"—"}（${d.scorers.filter(s=>s.group==="mgr").length} 位）`,
+    `市場行情參考薪資帶：${d.band}（min／mid／max，千元/月）`,
+    `是否錄取：${m.hire||"—"}`,
+    `到職時間：${t.landingDate||"—"}`,
+    `建議本薪：${t.base?t.base+"K":"—"}`,
+    `期望薪資：${t.expect||"—"}`,
+    `敘薪落點：${L[m.landing]||"—"}`,
+    `核薪說明：${t.salaryNote||"—"}`,
+    m.comment?`綜合評語：${m.comment}`:null
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+$("#btnCopy").addEventListener("click", async ()=>{
+  if(!currentRole){ alert("請先選擇職務。"); return; }
+  const txt = summaryText(collect());
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast("任用資訊摘要已複製，可貼入「任用名單」");
+  }catch(err){
+    const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("任用資訊摘要已複製，可貼入「任用名單」"); }
+    catch(e2){ alert("複製失敗，請手動複製：\n\n"+txt); }
+    ta.remove();
+  }
+});
+
+/* ---------- 產生報告並下載 ---------- */
+function reportHTML(d){
+  const m=d.meta, t=m.take;
+  const esc=s=>(s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const landingMap={min:"近 min（保守起敘）",mid:"近 mid（預設上限）",over:"逾 mid（需附說明／證照，送執行長核准）"};
+  const scHeads = d.scorers.map(s=>`<th class="c ${s.group}">${esc(scorerName(s))}</th>`).join("");
+  const rowsHtml = d.rows.map((r,i)=>{
+    const cells = d.scorers.map(s=>{
+      const cell = r.cells.find(c=>c.id===s.id);
+      const v = cell? cell.v : null;
+      return `<td class="c ${s.group}">${typeof v==="number"?"L"+v:"—"}</td>`;
+    }).join("");
+    return `<tr${r.counted?"":' class="muted"'}>
+      <td class="c">${i+1}</td>
+      <td>${esc(r.name)}${r.isExp?' <span class="tag">'+(r.counted?"經驗·計分":"經驗·參考")+'</span>':''}</td>
+      ${cells}
+      <td class="c avg">${r.avg!==null?fmt(r.avg):"—"}</td>
+      <td class="desc">${esc(r.levelDesc||"")}</td>
+    </tr>`;
+  }).join("");
+  const hireColor = m.hire==="錄取"?"#2b7a5b":(m.hire==="不錄取"?"#b23a48":"#b06f22");
+  return `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>五大核心能力評核報告 ${esc(m.name)}</title>
+<style>
+  body{font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;color:#182430;max-width:940px;margin:32px auto;padding:0 24px;line-height:1.6}
+  h1{font-size:22px;border-bottom:2px solid #182430;padding-bottom:10px;margin-bottom:4px}
+  .brand{color:#6b7b8a;font-size:13px;margin:0 0 18px}
+  h2.sh{font-size:14px;margin:22px 0 8px;padding-bottom:5px;border-bottom:1px solid #dde3e9}
+  .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 20px;background:#f7f9fb;border:1px solid #e2e6ea;border-radius:10px;padding:14px 18px;margin-bottom:6px;font-size:14px}
+  .meta div span{color:#6b7b8a;font-size:12px;display:block}
+  .meta div b{font-size:15px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px}
+  th,td{border:1px solid #dde3e9;padding:7px 9px;vertical-align:top}
+  th{background:#eef1f4;font-size:12px;text-align:left}
+  td.c{text-align:center;white-space:nowrap} th.c{text-align:center}
+  td.desc{color:#3a4a59;font-size:12px}
+  .hr{color:#2f6d94;font-weight:700} .mgr{color:#b06f22;font-weight:700} td.avg{color:#2b7a5b;font-weight:800}
+  tr.muted td{color:#93a2b0;background:#fbfcfd}
+  .tag{font-size:10.5px;background:#f6ecdd;color:#b06f22;padding:1px 6px;border-radius:10px}
+  .grpavg{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:12.5px;color:#3a4a59}
+  .grpavg b{font-variant-numeric:tabular-nums}
+  .result{display:flex;gap:16px;margin:10px 0 6px;flex-wrap:wrap}
+  .box{flex:1;min-width:170px;border:1px solid #e2e6ea;border-radius:10px;padding:14px 16px}
+  .box .k{font-size:12px;color:#6b7b8a} .box .v{font-size:28px;font-weight:800}
+  .box.final .v{color:#2b7a5b} .box.tier .v{font-size:20px} .box.band .v{font-size:22px;letter-spacing:.02em}
+  .take{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 20px;background:#f7f9fb;border:1px solid #e2e6ea;border-radius:10px;padding:14px 18px;margin-bottom:8px;font-size:14px}
+  .take div span{color:#6b7b8a;font-size:12px;display:block} .take div b{font-size:15px}
+  .hire{display:inline-block;font-size:15px;font-weight:800;color:${hireColor}}
+  .comment{white-space:pre-wrap;background:#f7f9fb;border-radius:8px;padding:12px 14px;font-size:13.5px}
+  .sign{display:flex;gap:30px;margin-top:36px;flex-wrap:wrap}
+  .sign div{flex:1;min-width:150px;border-top:1px solid #182430;padding-top:6px;font-size:12.5px;color:#6b7b8a}
+  .foot{margin-top:24px;font-size:11px;color:#93a2b0;border-top:1px solid #eaeef2;padding-top:10px}
+  @media print{body{margin:0}}
+</style></head><body>
+<p class="brand">勝海科技有限公司 · 人力資源部</p>
+<h1>五大核心能力評核報告</h1>
+<div class="meta">
+  <div><span>應徵者</span><b>${esc(m.name)||"—"}</b></div>
+  <div><span>應徵職務</span><b>${esc(m.role)}</b></div>
+  <div><span>實際年資</span><b>${esc(m.years)||"—"} 年</b></div>
+  <div><span>評核日期</span><b>${esc(m.date)||"—"}</b></div>
+  <div><span>人資評分人</span><b>${esc(d.scorers.filter(s=>s.group==="hr").map(scorerName).join("、"))||"—"}</b></div>
+  <div><span>面談主管評分人</span><b>${esc(d.scorers.filter(s=>s.group==="mgr").map(scorerName).join("、"))||"—"}</b></div>
+</div>
+<h2 class="sh">能力評分明細</h2>
+<table>
+  <thead><tr><th style="width:30px">#</th><th>核心能力項目</th>${scHeads}<th class="c" style="width:56px">平均</th><th>對應等級標準（依平均）</th></tr></thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+<div class="grpavg"><span>分組平均：</span><span class="hr">人資平均 <b>${d.hrAvg!==null?fmt(d.hrAvg):"—"}</b></span><span class="mgr">主管平均 <b>${d.mgrAvg!==null?fmt(d.mgrAvg):"—"}</b></span></div>
+<div class="result">
+  <div class="box final"><div class="k">綜合能力分數${d.bonus>0?"（含加分）":"（各項平均）"}</div><div class="v">${d.finalAvg!==null?fmt(d.finalAvg):"—"}</div></div>
+  <div class="box tier"><div class="k">對應層級</div><div class="v">${d.tier?d.tier.name:"—"}</div></div>
+  <div class="box band"><div class="k">建議薪資帶（min／mid／max，千元/月）</div><div class="v">${d.band}</div></div>
+</div>
+${d.bonus>0?`<div class="box" style="background:#e3f0ea;border-color:#cfe6da;margin-bottom:8px"><div class="k">直接產業經驗加分</div><div style="font-size:14px;margin-top:2px">基礎綜合分數 <b>${fmt(d.baseAvg)}</b>　＋加分 <b>${fmt(d.bonus)}</b>　＝ 調整後 <b style="color:#2b7a5b">${fmt(d.finalAvg)}</b>（上限 5）${m.bonusNote?`<br><span style="color:#3a4a59;font-size:13px">佐證／說明：${esc(m.bonusNote)}</span>`:""}</div></div>`:""}
+<h2 class="sh">任用資訊（面談主管填寫）</h2>
+<p style="margin:0 0 10px"><span class="k" style="font-size:12px;color:#6b7b8a">是否錄取：</span><span class="hire">${esc(m.hire)||"—"}</span></p>
+<div class="take">
+  <div><span>應徵者</span><b>${esc(t.name)||esc(m.name)||"—"}</b></div>
+  <div><span>項目</span><b>${esc(t.item)||"—"}</b></div>
+  <div><span>職能</span><b>${esc(t.func)||esc(m.role)}</b></div>
+  <div><span>面試時間</span><b>${esc(t.time)||esc(m.date)||"—"}</b></div>
+  <div><span>到職時間</span><b>${esc(t.landingDate)||"—"}</b></div>
+  <div><span>建議本薪</span><b>${t.base?esc(t.base)+" K/月":"—"}</b></div>
+  <div><span>期望薪資（區間）</span><b>${esc(t.expect)||"—"}</b></div>
+  <div><span>敘薪落點</span><b>${landingMap[m.landing]||"—"}</b></div>
+  <div><span>參考薪資帶</span><b>${d.band}</b></div>
+</div>
+${t.salaryNote?`<div class="k" style="font-size:12px;color:#6b7b8a;margin:8px 0 4px">核薪說明</div><div class="comment">${esc(t.salaryNote)}</div>`:""}
+${m.comment?`<div class="k" style="font-size:12px;color:#6b7b8a;margin:12px 0 4px">綜合評語</div><div class="comment">${esc(m.comment)}</div>`:""}
+<div class="sign"><div>人資評分人簽名 / 日期</div><div>用人主管簽名 / 日期</div><div>執行長核准（逾 mid 時）</div></div>
+<div class="foot">能力分數 1–5 對應五大核心能力等級標準；&lt;2.5 Junior、2.5–3.4 Mid-level、≥3.5 Senior。薪資帶引自「職等定義與薪資帶彙整表」。mid 為核薪預設上限，逾 mid 須附說明或證照並送執行長核准。本文件為內部招募審核用途。</div>
+</body></html>`;
+}
+
+$("#btnDownload").addEventListener("click", ()=>{
+  if(!currentRole){ alert("請先選擇職務。"); return; }
+  const d = collect();
+  if(!d.meta.name){ if(!confirm("尚未填寫應徵者姓名，仍要下載嗎？")) return; }
+  if(d.finalAvg===null){ if(!confirm("尚未有任何評分，仍要下載嗎？")) return; }
+  const html = reportHTML(d);
+  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const safe = s => (s||"").replace(/[\\/:*?"<>|]/g,"").trim();
+  a.href = url;
+  a.download = `五大核心能力評核_${safe(d.meta.name)||"未命名"}_${d.meta.roleKey}_${d.meta.date||""}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+});
+
+/* ---------- 初始化 ---------- */
+function initScorers(){
+  scorers = []; _seq = 0;
+  addScorer("hr"); addScorer("hr");
+  addScorer("mgr"); addScorer("mgr");
+}
+initScorers();
+renderScorerConfig();
+(function(){var d=new Date();$("#m-date").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+</script>
+</body>
+</html>
