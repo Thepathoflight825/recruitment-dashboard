@@ -172,6 +172,11 @@
   .empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
   .empty-state .big{font-size:17px;color:var(--ink-2);font-weight:600;margin-bottom:6px}
 
+  .loadnote{display:flex;align-items:flex-start;gap:10px;background:var(--hr-soft);border:1px solid #bcd6e6;border-left:4px solid var(--hr);border-radius:10px;padding:12px 14px;margin:0 0 22px;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+  .loadnote b{color:var(--hr)}
+  .loadnote .x{margin-left:auto;flex:none;background:none;border:none;color:var(--faint);font-size:16px;cursor:pointer;line-height:1}
+  .loadnote .x:hover{color:var(--ink)}
+
   footer.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint);line-height:1.7}
 
   @media print{
@@ -190,6 +195,11 @@
     </div>
     <p class="aim">人資與用人主管各自評分（可多位），系統自動取平均為「能力分數」並對應市場行情薪資帶。面談主管填寫任用資訊後，下載報告存入「任用名單」，由 Lark 自動化送任用群審核。</p>
   </header>
+
+  <div class="loadnote no-print" id="loadNote" style="display:none">
+    <div id="loadNoteText"></div>
+    <button class="x" id="loadNoteClose" title="關閉">✕</button>
+  </div>
 
   <!-- Candidate meta -->
   <section class="panel meta no-print">
@@ -309,6 +319,7 @@
         <button class="btn btn-primary" id="btnDownload">下載評核報告（HTML）</button>
         <button class="btn btn-secondary" id="btnPrint">列印 / 另存 PDF</button>
         <button class="btn btn-secondary" id="btnCopy">複製任用資訊摘要</button>
+        <button class="btn btn-secondary" id="btnHandoff">複製主管接手連結</button>
         <button class="btn btn-ghost" id="btnReset">清除全部</button>
       </div>
     </main>
@@ -751,6 +762,8 @@ $("#btnPull").addEventListener("click", ()=>{ prefillTake(true); toast("已帶�
 /* ---------- 清除 ---------- */
 $("#btnReset").addEventListener("click", ()=>{
   if(!confirm("確定清除所有輸入與評分？（評分人名單會重設為預設 2＋2）")) return;
+  try{ history.replaceState(null,"",location.origin+location.pathname); }catch(e){}
+  var ln=$("#loadNote"); if(ln) ln.style.display="none";
   scores={};
   ["m-name","m-years","bonusNote","m-comment","t-name","t-item","t-func","t-expect","t-base","t-salary-note"].forEach(id=>{const el=$("#"+id); if(el) el.value="";});
   ["m-date","t-time","t-landing-date"].forEach(id=>{const el=$("#"+id); if(el) el.value="";});
@@ -971,9 +984,121 @@ function initScorers(){
   addScorer("hr"); addScorer("hr");
   addScorer("mgr"); addScorer("mgr");
 }
-initScorers();
-renderScorerConfig();
-(function(){var d=new Date();$("#m-date").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+
+/* ---------- 交接連結：序列化 / 還原 ---------- */
+function _v(id){ var el=$("#"+id); return el? el.value : ""; }
+function _setV(id,val){ var el=$("#"+id); if(el) el.value = val||""; }
+
+function serializeState(){
+  return {
+    v:1,
+    role: currentRole,
+    scorers: scorers.map(s=>({i:s.id, g:s.group, n:s.name||""})),
+    scores: scores,
+    meta:{ name:_v("m-name"), years:_v("m-years"), date:_v("m-date") },
+    bonus:{ on:$("#bonusEnable").checked,
+            val:(document.querySelector('input[name="bonus"]:checked')||{}).value||"",
+            note:_v("bonusNote") },
+    hire:(document.querySelector('input[name="hire"]:checked')||{}).value||"",
+    landing:(document.querySelector('input[name="landing"]:checked')||{}).value||"",
+    comment:_v("m-comment"),
+    take:{ time:_v("t-time"), ldate:_v("t-landing-date"), name:_v("t-name"),
+           item:_v("t-item"), func:_v("t-func"), expect:_v("t-expect"),
+           base:_v("t-base"), snote:_v("t-salary-note") }
+  };
+}
+function encodeState(obj){
+  try{
+    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); // URL-safe
+  }catch(e){ return ""; }
+}
+function decodeState(str){
+  try{
+    var b64 = str.replace(/-/g,"+").replace(/_/g,"/");
+    while(b64.length % 4) b64 += "=";
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }catch(e){ return null; }
+}
+
+function applyState(st){
+  if(!st) return false;
+  if(Array.isArray(st.scorers) && st.scorers.length){
+    scorers = st.scorers.map(x=>({id:x.i, group:(x.g==="mgr"?"mgr":"hr"), name:x.n||""}));
+    var mx=0; scorers.forEach(s=>{ var m=/^s(\d+)$/.exec(s.id||""); if(m) mx=Math.max(mx,+m[1]); }); _seq=mx;
+  } else { initScorers(); }
+  scores = (st.scores && typeof st.scores==="object") ? st.scores : {};
+  _setV("m-name", st.meta&&st.meta.name); _setV("m-years", st.meta&&st.meta.years); _setV("m-date", st.meta&&st.meta.date);
+  var t=st.take||{};
+  _setV("t-time",t.time); _setV("t-landing-date",t.ldate); _setV("t-name",t.name); _setV("t-item",t.item);
+  _setV("t-func",t.func); _setV("t-expect",t.expect); _setV("t-base",t.base); _setV("t-salary-note",t.snote);
+  _setV("m-comment", st.comment);
+  currentRole = st.role||"";
+  $("#m-role").value = currentRole;
+  var has = !!(currentRole && RUBRICS[currentRole]);
+  $("#asideWrap").style.display = has?"block":"none";
+  $("#bonusPanel").style.display = has?"block":"none";
+  $("#takePanel").style.display = has?"block":"none";
+  $("#actions").style.display = has?"flex":"none";
+  $("#expToggleWrap").style.display = (has && RUBRICS[currentRole].cats.some(c=>c.isExp))?"flex":"none";
+  if(st.bonus){
+    $("#bonusEnable").checked = !!st.bonus.on;
+    $("#bonusOpts").style.display = st.bonus.on?"block":"none";
+    if(st.bonus.val){ var b=document.querySelector('input[name="bonus"][value="'+st.bonus.val+'"]'); if(b) b.checked=true; }
+    _setV("bonusNote", st.bonus.note);
+  }
+  if(st.hire){ var h=document.querySelector('input[name="hire"][value="'+st.hire+'"]'); if(h) h.checked=true; }
+  if(st.landing){ var l=document.querySelector('input[name="landing"][value="'+st.landing+'"]'); if(l) l.checked=true; }
+  renderScorerConfig();
+  render();
+  return has;
+}
+
+function scoredCatsByGroup(group){
+  var cats = (currentRole && RUBRICS[currentRole])? RUBRICS[currentRole].cats : [];
+  var n=0;
+  cats.forEach((c,ci)=>{ if(catGroupValues(ci,group).length) n++; });
+  return n;
+}
+function showLoadNote(st){
+  var ln=$("#loadNote"), tx=$("#loadNoteText"); if(!ln||!tx) return;
+  var who = (st.meta&&st.meta.name)? st.meta.name : "此人選";
+  var hrN = scoredCatsByGroup("hr");
+  tx.innerHTML = `<b>已載入交接資料。</b>${who} 的人資評分已帶入（人資已評 ${hrN} 項）。請於下方各項補上<b>主管評分</b>，並填寫下方「任用資訊」；完成後下載報告、回填記錄。`;
+  ln.style.display="flex";
+}
+$("#loadNoteClose").addEventListener("click", ()=>{ $("#loadNote").style.display="none"; });
+
+/* ---------- 複製主管接手連結 ---------- */
+$("#btnHandoff").addEventListener("click", async ()=>{
+  if(!currentRole){ alert("請先選擇職務並完成人資評分，再產生交接連結。"); return; }
+  var code = encodeState(serializeState());
+  if(!code){ alert("產生連結失敗，請重試。"); return; }
+  var url = location.origin + location.pathname + "?d=" + code;
+  try{
+    await navigator.clipboard.writeText(url);
+    toast("主管接手連結已複製，貼到記錄的『評核交接連結』欄");
+  }catch(err){
+    var ta=document.createElement("textarea"); ta.value=url; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("主管接手連結已複製"); }
+    catch(e2){ prompt("複製此連結：", url); }
+    ta.remove();
+  }
+});
+
+/* ---------- 啟動：優先從交接連結載入 ---------- */
+(function boot(){
+  var d = null;
+  try{ d = new URLSearchParams(location.search).get("d"); }catch(e){}
+  if(d){
+    var st = decodeState(d);
+    if(st){ applyState(st); showLoadNote(st); return; }
+  }
+  initScorers();
+  renderScorerConfig();
+  var dt=new Date();
+  $("#m-date").value = dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+})();
 </script>
 </body>
 </html>
