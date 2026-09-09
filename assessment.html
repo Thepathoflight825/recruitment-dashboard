@@ -319,7 +319,8 @@
         <button class="btn btn-primary" id="btnDownload">下載評核報告（HTML）</button>
         <button class="btn btn-secondary" id="btnPrint">列印 / 另存 PDF</button>
         <button class="btn btn-secondary" id="btnCopy">複製任用資訊摘要</button>
-        <button class="btn btn-secondary" id="btnHandoff">複製主管接手連結</button>
+        <button class="btn btn-secondary" id="btnSaveCloud">儲存到雲端</button>
+        <button class="btn btn-secondary" id="btnHandoff">儲存並複製主管接手連結</button>
         <button class="btn btn-ghost" id="btnReset">清除全部</button>
       </div>
     </main>
@@ -1069,15 +1070,107 @@ function showLoadNote(st){
 }
 $("#loadNoteClose").addEventListener("click", ()=>{ $("#loadNote").style.display="none"; });
 
-/* ---------- 複製主管接手連結 ---------- */
+/* ==================== 雲端持久化（GAS + Google Sheets） ==================== */
+/* 部署 GAS 網頁應用程式後，把結尾為 /exec 的網址貼到 GAS_URL。留空時工具自動退回舊版內嵌連結，不會中斷。 */
+var CLOUD = { GAS_URL: "https://script.google.com/macros/s/AKfycbxIh-iLlygHjS74wx7hD_vpnBI747ppaV2LzTzciyhXRATMWrtKbG9t-nnWH2kdsvE0/exec" };
+var currentId = ""; // 這筆評核在雲端的短 ID（對應網址 ?id=）
+
+function _genId(){
+  var c="0123456789abcdefghijklmnopqrstuvwxyz", s="";
+  for(var i=0;i<7;i++) s+=c.charAt(Math.floor(Math.random()*c.length));
+  return s;
+}
+
+/* 依「任用名單」欄位（前 25 欄）＋工具額外欄位組出一列資料 */
+function buildRecord(){
+  var st = serializeState();
+  var landingMap = {min:"近 min（保守起敘）", mid:"近 mid（預設上限）", over:"逾 mid（需附說明／證照，送執行長核准）"};
+  var pick = function(g){ return st.scorers.filter(function(s){return s.g===g;}).map(function(s){return s.n;}).filter(Boolean).join("、"); };
+  var finalTxt = (function(){ var t=(($("#sumFinal")||{}).textContent||"").trim(); return t==="—"?"":t; })();
+  var tierTxt  = (($("#tierName")||{}).textContent||"").trim();
+  var hrDone   = ((($("#sumHr")||{}).textContent||"—").trim()!=="—") ? "是" : "";
+  var bonusTxt = (st.bonus && st.bonus.on && st.bonus.val) ? ("＋"+st.bonus.val+(st.bonus.note?("／"+st.bonus.note):"")) : "";
+  var link = currentId ? (location.origin+location.pathname+"?id="+currentId) : "";
+  var t = st.take||{}, m = st.meta||{};
+  return {
+    /* ---- 前 25 欄：完全對齊 班班日常_任用名單 ---- */
+    "錄取者": t.name || m.name || "",
+    "任用職務": t.item || "",
+    "任用單位": "",                       // 流程填
+    "單位主管": pick("mgr"),
+    "負責HR": pick("hr"),
+    "任用狀態": "",                       // 流程填
+    "關聯招募名單": "",                   // 流程填
+    "HR評分完成": hrDone,
+    "五大核心能力綜合分數": finalTxt,
+    "對應層級": tierTxt,
+    "五大核心能力評核表": "",             // 流程填（可放靜態表單連結）
+    "評核交接連結": link,
+    "是否錄取": st.hire || "",
+    "建議本薪": t.base || "",
+    "期望薪資（區間）": t.expect || "",
+    "敘薪落點": landingMap[st.landing] || "",
+    "核薪說明": t.snote || "",
+    "任用訊息": "",                       // 流程填
+    "送任用群審核": "",                   // 流程填
+    "任用群審核結果": "",                 // 流程填
+    "人員任用申請進度": "",               // 流程填
+    "入職薪資": "",                       // 流程填
+    "入職日期": t.ldate || "",            // 評核時多為預計到職日
+    "Offer 狀態": "",                     // 流程填
+    "備註": "",                           // 流程填
+    /* ---- 名單無對應者，沿用工具欄位名稱 ---- */
+    "面試時間": t.time || "",
+    "職務類別": t.func || "",
+    "應徵者年資": m.years || "",
+    "評核日期": m.date || "",
+    "加給": bonusTxt,
+    "綜合評語": st.comment || ""
+  };
+}
+
+/* 存到雲端（新建或更新同一筆）；成功回傳短 ID，失敗回傳 "" */
+async function saveToCloud(){
+  if(!CLOUD.GAS_URL) return "";
+  if(!currentId) currentId = _genId();
+  var payload = { id: currentId, record: buildRecord(), state: serializeState() };
+  try{
+    var res = await fetch(CLOUD.GAS_URL, { method:"POST", body: JSON.stringify(payload) }); // text/plain：避開 CORS 預檢
+    var data = await res.json();
+    return (data && data.ok) ? currentId : "";
+  }catch(e){ return ""; }
+}
+
+/* 用短 ID 從雲端讀回並帶入畫面 */
+async function loadFromCloud(id){
+  if(!CLOUD.GAS_URL) return false;
+  try{
+    var res = await fetch(CLOUD.GAS_URL + "?id=" + encodeURIComponent(id));
+    var data = await res.json();
+    if(data && data.ok && data.state){
+      var st = (typeof data.state==="string") ? JSON.parse(data.state) : data.state;
+      currentId = id; applyState(st); showLoadNote(st); return true;
+    }
+    return false;
+  }catch(e){ return false; }
+}
+
+/* ---------- 儲存並複製主管接手連結（HR 用）---------- */
 $("#btnHandoff").addEventListener("click", async ()=>{
   if(!currentRole){ alert("請先選擇職務並完成人資評分，再產生交接連結。"); return; }
-  var code = encodeState(serializeState());
-  if(!code){ alert("產生連結失敗，請重試。"); return; }
-  var url = location.origin + location.pathname + "?d=" + code;
+  toast("儲存中…");
+  var id = await saveToCloud();
+  var url;
+  if(id){
+    url = location.origin + location.pathname + "?id=" + id;
+  } else {
+    var code = encodeState(serializeState());        // 離線備援：後端未設定或連線失敗 → 退回舊版內嵌連結
+    if(!code){ alert("產生連結失敗，請重試。"); return; }
+    url = location.origin + location.pathname + "?d=" + code;
+  }
   try{
     await navigator.clipboard.writeText(url);
-    toast("主管接手連結已複製，貼到記錄的『評核交接連結』欄");
+    toast(id ? "已存雲端，主管接手連結已複製，貼到『評核交接連結』欄" : "（離線）連結已複製，貼到『評核交接連結』欄");
   }catch(err){
     var ta=document.createElement("textarea"); ta.value=url; document.body.appendChild(ta); ta.select();
     try{ document.execCommand("copy"); toast("主管接手連結已複製"); }
@@ -1086,18 +1179,36 @@ $("#btnHandoff").addEventListener("click", async ()=>{
   }
 });
 
-/* ---------- 啟動：優先從交接連結載入 ---------- */
+/* ---------- 儲存到雲端（主管補評後回存同一筆）---------- */
+(function(){
+  var b = $("#btnSaveCloud"); if(!b) return;
+  b.addEventListener("click", async ()=>{
+    if(!currentRole){ alert("請先選擇職務。"); return; }
+    if(!CLOUD.GAS_URL){ toast("尚未設定雲端後端（GAS_URL）"); return; }
+    toast("儲存中…");
+    var id = await saveToCloud();
+    toast(id ? "已儲存到雲端，可回名單複製整列貼上" : "儲存失敗：請確認後端網址或網路連線");
+  });
+})();
+
+/* ---------- 啟動：優先從雲端（?id）載入，其次相容舊版（?d）---------- */
 (function boot(){
-  var d = null;
-  try{ d = new URLSearchParams(location.search).get("d"); }catch(e){}
-  if(d){
-    var st = decodeState(d);
-    if(st){ applyState(st); showLoadNote(st); return; }
+  var params=null; try{ params = new URLSearchParams(location.search); }catch(e){}
+  var id = params && params.get("id");
+  var d  = params && params.get("d");
+  function initFresh(){
+    initScorers();
+    renderScorerConfig();
+    var dt=new Date();
+    $("#m-date").value = dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
   }
-  initScorers();
-  renderScorerConfig();
-  var dt=new Date();
-  $("#m-date").value = dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+  function fromD(){ if(d){ var st=decodeState(d); if(st){ applyState(st); showLoadNote(st); return true; } } return false; }
+  if(id && CLOUD.GAS_URL){
+    loadFromCloud(id).then(function(ok){ if(!ok && !fromD()) initFresh(); });
+    return;
+  }
+  if(fromD()) return;
+  initFresh();
 })();
 </script>
 </body>
