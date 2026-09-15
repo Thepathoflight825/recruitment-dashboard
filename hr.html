@@ -343,6 +343,40 @@
 
   <!-- ── 差勤記錄 ── -->
   <div class="tab-content" id="tab-leave">
+    <!-- ── 加班分析 ── -->
+    <div style="margin:2px 0 14px;display:flex;align-items:center;gap:10px">
+      <div style="flex:0 0 auto;font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap">⏱️ 加班分析</div>
+      <div style="flex:0 0 auto;font-size:11px;color:var(--text-sub);white-space:nowrap">加班狀態分布・個人時數累積</div>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
+    <div class="stat-grid-4" id="ot-kpi"></div>
+
+    <div class="panel-grid-2" style="margin-bottom:14px">
+      <div class="panel">
+        <div class="panel-title">🕒 加班類型分布 <span class="pt-sub">依時數佔比</span></div>
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <div style="flex:0 0 160px;display:flex;justify-content:center"><canvas id="chart-ot-type" width="160" height="160"></canvas></div>
+          <div id="ot-type-legend" style="flex:1;min-width:180px"></div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-title">📈 加班時數月趨勢 <span class="pt-sub">依加班類型</span></div><canvas id="chart-ot-month" height="200"></canvas></div>
+    </div>
+
+    <div class="panel-grid-2" style="margin-bottom:14px">
+      <div class="panel"><div class="panel-title">🏢 各單位加班時數</div><canvas id="chart-ot-dept" height="170"></canvas></div>
+      <div class="panel"><div class="panel-title">👤 個人加班時數排行 <span class="pt-sub">Top 10</span></div><canvas id="chart-ot-person" height="170"></canvas></div>
+    </div>
+
+    <div class="panel"><div class="panel-title">📋 個人加班明細 <span class="pt-sub">時數累積</span></div><div id="ot-person-wrap"></div></div>
+
+    <!-- ── 請假分析 ── -->
+    <div style="margin:24px 0 14px;display:flex;align-items:center;gap:10px">
+      <div style="flex:0 0 auto;font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap">🏖️ 請假分析</div>
+      <div style="flex:0 0 auto;font-size:11px;color:var(--text-sub);white-space:nowrap">假別分布・個人請假排行</div>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
     <div class="panel-grid-2" style="margin-bottom:14px">
       <div class="panel"><div class="panel-title">📅 假別使用趨勢 <span class="pt-sub">月份</span></div><canvas id="chart-leave-month" height="200"></canvas></div>
       <div class="panel"><div class="panel-title">🏖️ 假別總量分布</div><canvas id="chart-leave-type" height="200"></canvas></div>
@@ -529,6 +563,18 @@ function loadDemoData() {
     {英文名字:'Judy',  部門:'客服中心',月份:'2026/03',假別:'病假',天數:0.5},
     // 補足特休、病假
     ...Array.from({length:40},(_,i)=>({英文名字:`E${i+30}`,部門:['技術中心','客服中心','管理中心','營運中心','運維中心'][i%5],月份:['2026/01','2026/02','2026/03','2026/04'][i%4],假別:['特休假','病假','福利假','生理假','公出假','補休假','事假'][i%7],天數:[1,0.5,1,0.5,1][i%5]})),
+    // 加班示範資料（與差勤記錄表共用，僅填加班欄位）
+    {英文名字:'Mista',  部門:'技術中心',加班日期:'2026/08/01',加班月份:'2026/08',加班類型:'休息日',加班時數:1},
+    {英文名字:'William',部門:'運維中心',加班日期:'2026/08/03',加班月份:'2026/08',加班類型:'平日',  加班時數:1.5},
+    {英文名字:'Luka',   部門:'技術中心',加班日期:'2026/08/06',加班月份:'2026/08',加班類型:'平日',  加班時數:3.5},
+    {英文名字:'Marc',   部門:'營運中心',加班日期:'2026/08/06',加班月份:'2026/08',加班類型:'平日',  加班時數:4.5},
+    {英文名字:'Tamia',  部門:'運維中心',加班日期:'2026/08/06',加班月份:'2026/08',加班類型:'平日',  加班時數:2},
+    {英文名字:'Marc',   部門:'營運中心',加班日期:'2026/08/16',加班月份:'2026/08',加班類型:'例假日',加班時數:5.17},
+    {英文名字:'Dennis', 部門:'營運中心',加班日期:'2026/08/31',加班月份:'2026/08',加班類型:'平日',  加班時數:2},
+    {英文名字:'Marc',   部門:'營運中心',加班日期:'2026/08/31',加班月份:'2026/08',加班類型:'平日',  加班時數:1},
+    {英文名字:'Mista',  部門:'技術中心',加班日期:'2026/08/31',加班月份:'2026/08',加班類型:'平日',  加班時數:4.42},
+    {英文名字:'Luka',   部門:'技術中心',加班日期:'2026/07/12',加班月份:'2026/07',加班類型:'平日',  加班時數:3},
+    {英文名字:'Marc',   部門:'營運中心',加班日期:'2026/07/20',加班月份:'2026/07',加班類型:'休息日',加班時數:6},
   ];
   renderAll();
   document.getElementById('last-updated').textContent = '示範模式';
@@ -589,6 +635,12 @@ function getFilteredLeaveList() {
   return filterByPeriod(leaveList, '月份');
 }
 
+// 加班紀錄與請假共用差勤記錄表，但以「加班月份」為時間軸；只取有加班資料的列
+function getFilteredOvertimeList() {
+  const ot = leaveList.filter(r => (gf(r,'加班日期') || gf(r,'加班時數') || gf(r,'加班月份')));
+  return filterByPeriod(ot, '加班月份');
+}
+
 
 function gf(obj, key) {
   if (!obj || obj[key] === undefined || obj[key] === null) return null;
@@ -605,6 +657,7 @@ function renderAll() {
   renderCharts();
   renderAttrition();
   renderLeave();
+  renderOvertime();
   renderAlertBannersHR();
   renderReportHR();
 }
@@ -834,6 +887,68 @@ function renderLeave() {
   el.innerHTML = `<table class="data-table"><thead><tr><th>姓名</th><th>假別明細</th><th style="text-align:right">合計(天)</th></tr></thead><tbody>
     ${topPersons.map(([name,d])=>`<tr><td><strong>${name}</strong></td><td>${Object.entries(d.types).map(([t,v])=>`<span class="badge badge-gray" style="margin-right:3px;background:${LEAVE_COLORS[t]+'22'};color:#333">${t} ${v.toFixed(2)}</span>`).join('')}</td><td style="text-align:right;font-weight:700">${d.total.toFixed(2)}</td></tr>`).join('')}
     </tbody></table>`;
+}
+
+// ── 加班分析 ──
+const OT_COLORS = {'平日':'#3B8BD4','休息日':'#EF9F27','例假日':'#E24B4A','國定假日':'#6B4FA0','特別休假日':'#1D9E75','其他':'#8896A6'};
+function renderOvertime() {
+  const ol = getFilteredOvertimeList();
+
+  // ── KPI 卡片 ──
+  const totalHrs = ol.reduce((a,r)=>a+n(gf(r,'加班時數')),0);
+  const rowCnt   = ol.length;
+  const people   = new Set(ol.map(r=>(gf(r,'英文名字')||'').trim()).filter(Boolean)).size;
+  const avgHrs   = people ? totalHrs/people : 0;
+  const holidayHrs = ol.filter(r=>['休息日','例假日','國定假日'].includes(gf(r,'加班類型'))).reduce((a,r)=>a+n(gf(r,'加班時數')),0);
+  const holidayPct = totalHrs ? Math.round(holidayHrs/totalHrs*100) : 0;
+  const unit = (u)=>`<span style="font-size:13px;font-weight:500;color:var(--text-sub)"> ${u}</span>`;
+  const kpiEl = document.getElementById('ot-kpi');
+  if (kpiEl) kpiEl.innerHTML = `
+    <div class="stat-card amber"><div class="stat-label">加班總時數</div><div class="stat-value">${totalHrs.toFixed(1)}${unit('小時')}</div><div class="stat-icon">⏱️</div></div>
+    <div class="stat-card blue"><div class="stat-label">加班人次</div><div class="stat-value">${rowCnt}${unit('筆')}</div><div class="stat-icon">📝</div></div>
+    <div class="stat-card teal"><div class="stat-label">加班人數</div><div class="stat-value">${people}${unit('人')}</div><div class="stat-icon">👥</div></div>
+    <div class="stat-card purple"><div class="stat-label">平均每人時數</div><div class="stat-value">${avgHrs.toFixed(1)}${unit('小時')}</div><div class="stat-sub">假日加班 ${holidayHrs.toFixed(1)} 小時 · 占 ${holidayPct}%</div></div>`;
+
+  // 空資料處理：清空圖表與明細
+  if (!ol.length) {
+    ['chart-ot-type','chart-ot-month','chart-ot-dept','chart-ot-person'].forEach(id=>{ if(chartInstances[id]){chartInstances[id].destroy(); delete chartInstances[id];} });
+    const lg=document.getElementById('ot-type-legend'); if(lg) lg.innerHTML='<div style="color:var(--text-sub);font-size:12px">此期間暫無加班資料</div>';
+    const pw=document.getElementById('ot-person-wrap'); if(pw) pw.innerHTML='<div style="color:var(--text-sub);font-size:12px">此期間暫無加班資料</div>';
+    return;
+  }
+
+  // ── 加班類型分布（甜甜圈 + 自訂圖例）──
+  const typeMap = {}; ol.forEach(r=>{ const t=gf(r,'加班類型')||'其他'; if(!typeMap[t]) typeMap[t]={hrs:0,cnt:0}; typeMap[t].hrs+=n(gf(r,'加班時數')); typeMap[t].cnt++; });
+  const typeEntries = Object.entries(typeMap).sort((a,b)=>b[1].hrs-a[1].hrs);
+  const typeColors  = typeEntries.map(([t])=>OT_COLORS[t]||'#8896A6');
+  mkChart('chart-ot-type',{type:'doughnut',data:{labels:typeEntries.map(e=>e[0]),datasets:[{data:typeEntries.map(e=>parseFloat(e[1].hrs.toFixed(2))),backgroundColor:typeColors,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}：${c.parsed} 小時`}}},responsive:false}});
+  const legendEl = document.getElementById('ot-type-legend');
+  if (legendEl) legendEl.innerHTML = typeEntries.map(([t,d],i)=>{ const pct=totalHrs?Math.round(d.hrs/totalHrs*100):0; return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid #F1EFE8"><span style="width:11px;height:11px;border-radius:3px;background:${typeColors[i]};flex:0 0 auto"></span><span style="flex:1;font-size:12px;font-weight:500;color:var(--navy)">${t}</span><span style="font-size:14px;font-weight:700;color:var(--navy)">${d.hrs.toFixed(1)}h</span><span style="font-size:11px;color:var(--text-sub);min-width:66px;text-align:right">${d.cnt} 筆 · ${pct}%</span></div>`; }).join('');
+
+  // ── 加班時數月趨勢（堆疊，依類型）──
+  const months  = [...new Set(ol.map(r=>gf(r,'加班月份')).filter(Boolean))].sort();
+  const otTypes = [...new Set(ol.map(r=>gf(r,'加班類型')||'其他'))];
+  const monthDs = otTypes.map((t,i)=>({label:t,data:months.map(m=>ol.filter(r=>gf(r,'加班月份')===m&&(gf(r,'加班類型')||'其他')===t).reduce((a,r)=>a+n(gf(r,'加班時數')),0)),backgroundColor:OT_COLORS[t]||CHART_COLORS[i],stack:'a'}));
+  mkChart('chart-ot-month',{type:'bar',data:{labels:months,datasets:monthDs},options:{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'小時',font:{size:10}}}},plugins:{legend:{labels:{font:{size:10}}}},responsive:true,maintainAspectRatio:true}});
+
+  // ── 各單位加班時數（橫條）──
+  const deptMap = {}; ol.forEach(r=>{ const d=gf(r,'部門')||'其他'; deptMap[d]=(deptMap[d]||0)+n(gf(r,'加班時數')); });
+  const sortedDept = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
+  mkChart('chart-ot-dept',{type:'bar',data:{labels:sortedDept.map(d=>d[0]),datasets:[{data:sortedDept.map(d=>parseFloat(d[1].toFixed(2))),backgroundColor:'#EF9F27',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},layout:{padding:{right:40}},scales:{x:{beginAtZero:true,title:{display:true,text:'小時',font:{size:10}}},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+
+  // ── 個人加班明細（時數累積）──
+  const personMap = {}; ol.forEach(r=>{ const p=gf(r,'英文名字')||'未知'; if(!personMap[p]) personMap[p]={total:0,cnt:0,types:{},dept:gf(r,'部門')||'—'}; personMap[p].total+=n(gf(r,'加班時數')); personMap[p].cnt++; const t=gf(r,'加班類型')||'其他'; personMap[p].types[t]=(personMap[p].types[t]||0)+n(gf(r,'加班時數')); });
+  const persons = Object.entries(personMap).sort((a,b)=>b[1].total-a[1].total);
+
+  // ── 個人加班時數排行（橫條 Top 10）──
+  const top = persons.slice(0,10);
+  mkChart('chart-ot-person',{type:'bar',data:{labels:top.map(p=>p[0]),datasets:[{data:top.map(p=>parseFloat(p[1].total.toFixed(2))),backgroundColor:'#3B8BD4',borderRadius:4}]},options:{indexAxis:'y',plugins:{legend:{display:false}},layout:{padding:{right:40}},scales:{x:{beginAtZero:true,title:{display:true,text:'小時',font:{size:10}}},y:{grid:{display:false}}},responsive:true,maintainAspectRatio:true}});
+
+  // ── 明細表 ──
+  const pw = document.getElementById('ot-person-wrap');
+  if (pw) pw.innerHTML = persons.length ? `<table class="data-table"><thead><tr><th>姓名</th><th>部門</th><th>類型明細</th><th style="text-align:center">次數</th><th style="text-align:right">合計(小時)</th></tr></thead><tbody>
+    ${persons.map(([name,d])=>`<tr><td><strong>${name}</strong></td><td style="font-size:11px;color:var(--text-sub)">${d.dept}</td><td>${Object.entries(d.types).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`<span class="badge" style="margin-right:3px;background:${(OT_COLORS[t]||'#8896A6')}22;color:#333">${t} ${v.toFixed(1)}h</span>`).join('')}</td><td style="text-align:center">${d.cnt}</td><td style="text-align:right;font-weight:700">${d.total.toFixed(1)}</td></tr>`).join('')}
+    </tbody></table>` : '<div style="color:var(--text-sub);font-size:12px">此期間暫無加班資料</div>';
 }
 
 // ── 風險計算 ──
