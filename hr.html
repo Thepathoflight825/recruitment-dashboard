@@ -986,7 +986,7 @@ function renderOvertimeRisk() {
   const rows = Object.entries(risk).map(([name,R])=>{
     const mv = Object.entries(R.months);
     const peak = mv.reduce((mx,[m,v])=>v>mx.v?{m,v}:mx,{m:'—',v:0});
-    const periodCounted = mv.reduce((a,[,v])=>a+v,0);
+    const roll3 = worst3Counted(R.months);   // 連續3個月計入時數（獨立指標，不併入風險等級）
     const hasHol = R.holH>0;
     let score, tier, color, advice;
     if (peak.v>CAP_EXT){ score=5; tier='嚴重超標'; color='red'; advice=`最高單月計入 ${peak.v.toFixed(1)}h，已逾放寬上限 54h，屬違法風險，須立即調整排班。`; }
@@ -994,13 +994,12 @@ function renderOvertimeRisk() {
     else if (peak.v>=37){ score=3; tier='接近上限'; color='amber'; advice='已達月 46h 上限 8 成以上，建議控管後續加班安排。'; }
     else if (peak.v>=24){ score=2; tier='留意'; color='amber'; advice='加班頻率偏高，建議持續觀察並關心負荷。'; }
     else { score=1; tier='正常'; color='teal'; advice='加班量在安全範圍內。'; }
-    if (periodCounted>CAP_3M && score<4){ score=4; tier='超標'; color='red'; advice=`期間累計計入 ${periodCounted.toFixed(1)}h，已逾連續 3 個月 138h 總量上限。`; }
     if (hasHol){
       score=Math.max(score,4);
       if (tier!=='超標' && tier!=='嚴重超標'){ tier='例假紅線'; color='red'; advice='例假日出勤屬法定強制休息，僅限天災/事變/突發並報備，且須強制補休 1 日。'; }
       else { advice += '另含例假日出勤，須報備並強制補休 1 日。'; }
     }
-    return {name, dept:R.dept, total:R.total, cnt:R.cnt, days:R.days.size, holH:R.holH, peak, periodCounted, hasHol, score, tier, color, advice};
+    return {name, dept:R.dept, total:R.total, cnt:R.cnt, days:R.days.size, holH:R.holH, peak, roll3, hasHol, score, tier, color, advice};
   }).sort((a,b)=> b.score-a.score || b.peak.v-a.peak.v || b.total-a.total);
 
   // 摘要
@@ -1024,16 +1023,20 @@ function renderOvertimeRisk() {
   </div>`;
 
   const barColor={red:'#E24B4A',amber:'#EF9F27',teal:'#1D9E75'};
-  const table = `<table class="data-table"><thead><tr><th>姓名</th><th>部門</th><th style="text-align:center">加班天數</th><th style="text-align:right">期間總時數</th><th style="min-width:140px">最高單月計入 (上限 46h)</th><th style="text-align:center">例假日</th><th style="text-align:center">風險等級</th><th>建議</th></tr></thead><tbody>
+  const table = `<table class="data-table"><thead><tr><th>姓名</th><th>部門</th><th style="text-align:center">加班天數</th><th style="text-align:right">期間總時數</th><th style="min-width:140px">最高單月計入 (上限 46h)</th><th style="min-width:148px">連續3個月計入 (上限 138h)</th><th style="text-align:center">例假日</th><th style="text-align:center">風險等級</th><th>建議</th></tr></thead><tbody>
     ${rows.map(r=>{
       const pct=Math.min(100, r.peak.v/CAP*100);
       const over=r.peak.v>CAP;
+      const pct3=Math.min(100, r.roll3.sum/CAP_3M*100);
+      const over3=r.roll3.sum>CAP_3M;
+      const col3=over3?'#E24B4A':(r.roll3.sum>=CAP_3M*0.8?'#EF9F27':'#3B8BD4');
       return `<tr>
         <td><strong>${r.name}</strong></td>
         <td style="font-size:11px;color:var(--text-sub)">${r.dept}</td>
         <td style="text-align:center">${r.days} 天<div style="font-size:10px;color:var(--text-sub)">${r.cnt} 筆</div></td>
         <td style="text-align:right;font-weight:600">${r.total.toFixed(1)}h</td>
         <td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:#EEE;border-radius:3px;overflow:hidden;min-width:56px"><div style="height:100%;width:${pct}%;background:${barColor[r.color]||'#3B8BD4'}"></div></div><span style="font-size:11px;font-weight:700;min-width:48px;text-align:right;color:${over?'#E24B4A':'#333'}">${r.peak.v.toFixed(1)}/46</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:#EEE;border-radius:3px;overflow:hidden;min-width:56px"><div style="height:100%;width:${pct3}%;background:${col3}"></div></div><span style="font-size:11px;font-weight:700;min-width:52px;text-align:right;color:${over3?'#E24B4A':'#333'}">${r.roll3.sum.toFixed(1)}/138</span></div>${r.roll3.span?`<div style="font-size:10px;color:var(--text-sub);margin-top:2px;text-align:right">${r.roll3.span}</div>`:''}</td>
         <td style="text-align:center">${r.hasHol?`<span class="badge badge-red">${r.holH.toFixed(1)}h</span>`:'<span style="color:#ccc">—</span>'}</td>
         <td style="text-align:center"><span class="badge badge-${r.color}">${r.tier}</span></td>
         <td style="font-size:11px;color:#555;line-height:1.5">${r.advice}</td>
@@ -1051,6 +1054,26 @@ function renderOvertimeRisk() {
 function periodLabelText() {
   const m = {current:'當月', prev:'上個月', '3m':'近三個月', '6m':'近半年', '1y':'今年度', all:'全部期間'};
   return '時間範圍：' + (m[selectedPeriod] || selectedPeriod);
+}
+
+// 連續 3 個曆月「計入時數」(平日＋休息日) 的最大滾動總和，對照 138h 總量管制；獨立呈現，不影響風險等級
+function worst3Counted(monthsObj) {
+  const idx = {};
+  Object.entries(monthsObj).forEach(([m,v])=>{
+    const p = String(m).split('/'); const y=+p[0], mm=+p[1];
+    if(!y||!mm) return;
+    const k = y*12+(mm-1);
+    idx[k] = (idx[k]||0) + v;
+  });
+  const keys = Object.keys(idx).map(Number);
+  if(!keys.length) return {sum:0, span:''};
+  let best = {sum:0, start:keys[0]};
+  keys.forEach(k=>{
+    const s = (idx[k]||0)+(idx[k+1]||0)+(idx[k+2]||0);
+    if(s>best.sum) best = {sum:s, start:k};
+  });
+  const fmt = k => `${Math.floor(k/12)}/${String(k%12+1).padStart(2,'0')}`;
+  return {sum:best.sum, span:`${fmt(best.start)}–${fmt(best.start+2)}`};
 }
 
 // ── 風險計算 ──
