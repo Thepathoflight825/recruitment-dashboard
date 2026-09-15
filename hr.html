@@ -370,6 +370,8 @@
 
     <div class="panel"><div class="panel-title">📋 個人加班明細 <span class="pt-sub">時數累積</span></div><div id="ot-person-wrap"></div></div>
 
+    <div class="panel" style="margin-top:14px"><div class="panel-title">📊 加班頻率評估與風險預告 <span class="pt-sub">依勞基法工時上限</span></div><div id="ot-risk-wrap"></div></div>
+
     <!-- ── 請假分析 ── -->
     <div style="margin:24px 0 14px;display:flex;align-items:center;gap:10px">
       <div style="flex:0 0 auto;font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap">🏖️ 請假分析</div>
@@ -575,6 +577,14 @@ function loadDemoData() {
     {英文名字:'Mista',  部門:'技術中心',加班日期:'2026/08/31',加班月份:'2026/08',加班類型:'平日',  加班時數:4.42},
     {英文名字:'Luka',   部門:'技術中心',加班日期:'2026/07/12',加班月份:'2026/07',加班類型:'平日',  加班時數:3},
     {英文名字:'Marc',   部門:'營運中心',加班日期:'2026/07/20',加班月份:'2026/07',加班類型:'休息日',加班時數:6},
+    // 示範：接近月上限案例（平日+休息日計入 40h ≈ 46h 上限 87%）
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/05',加班月份:'2026/08',加班類型:'平日',  加班時數:4},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/07',加班月份:'2026/08',加班類型:'平日',  加班時數:4},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/12',加班月份:'2026/08',加班類型:'平日',  加班時數:4},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/16',加班月份:'2026/08',加班類型:'休息日',加班時數:8},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/23',加班月份:'2026/08',加班類型:'休息日',加班時數:8},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/30',加班月份:'2026/08',加班類型:'休息日',加班時數:8},
+    {英文名字:'Kevin',  部門:'技術中心',加班日期:'2026/08/28',加班月份:'2026/08',加班類型:'平日',  加班時數:4},
   ];
   renderAll();
   document.getElementById('last-updated').textContent = '示範模式';
@@ -658,6 +668,7 @@ function renderAll() {
   renderAttrition();
   renderLeave();
   renderOvertime();
+  renderOvertimeRisk();
   renderAlertBannersHR();
   renderReportHR();
 }
@@ -949,6 +960,97 @@ function renderOvertime() {
   if (pw) pw.innerHTML = persons.length ? `<table class="data-table"><thead><tr><th>姓名</th><th>部門</th><th>類型明細</th><th style="text-align:center">次數</th><th style="text-align:right">合計(小時)</th></tr></thead><tbody>
     ${persons.map(([name,d])=>`<tr><td><strong>${name}</strong></td><td style="font-size:11px;color:var(--text-sub)">${d.dept}</td><td>${Object.entries(d.types).sort((a,b)=>b[1]-a[1]).map(([t,v])=>`<span class="badge" style="margin-right:3px;background:${(OT_COLORS[t]||'#8896A6')}22;color:#333">${t} ${v.toFixed(1)}h</span>`).join('')}</td><td style="text-align:center">${d.cnt}</td><td style="text-align:right;font-weight:700">${d.total.toFixed(1)}</td></tr>`).join('')}
     </tbody></table>` : '<div style="color:var(--text-sub);font-size:12px">此期間暫無加班資料</div>';
+}
+
+// ── 加班頻率評估與風險預告（依勞基法工時上限）──
+function renderOvertimeRisk() {
+  const wrap = document.getElementById('ot-risk-wrap');
+  if (!wrap) return;
+  const ol = getFilteredOvertimeList();
+  if (!ol.length) { wrap.innerHTML = '<div style="color:var(--text-sub);font-size:12px">此期間暫無加班資料，無風險評估。</div>'; return; }
+
+  const COUNTED = ['平日','休息日'];          // 計入每月 46h 延長工時上限之類型
+  const CAP = 46, CAP_EXT = 54, CAP_3M = 138; // 法定上限
+
+  // 逐人彙總：以「加班月份」分月，計算計入 46h 之時數與例假日時數
+  const risk = {};
+  ol.forEach(r=>{
+    const p=gf(r,'英文名字')||'未知', mo=gf(r,'加班月份')||'—', ty=gf(r,'加班類型')||'其他', h=n(gf(r,'加班時數')), day=gf(r,'加班日期')||'';
+    if(!risk[p]) risk[p]={dept:gf(r,'部門')||'—', total:0, cnt:0, days:new Set(), months:{}, holH:0};
+    const R=risk[p]; R.total+=h; R.cnt++; if(day) R.days.add(day);
+    if(!R.months[mo]) R.months[mo]=0;
+    if(COUNTED.includes(ty)) R.months[mo]+=h;
+    if(ty==='例假日') R.holH+=h;
+  });
+
+  const rows = Object.entries(risk).map(([name,R])=>{
+    const mv = Object.entries(R.months);
+    const peak = mv.reduce((mx,[m,v])=>v>mx.v?{m,v}:mx,{m:'—',v:0});
+    const periodCounted = mv.reduce((a,[,v])=>a+v,0);
+    const hasHol = R.holH>0;
+    let score, tier, color, advice;
+    if (peak.v>CAP_EXT){ score=5; tier='嚴重超標'; color='red'; advice=`最高單月計入 ${peak.v.toFixed(1)}h，已逾放寬上限 54h，屬違法風險，須立即調整排班。`; }
+    else if (peak.v>CAP){ score=4; tier='超標'; color='red'; advice=`最高單月計入 ${peak.v.toFixed(1)}h，已逾 46h；除非經工會/勞資會議同意放寬至 54h，否則違法。`; }
+    else if (peak.v>=37){ score=3; tier='接近上限'; color='amber'; advice='已達月 46h 上限 8 成以上，建議控管後續加班安排。'; }
+    else if (peak.v>=24){ score=2; tier='留意'; color='amber'; advice='加班頻率偏高，建議持續觀察並關心負荷。'; }
+    else { score=1; tier='正常'; color='teal'; advice='加班量在安全範圍內。'; }
+    if (periodCounted>CAP_3M && score<4){ score=4; tier='超標'; color='red'; advice=`期間累計計入 ${periodCounted.toFixed(1)}h，已逾連續 3 個月 138h 總量上限。`; }
+    if (hasHol){
+      score=Math.max(score,4);
+      if (tier!=='超標' && tier!=='嚴重超標'){ tier='例假紅線'; color='red'; advice='例假日出勤屬法定強制休息，僅限天災/事變/突發並報備，且須強制補休 1 日。'; }
+      else { advice += '另含例假日出勤，須報備並強制補休 1 日。'; }
+    }
+    return {name, dept:R.dept, total:R.total, cnt:R.cnt, days:R.days.size, holH:R.holH, peak, periodCounted, hasHol, score, tier, color, advice};
+  }).sort((a,b)=> b.score-a.score || b.peak.v-a.peak.v || b.total-a.total);
+
+  // 摘要
+  const ppl=rows.length;
+  const highRisk=rows.filter(r=>r.score>=4).length;
+  const amber=rows.filter(r=>r.score===2||r.score===3).length;
+  const holPpl=rows.filter(r=>r.hasHol).length;
+  const topPeak=rows.reduce((mx,r)=>r.peak.v>mx.v?{v:r.peak.v,name:r.name,m:r.peak.m}:mx,{v:0,name:'—',m:''});
+
+  const summary = `<div class="report-summary-box" style="margin-bottom:14px">
+    <div class="rs-title">⏱️ 加班頻率評估摘要　<span style="font-size:11px;font-weight:400;color:#6c9bc8">📅 ${periodLabelText()}</span></div>
+    <div class="rs-sub">法規依據：每月延長工時上限 46h（經工會/勞資會議同意得放寬至 54h）；連續 3 個月不得逾 138h；例假日為法定強制休息，僅限天災/事變/突發並報備。計入時數＝平日＋休息日加班（例假日、國定假日前 8h 不計入）。</div>
+    <div class="rs-body">本期共 <strong style="color:#fff">${ppl}</strong> 位同仁有加班紀錄，其中 <strong style="color:${highRisk?'#F08080':'#5DCAA5'}">${highRisk}</strong> 位達超標／紅線風險、<strong style="color:${amber?'#EBB454':'#5DCAA5'}">${amber}</strong> 位需留意${holPpl?`；<strong style="color:#F08080">${holPpl}</strong> 位曾於例假日出勤（法律紅線）`:''}。最高單月計入時數為 <strong style="color:#fff">${topPeak.name} ${topPeak.v.toFixed(1)}h</strong>（${topPeak.m}）。</div>
+    <div class="rs-kpi-row">
+      <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:#8fb8e0">${ppl}</div><div class="rs-kpi-lbl">加班人數</div></div>
+      <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${highRisk?'#F08080':'#5DCAA5'}">${highRisk}</div><div class="rs-kpi-lbl">超標/紅線</div></div>
+      <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${amber?'#EBB454':'#5DCAA5'}">${amber}</div><div class="rs-kpi-lbl">需留意</div></div>
+      <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${holPpl?'#F08080':'#5DCAA5'}">${holPpl}</div><div class="rs-kpi-lbl">例假日出勤</div></div>
+      <div class="rs-kpi-item"><div class="rs-kpi-val" style="color:${topPeak.v>CAP?'#F08080':'#EBB454'}">${topPeak.v.toFixed(1)}</div><div class="rs-kpi-lbl">最高單月計入(h)</div></div>
+    </div>
+  </div>`;
+
+  const barColor={red:'#E24B4A',amber:'#EF9F27',teal:'#1D9E75'};
+  const table = `<table class="data-table"><thead><tr><th>姓名</th><th>部門</th><th style="text-align:center">加班天數</th><th style="text-align:right">期間總時數</th><th style="min-width:140px">最高單月計入 (上限 46h)</th><th style="text-align:center">例假日</th><th style="text-align:center">風險等級</th><th>建議</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const pct=Math.min(100, r.peak.v/CAP*100);
+      const over=r.peak.v>CAP;
+      return `<tr>
+        <td><strong>${r.name}</strong></td>
+        <td style="font-size:11px;color:var(--text-sub)">${r.dept}</td>
+        <td style="text-align:center">${r.days} 天<div style="font-size:10px;color:var(--text-sub)">${r.cnt} 筆</div></td>
+        <td style="text-align:right;font-weight:600">${r.total.toFixed(1)}h</td>
+        <td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:6px;background:#EEE;border-radius:3px;overflow:hidden;min-width:56px"><div style="height:100%;width:${pct}%;background:${barColor[r.color]||'#3B8BD4'}"></div></div><span style="font-size:11px;font-weight:700;min-width:48px;text-align:right;color:${over?'#E24B4A':'#333'}">${r.peak.v.toFixed(1)}/46</span></div></td>
+        <td style="text-align:center">${r.hasHol?`<span class="badge badge-red">${r.holH.toFixed(1)}h</span>`:'<span style="color:#ccc">—</span>'}</td>
+        <td style="text-align:center"><span class="badge badge-${r.color}">${r.tier}</span></td>
+        <td style="font-size:11px;color:#555;line-height:1.5">${r.advice}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    <div style="margin-top:12px;padding:10px 12px;background:#FBF7EE;border:0.5px solid #EADFC5;border-radius:8px;font-size:11px;color:#7A6320;line-height:1.7">
+      <strong>📌 費率提醒（排班與核算參考）</strong>：平日加班第 1–2h ×1.34、第 3–4h ×1.67（每日總工時不逾 12h）；休息日 1–2h ×1.34、3–8h ×1.67、9–12h ×2.67；例假日做一給八＋強制補休 1 日，逾 8h ×2.0（限天災/事變/突發並報備）；國定假日做一給八，逾 8h 依平日費率。務必採 <strong>1.34／1.67 倍</strong>，勿用 1.33／1.66（低於法定「三分之一／三分之二以上」即違法）。
+    </div>`;
+
+  wrap.innerHTML = summary + table;
+}
+
+// 取得目前時間範圍的文字標籤
+function periodLabelText() {
+  const m = {current:'當月', prev:'上個月', '3m':'近三個月', '6m':'近半年', '1y':'今年度', all:'全部期間'};
+  return '時間範圍：' + (m[selectedPeriod] || selectedPeriod);
 }
 
 // ── 風險計算 ──
