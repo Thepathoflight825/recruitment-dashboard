@@ -68,12 +68,13 @@
   .section-title { font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:.07em; margin:24px 0 10px; padding-bottom:6px; border-bottom:0.5px solid var(--border); }
 
   /* ── KPI cards strip ── */
-  .kpi-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:6px; }
+  .kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:6px; }
   .kpi-card { background:#fff; border-radius:10px; border:0.5px solid var(--border); padding:14px 16px; position:relative; overflow:hidden; }
   .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
   .kpi-card.hr::before     { background:#3B8BD4; }
   .kpi-card.recruit::before{ background:#1D9E75; }
   .kpi-card.care::before   { background:#6B4FA0; }
+  .kpi-card.att::before    { background:#BA7517; }
   .kpi-card-label { font-size:10px; color:var(--text-sub); margin-bottom:4px; }
   .kpi-card-val   { font-size:26px; font-weight:700; line-height:1; }
   .kpi-card-sub   { font-size:10px; color:#b4b2a9; margin-top:4px; }
@@ -84,7 +85,7 @@
   .tag-info   { background:var(--blue-light);   color:var(--blue); }
 
   /* ── Block panels ── */
-  .block-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px; }
+  .block-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:14px; }
   .block-panel { background:#fff; border-radius:12px; border:0.5px solid var(--border); padding:16px 18px; }
   .block-panel-title { font-size:12px; font-weight:700; color:var(--navy); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
   .metric-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:0.5px solid #F1EFE8; font-size:12px; }
@@ -213,13 +214,13 @@
     <button class="print-btn" onclick="copyReportText()">📋 複製文字</button>
   </div>
 
-  <!-- ── 三大區塊核心指標 ── -->
+  <!-- ── 四大區塊核心指標（人力資源／考勤／招募／關懷）── -->
   <div class="section-title">📌 本月核心指標總覽</div>
   <div class="kpi-strip" id="kpi-strip">
     <div class="loading-state"><div class="spinner"></div>載入中...</div>
   </div>
 
-  <!-- ── 三欄詳細指標 ── -->
+  <!-- ── 2×2 詳細指標 ── -->
   <div class="block-grid" id="block-grid">
     <div class="loading-state"><div class="spinner"></div>載入中...</div>
   </div>
@@ -391,6 +392,16 @@ function periodLabel(p) {
 function updateMonthBadge() {
   document.getElementById('month-badge').textContent = periodLabel(selectedPeriod);
 }
+
+// 姓名正規化：去空白、去 KR- 前綴、小寫（對應「KR- Roy」「Kr-Luka」「Roy」為同一人）
+function normName(v){ return String(v||'').toLowerCase().replace(/\s+/g,'').replace(/^kr-/,''); }
+// 報告月份：當月／上個月取該月；近三個月取最後一個月
+function reportMonthOf(p){
+  const ms = periodMonths(p);
+  if (ms && ms.length) return ms[ms.length-1];
+  const d = new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 };
+}
+function ymKey(y,m){ return `${y}/${String(m).padStart(2,'0')}`; }
 
 // ── 季度關懷排程（2026 = 6/9/12 月；2027 起 = 3/6/9/12 月）──
 function careMonthsOf(y){ return y >= 2027 ? [3,6,9,12] : [6,9,12]; }
@@ -652,30 +663,121 @@ function computeHRMetrics() {
 
 // ── 關懷指標 ──
 function computeCareMetrics() {
-  const fr = filterByPeriod(careRecords, '面談日期');
+  const frAll = filterByPeriod(careRecords, '面談日期');
   const activeEmps = careEmployees.filter(e => !gf(e,'在職狀態')?.includes('離職'));
   const highRisk = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('高')).length;
   const midRisk  = activeEmps.filter(e => gf(e,'當前風險等級')?.includes('中')).length;
-  const overdueP = promises.filter(p => {
-    const s = gf(p,'兌現狀態') || '';
-    return s.includes('逾期') || (parseFloat(gf(p,'逾期天數'))||0) > 3;
-  }).length;
-  const coveredIds = [...new Set(fr.map(r => gf(r,'關懷員工')).filter(Boolean))];
-  const coverageRate = activeEmps.length ? Math.round(coveredIds.length / activeEmps.length * 100) : 0;
-  const pendingP = promises.filter(p => { const s=gf(p,'兌現狀態')||''; return s==='待處理'||s.includes('逾期'); }).length;
+  const empKey = e => normName(gf(e,'英文名')) || normName(gf(e,'Lark 帳號 ID'));
+  const empName = e => String(gf(e,'英文名')||gf(e,'員工姓名')||'').trim();
+  // 單位主管＝員工主檔「直屬主管」欄位中出現過的名字（以在職員工為準），不列入應關懷人數
+  const managerKeys = new Set();
+  activeEmps.forEach(e => String(gf(e,'直屬主管')||'').split(/[,、]/).map(normName).filter(Boolean).forEach(k => managerKeys.add(k)));
+  // 直屬主管空白（或為 Max）＝主管是執行長：
+  //   名字出現在他人「直屬主管」欄 → 單位主管；未出現 → 執行長直屬的一般同仁。兩者皆不列入應關懷人數
+  const CEO_KEY = 'max';
+  const isUnderCEO = e => { const sup = normName(gf(e,'直屬主管')); return !sup || sup === CEO_KEY; };
+  const ceoDirectEmps = activeEmps.filter(e => isUnderCEO(e) && !managerKeys.has(empKey(e)));
+  const eligibleEmps = activeEmps.filter(e => !managerKeys.has(empKey(e)) && !isUnderCEO(e));
+  const empByKey = {}; eligibleEmps.forEach(e => empByKey[empKey(e)] = e);
+  // 計入季度覆蓋率的紀錄：關懷對象為應關懷員工，且面談主管＝該員工直屬主管
+  // 非直屬主管進行的關懷（如執行長因應個人表現單獨關懷）屬特殊狀況，不計入
+  const fr = [], specialRecs = [];
+  frAll.forEach(r => {
+    const e = empByKey[normName(gf(r,'關懷員工'))];
+    if (!e) return; // 單位主管或非在職者：不列入
+    const sup = normName(gf(e,'直屬主管'));
+    const interviewer = normName(gf(r,'主管'));
+    if (!sup || !interviewer || sup === interviewer) fr.push(r);
+    else specialRecs.push({ name: empName(e), interviewer: String(gf(r,'主管')||'').trim(), date: gf(r,'面談日期') });
+  });
+  const coveredIds = [...new Set(fr.map(r => normName(gf(r,'關懷員工'))))];
+  const pendingEmps = eligibleEmps.filter(e => !coveredIds.includes(empKey(e)))
+    .map(e => ({ name: empName(e), dept: String(gf(e,'部門')||'').trim(), sup: String(gf(e,'直屬主管')||'').trim() }));
+  const coverageRate = eligibleEmps.length ? Math.round(coveredIds.length / eligibleEmps.length * 100) : 0;
   // 季度關懷：非關懷月無關懷紀錄屬正常，覆蓋率不視為缺口
   const isCareMonth = isCarePeriod(selectedPeriod);
   const refYear = (periodMonths(selectedPeriod)?.[0]?.y) || new Date().getFullYear();
   const careScheduleLabel = careScheduleLabelOf(refYear);
   const nextCareLabel = nextCareLabelOf(selectedPeriod);
-  return { activeEmps, highRisk, midRisk, fr, coverageRate, overdueP, pendingP, coveredIds, isCareMonth, careScheduleLabel, nextCareLabel };
+  return { activeEmps, eligibleEmps, managerCnt: managerKeys.size, ceoDirectEmps: ceoDirectEmps.map(empName), highRisk, midRisk, fr, specialRecs, coverageRate, coveredIds, pendingEmps, isCareMonth, careScheduleLabel, nextCareLabel };
+}
+
+// ── 考勤指標（請假＝報告當月；加班＝報告月份＋前兩個月，共三個月）──
+function computeAttendanceMetrics() {
+  const rmo = reportMonthOf(selectedPeriod);
+  const win = [-2,-1,0].map(k => { const d = new Date(rmo.y, rmo.m-1+k, 1); return ymKey(d.getFullYear(), d.getMonth()+1); });
+  const curKey = win[2];
+  const r1 = v => Math.round(v*10)/10;
+  const monthOf = (r, dateF, monthF) => {
+    const d = parseDateVal(gf(r,dateF));
+    if (d && !isNaN(d)) return ymKey(d.getFullYear(), d.getMonth()+1);
+    const m = String(gf(r,monthF)||'').match(/(\d{4})[\/\-](\d{1,2})/);
+    return m ? ymKey(+m[1], +m[2]) : '';
+  };
+  const fmtDate = v => { const d = parseDateVal(v); return d && !isNaN(d) ? `${d.getMonth()+1}/${d.getDate()}` : String(v||''); };
+  const who  = r => String(gf(r,'英文名字')||gf(r,'中文姓名')||'').trim();
+  const dept = r => String(gf(r,'部門')||'其他').trim();
+
+  // 請假（報告當月）；公出假非請假，另列
+  const leaveRecs = leaveList.filter(r => String(gf(r,'假別')||'').trim() && monthOf(r,'請假日期','月份') === curKey);
+  const hrsOf = r => n(gf(r,'時數')) || n(gf(r,'天數')) * 8;
+  const isTrip = r => String(gf(r,'假別')).includes('公出');
+  const leaves = leaveRecs.filter(r => !isTrip(r)), trips = leaveRecs.filter(isTrip);
+  const leaveByType = {}; leaves.forEach(r => { const t=String(gf(r,'假別')).trim(); leaveByType[t]=r1((leaveByType[t]||0)+hrsOf(r)); });
+  const leave = {
+    recs: leaves.length, persons: new Set(leaves.map(who)).size, hours: r1(leaves.reduce((a,r)=>a+hrsOf(r),0)),
+    byType: leaveByType, tripRecs: trips.length, tripHours: r1(trips.reduce((a,r)=>a+hrsOf(r),0))
+  };
+
+  // 加班（三個月窗口）
+  const otRecs = leaveList.filter(r => n(gf(r,'加班時數')) > 0)
+    .map(r => ({ month: monthOf(r,'加班日期','加班月份'), who: who(r), dept: dept(r), type: String(gf(r,'加班類型')||'未分類').trim(), hours: n(gf(r,'加班時數')), date: fmtDate(gf(r,'加班日期')) }))
+    .filter(o => win.includes(o.month));
+  const byMonth = {};
+  win.forEach(k => byMonth[k] = { recs:0, persons:new Set(), hours:0, byType:{}, byDept:{}, byPerson:{} });
+  otRecs.forEach(o => {
+    const b = byMonth[o.month]; b.recs++; b.persons.add(o.who); b.hours += o.hours;
+    b.byType[o.type] = (b.byType[o.type]||0) + o.hours;
+    b.byDept[o.dept] = (b.byDept[o.dept]||0) + o.hours;
+    b.byPerson[o.who] = (b.byPerson[o.who]||0) + o.hours;
+  });
+  const months = win.map(k => {
+    const b = byMonth[k];
+    const top = Object.entries(b.byPerson).sort((a,c)=>c[1]-a[1])[0];
+    const rnd = o => Object.fromEntries(Object.entries(o).sort((a,c)=>c[1]-a[1]).map(([x,v])=>[x,r1(v)]));
+    return { key:k, recs:b.recs, persons:b.persons.size, hours:r1(b.hours), byType:rnd(b.byType), byDept:rnd(b.byDept), top: top ? { who:top[0], hours:r1(top[1]) } : null, byPerson:b.byPerson };
+  });
+  const cur = months[2], prev = months[1];
+  const momPct = prev.hours > 0 ? Math.round((cur.hours - prev.hours) / prev.hours * 100) : null;
+  const personTotal = {}, personMonths = {};
+  otRecs.forEach(o => { personTotal[o.who]=(personTotal[o.who]||0)+o.hours; (personMonths[o.who] = personMonths[o.who] || new Set()).add(o.month); });
+  const multiMonth = Object.entries(personMonths).filter(([,ms]) => ms.size >= 2).map(([w,ms]) => ({ who:w, months:ms.size, hours:r1(personTotal[w]) }));
+  // 工時合規：單月 46h、三個月合計 138h
+  const monthOver = []; months.forEach(m => Object.entries(m.byPerson).forEach(([w,h]) => { if (h > 46) monthOver.push({ month:m.key, who:w, hours:r1(h) }); }));
+  const triOver = Object.entries(personTotal).filter(([,h]) => h > 138).map(([w,h]) => ({ who:w, hours:r1(h) }));
+  // 例假日／國定假日出勤：需核對事由、報備與補休
+  const holidayRecs = otRecs.filter(o => o.type.includes('例假') || o.type.includes('國定'));
+  // 平日加班 ≥ 4h：正常工時 8h + 加班 4h 可能觸及單日 12h 上限，需對照出勤紀錄人工核對
+  const longDayRecs = otRecs.filter(o => o.type.includes('平日') && o.hours >= 4);
+  return {
+    curKey, win, leave, months, cur, momPct,
+    total: { recs: otRecs.length, persons: Object.keys(personTotal).length, hours: r1(otRecs.reduce((a,o)=>a+o.hours,0)) },
+    multiMonth, monthOver, triOver, holidayRecs, longDayRecs,
+    emptyMonths: months.filter(m => m.recs === 0).map(m => m.key)
+  };
 }
 
 // ══════════════════════════════════════
 //  風險整合計算
 // ══════════════════════════════════════
-function computeAllRisks(rm, hm, cm) {
+function computeAllRisks(rm, hm, cm, am) {
   const risks = [];
+
+  // ── 考勤風險（僅法定上限超標才列入）──
+  if (am && am.monthOver.length)
+    risks.push({ level:'high', icon:'⏱', source:'考勤', title:'單月加班超過 46 小時上限', metric: am.monthOver.map(o=>`${o.who}（${o.month}：${o.hours}h）`).join('、'), desc:`已超出勞基法單月加班上限，請立即與主管確認工作分配並調整排班。` });
+  if (am && am.triOver.length)
+    risks.push({ level:'high', icon:'⏱', source:'考勤', title:'三個月加班合計超過 138 小時', metric: am.triOver.map(o=>`${o.who}（${o.hours}h）`).join('、'), desc:`三個月累計加班超出上限，請檢視人力配置。` });
 
   // ── 人力資源風險 ──
   if (hm.monthlyRate > 10)
@@ -711,9 +813,6 @@ function computeAllRisks(rm, hm, cm) {
     risks.push({ level:'high', icon:'🔴', source:'員工關懷', title:'高留任風險員工需立即關懷', metric:`共 ${cm.highRisk} 位：${names || '詳見關懷系統'}`, desc:`高風險員工若未及時關懷介入，離職機率顯著提升，請主管本週內安排 1on1，HR 同步追蹤。` });
   }
 
-  if (cm.overdueP > 0)
-    risks.push({ level:'high', icon:'📋', source:'員工關懷', title:'主管承諾逾期未兌現', metric:`${cm.overdueP} 項承諾已逾期超過 3 天`, desc:`逾期承諾會直接影響員工對主管的信任感，請 HR 本週內逐一追蹤並協助推進。` });
-
   if (cm.midRisk >= 2)
     risks.push({ level:'medium', icon:'🟡', source:'員工關懷', title:'中風險員工持續追蹤中', metric:`共 ${cm.midRisk} 位中風險員工`, desc:`中風險員工若連續兩次評估未改善，建議主管縮短關懷頻率為每月一次，持續追蹤。` });
 
@@ -729,9 +828,10 @@ function renderAll() {
   const rm = computeRecruitMetrics();
   const hm = computeHRMetrics();
   const cm = computeCareMetrics();
-  const risks = computeAllRisks(rm, hm, cm);
-  renderKPIStrip(rm, hm, cm);
-  renderBlockGrid(rm, hm, cm);
+  const am = computeAttendanceMetrics();
+  const risks = computeAllRisks(rm, hm, cm, am);
+  renderKPIStrip(rm, hm, cm, am);
+  renderBlockGrid(rm, hm, cm, am);
   renderRiskList(risks);
   renderActions(risks, rm, hm, cm);
 }
@@ -745,13 +845,19 @@ function tagText(ok, val, unit) {
   return ok ? '達標' : '未達標';
 }
 
-function renderKPIStrip(rm, hm, cm) {
+function renderKPIStrip(rm, hm, cm, am) {
   const cards = [
     {
       cls:'hr', label:'本月在職人數', val: hm.activeCnt, unit:'人',
       sub: `離職 ${hm.exitCnt} 人・淨變化 ${hm.netChange >= 0 ? '+':''}${hm.netChange}`,
       tagCls: hm.exitCnt <= 1 ? 'tag-ok' : hm.monthlyRate > 10 ? 'tag-danger' : 'tag-warn',
       tagTxt: hm.exitCnt === 0 ? '無異動' : `離職 ${hm.exitCnt} 人`
+    },
+    {
+      cls:'att', label:'本月加班時數', val: am.cur.hours, unit:'h',
+      sub: `加班 ${am.cur.persons} 人・${am.cur.recs} 筆${am.momPct !== null ? `・較上月 ${am.momPct >= 0 ? '+' : ''}${am.momPct}%` : ''}`,
+      tagCls: (am.monthOver.length || am.triOver.length) ? 'tag-danger' : 'tag-ok',
+      tagTxt: (am.monthOver.length || am.triOver.length) ? '超過上限' : '合規'
     },
     {
       cls:'recruit', label:'本月履歷收件', val: rm.total, unit:'份',
@@ -763,7 +869,7 @@ function renderKPIStrip(rm, hm, cm) {
     },
     {
       cls:'care', label:'高留任風險員工', val: cm.highRisk, unit:'人',
-      sub: cm.isCareMonth ? `中風險 ${cm.midRisk} 人・關懷覆蓋率 ${cm.coverageRate}%` : `中風險 ${cm.midRisk} 人・本月非關懷月`,
+      sub: cm.isCareMonth ? `中風險 ${cm.midRisk} 人・關懷覆蓋率 ${cm.coverageRate}%（${cm.coveredIds.length}/${cm.eligibleEmps.length}）` : `中風險 ${cm.midRisk} 人・本月非關懷月`,
       tagCls: cm.highRisk === 0 ? 'tag-ok' : 'tag-danger',
       tagTxt: cm.highRisk === 0 ? '良好' : '需立即處理'
     },
@@ -777,7 +883,7 @@ function renderKPIStrip(rm, hm, cm) {
     </div>`).join('');
 }
 
-function renderBlockGrid(rm, hm, cm) {
+function renderBlockGrid(rm, hm, cm, am) {
   const hrRows = [
     { label:'本月在職人數',    val: hm.activeCnt + ' 人', cls: '' },
     { label:'本月離職人數',    val: hm.exitCnt + ' 人',  cls: hm.exitCnt >= 3 ? 'red' : hm.exitCnt >= 1 ? 'amber' : 'teal' },
@@ -799,15 +905,25 @@ function renderBlockGrid(rm, hm, cm) {
     { label:'職缺狀態',        val: rm.positions.length ? rm.positions.map(p=> rm.pausedPositions.has(p) ? `${p}（暫緩）` : rm.openUnfilled.includes(p) ? `${p}（招募中）` : `${p}（已關閉）`).join('、') : '本月無收件職缺', cls: (rm.activeScope.length && rm.openUnfilled.length === 0) ? 'teal' : '' },
   ];
   const careRows = [
-    { label:'在職員工總數',    val: cm.activeEmps.length + ' 人', cls: '' },
+    { label:'應關懷人數',      val: `${cm.eligibleEmps.length} 人（不含單位主管 ${cm.managerCnt} 人、執行長直屬 ${cm.ceoDirectEmps.length} 人）`, cls: '' },
     { label:'高留任風險',      val: cm.highRisk + ' 人', cls: cm.highRisk > 0 ? 'red' : 'teal' },
     { label:'中留任風險',      val: cm.midRisk + ' 人',  cls: cm.midRisk >= 2 ? 'amber' : '' },
-    { label:'本月關懷次數',    val: cm.fr.length + ' 次', cls: !cm.isCareMonth ? '' : (cm.fr.length > 0 ? 'teal' : 'amber') },
+    { label:'本月關懷次數',    val: cm.fr.length + ' 次' + (cm.specialRecs.length ? `（另特殊關懷 ${cm.specialRecs.length} 次不計入）` : ''), cls: !cm.isCareMonth ? '' : (cm.fr.length > 0 ? 'teal' : 'amber') },
     cm.isCareMonth
-      ? { label:'關懷覆蓋率', val: cm.coverageRate + '%', cls: cm.coverageRate >= 80 ? 'teal' : cm.coverageRate >= 50 ? 'amber' : 'red' }
+      ? { label:'關懷覆蓋率', val: `${cm.coverageRate}%（${cm.coveredIds.length}/${cm.eligibleEmps.length}）`, cls: cm.coverageRate >= 80 ? 'teal' : cm.coverageRate >= 50 ? 'amber' : 'red' }
       : { label:'關懷覆蓋率', val: '非關懷月', cls: '' },
-    { label:'逾期承諾',        val: cm.overdueP + ' 項', cls: cm.overdueP > 0 ? 'red' : 'teal' },
+    ...(cm.isCareMonth && cm.pendingEmps.length ? [{ label:'待完成面談', val: cm.pendingEmps.map(e=>`${e.name}（${e.dept}）`).join('、'), cls: 'amber' }] : []),
     { label:'關懷排程',        val: cm.isCareMonth ? '本月為關懷月' : `下次：${cm.nextCareLabel}`, cls: '' },
+  ];
+  const fmtObj = o => Object.entries(o).map(([k,v])=>`${k} ${v}h`).join('、') || '—';
+  const attRows = [
+    { label:'本月請假',        val: `${am.leave.persons} 人・${am.leave.recs} 筆・${am.leave.hours}h`, cls: '' },
+    { label:'請假假別',        val: fmtObj(am.leave.byType), cls: '' },
+    { label:'本月加班',        val: `${am.cur.persons} 人・${am.cur.recs} 筆・${am.cur.hours}h`, cls: '' },
+    { label:'加班類型',        val: fmtObj(am.cur.byType), cls: '' },
+    { label:'三個月加班合計',  val: `${am.total.persons} 人・${am.total.recs} 筆・${am.total.hours}h（${am.win[0]}–${am.win[2]}）`, cls: '' },
+    { label:'工時上限（46h／138h）', val: (am.monthOver.length || am.triOver.length) ? '有超標' : '無超標', cls: (am.monthOver.length || am.triOver.length) ? 'red' : 'teal' },
+    { label:'例假日／國定假日出勤', val: am.holidayRecs.length ? am.holidayRecs.map(o=>`${o.who} ${o.date} ${o.type} ${o.hours}h`).join('、') : '無', cls: am.holidayRecs.length ? 'amber' : 'teal' },
   ];
 
   function buildBlock(icon, title, color, rows) {
@@ -822,6 +938,7 @@ function renderBlockGrid(rm, hm, cm) {
 
   document.getElementById('block-grid').innerHTML =
     buildBlock('👥', '人力資源', '#3B8BD4', hrRows) +
+    buildBlock('🕒', '考勤儀表板', '#BA7517', attRows) +
     buildBlock('📋', '招募管理', '#1D9E75', recruitRows) +
     buildBlock('💚', '員工關懷', '#6B4FA0', careRows);
 }
@@ -864,12 +981,12 @@ function renderActions(risks, rm, hm, cm) {
             <li>若多人因薪資婉拒，啟動 <strong>薪資結構檢討</strong>，對比市場行情</li>`,
       steps:['確認主管面試檔期','完成離職訪談記錄','啟動薪資校準評估'] });
 
-  if (cm.highRisk > 0 || cm.overdueP > 0)
+  if (cm.highRisk > 0)
     actions.push({ icon:'💬', title:'高風險員工關懷介入', tag:'緊急・立即執行',
       body:`<li>高風險員工請主管 <strong>本週內</strong> 安排 1on1，並將面談記錄同步至關懷系統</li>
-            <li>逾期承諾請 HR 逐一確認完成狀況，未完成者更新預計完成日期</li>
+            <li>主管將面談重點與後續安排同步填入關懷紀錄，HR 定期檢視</li>
             <li>HR 獨立約談高風險員工，了解主管無法得知的深層狀況</li>`,
-      steps:['主管本週安排 1on1','更新逾期承諾','HR 獨立約談'] });
+      steps:['主管本週安排 1on1','同步關懷紀錄','HR 獨立約談'] });
 
   if (rm.total < 20 && rm.openUnfilled.length > 0)
     actions.push({ icon:'📢', title:'擴大招募渠道・提升收件量', tag:'短期・立即執行',
@@ -926,8 +1043,13 @@ function copyDataForAI() {
   const rm = computeRecruitMetrics();
   const hm = computeHRMetrics();
   const cm = computeCareMetrics();
-  const risks = computeAllRisks(rm, hm, cm);
+  const am = computeAttendanceMetrics();
+  const risks = computeAllRisks(rm, hm, cm, am);
   const period = periodLabel(selectedPeriod);
+  const fmtObj = o => Object.entries(o).map(([k,v])=>`${k} ${v}h`).join('、') || '無';
+  const otMonthLine = m => m.recs
+    ? `- ${m.key}：加班 ${m.persons} 人、${m.recs} 筆，合計 ${m.hours} 小時｜類型：${fmtObj(m.byType)}｜單位：${fmtObj(m.byDept)}｜個人最高：${m.top.who} ${m.top.hours}h`
+    : `- ${m.key}：無加班紀錄`;
 
   const text =
 `【${period} 人力資源數據】
@@ -938,6 +1060,11 @@ function copyDataForAI() {
 - 本月新進人數：${hm.newCnt} 人（淨人力變化：${hm.netChange >= 0 ? '+' : ''}${hm.netChange}）
 - 年資 0-1 年員工佔比：${hm.juniorPct}%
 - 自願離職佔本月離職：${hm.exitCnt > 0 ? hm.voluntaryPct + '%' : '無離職'}
+
+■ 考勤儀表板（${am.curKey}）
+- 本月請假：${am.leave.persons} 人、${am.leave.recs} 筆，合計 ${am.leave.hours} 小時｜假別：${fmtObj(am.leave.byType)}${am.leave.tripRecs ? `\n- 公出（非請假，另列）：${am.leave.tripRecs} 筆、${am.leave.tripHours} 小時` : ''}
+- 本月加班：${am.cur.persons} 人、${am.cur.recs} 筆，合計 ${am.cur.hours} 小時${am.momPct !== null ? `（較上月 ${am.momPct >= 0 ? '+' : ''}${am.momPct}%）` : ''}
+- 工時上限：${(am.monthOver.length || am.triOver.length) ? '有超標，詳見加班分析' : '單月 46 小時、三個月 138 小時皆無超標'}
 
 ■ 招募管理
 - 本月收件總數：${rm.total} 份（目標 ≥ 10 份）${rm.ongoingUnevaluated > 0 ? `，其中 ${rm.ongoingUnevaluated} 份為「達成後持續進件」（職缺已補實、104 刊登未關閉，未進入評估流程，屬正常現象）` : ''}
@@ -954,12 +1081,21 @@ function copyDataForAI() {
 - 招募判讀提醒：職缺是否仍需招募，以「職缺狀態」為準——「已關閉」＝已補實或結案；「暫緩擱置」＝刻意暫停、持續收件但不進流程；兩者皆不得判為招募缺口或「收件嚴重不足」，也不列入填補率分母。只有「招募中」且未補實的職缺，收件量過低才算議題。評估效率請以「招募精準度」判讀（進入評估流程人數÷錄取），不可用收件總量除以錄取數（會被達成後持續進件與擱置收件稀釋而失真）。流失請以「有效流失率」判讀，「自然未續行」與「公司篩選不通過」皆非招募流失，不得計入。小樣本（進流程 < 10 人）的比率指標波動大，不得單以百分比判定為高風險。
 
 ■ 員工關懷
-- 在職員工：${cm.activeEmps.length} 人
+- 關懷制度：季度關懷（${cm.careScheduleLabel}），主管每季進行一次 1on1 關懷面談
+- 應關懷人數：${cm.eligibleEmps.length} 人（在職 ${cm.activeEmps.length} 人，扣除單位主管 ${cm.managerCnt} 人、執行長直屬同仁 ${cm.ceoDirectEmps.length} 人${cm.ceoDirectEmps.length ? '：' + cm.ceoDirectEmps.join('、') : ''}；單位主管＝員工主檔「直屬主管」欄出現的名字，直屬主管空白＝主管為執行長 Max）
 - 高留任風險員工：${cm.highRisk} 人
 - 中留任風險員工：${cm.midRisk} 人
-- 逾期未兌現承諾：${cm.overdueP} 項
-- 關懷制度：季度關懷（${cm.careScheduleLabel}），主管每季進行一次 1on1 關懷面談
-- 本月關懷狀態：${cm.isCareMonth ? `本月為關懷月，已關懷 ${cm.coveredIds.length} 人，關懷覆蓋率 ${cm.coverageRate}%` : `本月為非關懷月（下次關懷月：${cm.nextCareLabel}），無關懷紀錄屬正常，不得判定為關懷不足、關懷覆蓋率過低或員工關懷高風險`}
+- 本月關懷狀態：${cm.isCareMonth ? `本月為關懷月，已完成 ${cm.coveredIds.length} 人，關懷覆蓋率 ${cm.coverageRate}%（${cm.coveredIds.length}/${cm.eligibleEmps.length}）${cm.pendingEmps.length ? `；尚未完成 ${cm.pendingEmps.length} 人：${cm.pendingEmps.map(e=>`${e.name}（${e.dept}／主管 ${e.sup || "未填"}）`).join('、')}` : ''}` : `本月為非關懷月（下次關懷月：${cm.nextCareLabel}），無關懷紀錄屬正常，不得判定為關懷不足、關懷覆蓋率過低或員工關懷高風險`}${cm.specialRecs.length ? `
+- 特殊關懷（不計入季度覆蓋率與風險統計）：${cm.specialRecs.map(r=>`${r.name}（由 ${r.interviewer} 進行）`).join('、')}——非直屬主管進行的個別關懷，屬特殊狀況` : ''}
+- 關懷判讀提醒：關懷紀錄中的「主管承諾」欄為主管紀錄用途，並非正式承諾，不得列為風險、不得要求回覆期限，也不需追蹤兌現狀況。
+
+■ 加班分析（${am.win[0]}–${am.win[2]}，報告月份＋前兩個月）
+${am.months.map(otMonthLine).join('\n')}
+- 三個月合計：${am.total.persons} 人、${am.total.recs} 筆，共 ${am.total.hours} 小時${am.multiMonth.length ? `；跨月皆有加班：${am.multiMonth.map(p=>`${p.who}（${p.months} 個月，累計 ${p.hours}h）`).join('、')}` : ''}
+- 單月 46 小時上限：${am.monthOver.length ? '超標 ' + am.monthOver.map(o=>`${o.who}（${o.month} ${o.hours}h）`).join('、') : '無人超標'}
+- 三個月 138 小時上限：${am.triOver.length ? '超標 ' + am.triOver.map(o=>`${o.who}（${o.hours}h）`).join('、') : '無人超標'}
+- 例假日／國定假日出勤（需核對事由與報備；例假日須另給補休）：${am.holidayRecs.length ? am.holidayRecs.map(o=>`${o.who}（${o.dept}）${o.date} ${o.type} ${o.hours}h`).join('、') : '無'}
+- 平日加班 ≥ 4 小時（需對照出勤紀錄核對單日總工時是否超過 12 小時）：${am.longDayRecs.length ? am.longDayRecs.map(o=>`${o.who} ${o.date} ${o.hours}h`).join('、') : '無'}${am.emptyMonths.length ? `\n- 註：${am.emptyMonths.join('、')} 無加班紀錄` : ''}
 
 ■ 本月主要風險
 ${risks.length > 0 ? risks.map(r => `- [${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}風險][${r.source}] ${r.title}：${r.metric}`).join('\n') : '- 本月無顯著風險'}`;
@@ -978,11 +1114,13 @@ function copyReportText() {
   const rm = computeRecruitMetrics();
   const hm = computeHRMetrics();
   const cm = computeCareMetrics();
+  const am = computeAttendanceMetrics();
   const period = periodLabel(selectedPeriod);
   const text = `【${period} 月度人力資源報告數據摘要】\n\n` +
     `人力資源：在職 ${hm.activeCnt} 人・離職 ${hm.exitCnt} 人・新進 ${hm.newCnt} 人・離職率 ${hm.monthlyRate}%\n` +
+    `考勤：請假 ${am.leave.persons} 人・${am.leave.hours}h・加班 ${am.cur.persons} 人・${am.cur.hours}h\n` +
     `招募管理：收件 ${rm.total} 份・本月錄取 ${rm.periodHires.length} 人・${rm.openUnfilled.length === 0 ? '職缺已補實' : '尚有 ' + rm.openUnfilled.length + ' 職缺招募中'}\n` +
-    `員工關懷：高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・${cm.isCareMonth ? '覆蓋率 ' + cm.coverageRate + '%' : '本月非關懷月'}・逾期承諾 ${cm.overdueP} 項`;
+    `員工關懷：高風險 ${cm.highRisk} 人・中風險 ${cm.midRisk} 人・${cm.isCareMonth ? '覆蓋率 ' + cm.coverageRate + '%（' + cm.coveredIds.length + '/' + cm.eligibleEmps.length + '）' : '本月非關懷月'}`;
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.querySelector('.print-btn:last-child');
     const orig = btn.textContent;
